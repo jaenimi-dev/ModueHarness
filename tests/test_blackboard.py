@@ -90,3 +90,27 @@ def test_blackboard_logs(temp_board: Blackboard):
     content = log_file.read_text(encoding="utf-8")
     assert "Step: step_1 (Agent: claude)" in content
     assert "Execution output log line." in content
+
+
+def test_blackboard_artifact_metadata(tmp_path: Path):
+    """Verify artifact metadata persistence and EventBus notifications."""
+    from modue_harness.core.events import EventBus, EventType
+    bus = EventBus()
+    board = Blackboard(root_dir=tmp_path / "board_with_bus", event_bus=bus)
+    board.initialize()
+
+    board.write_artifact(
+        "report.txt",
+        "Sample content",
+        metadata={"category": "test"},
+        author_agent="tester",
+    )
+
+    meta = board.read_artifact_metadata("report.txt")
+    assert meta is not None
+    assert meta["author"] == "tester"
+    assert meta["custom"]["category"] == "test"
+
+    produced_events = bus.get_history(EventType.ARTIFACT_PRODUCED)
+    assert len(produced_events) == 1
+    assert produced_events[0].payload["artifact_path"] == "report.txt"

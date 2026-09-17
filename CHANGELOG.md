@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-09-18
+
+### Added
+- **Lifecycle Event System (`core/events.py`)**:
+  - `EventBus` pub/sub broker and `HarnessEvent` records.
+  - Lifecycle events for workflow start/completion, step start/failure, artifact production, and task status changes.
+- **Enhanced Blackboard**:
+  - Artifact metadata persistence (`.meta.json`) tracking author agent, file size, and creation timestamp.
+  - Full EventBus integration in Blackboard operations.
+- **Advanced CLI Adapters**:
+  - Real-time line-by-line streaming output via `execute_stream()`.
+  - Model selection and system instruction options for `ClaudeCLIAdapter`, `AGYCLIAdapter`, and `AiderCLIAdapter`.
+- **Conditional & Resilient Pipeline Execution**:
+  - Preconditions support (`condition: artifact_exists:<path>`, `not_exists:<path>`).
+  - Dynamic artifact variable interpolation (`${artifact:path}`).
+  - Step automatic retry (`retry_count`) and fallback agent delegation (`fallback_agent`).
+
 ## [0.1.0] - 2026-09-17
 
 ### Added

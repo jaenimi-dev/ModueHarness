@@ -123,3 +123,103 @@ def test_pipeline_runner_step_failure(tmp_path: Path):
     assert summary["success"] is False
     assert summary["status"] == "failed"
     assert summary["steps"][0]["exit_code"] == 42
+
+
+def test_pipeline_condition_and_interpolation(tmp_path: Path):
+    """Verify conditional execution skipping and template variable replacement."""
+    board = Blackboard(tmp_path / "blackboard")
+    board.initialize()
+    board.write_artifact("notes.txt", "Architecture Note 42")
+
+    config = WorkflowConfig(
+        name="condition-pipeline",
+        topology="pipeline",
+        agents={"tester": WorkflowAgentConfig(name="tester", adapter="generic")},
+        steps=[
+            # This step should execute because notes.txt exists
+            WorkflowStepConfig(
+                id="step_read",
+                agent="tester",
+                instruction="Notes are: ${artifact:notes.txt}",
+                condition="artifact_exists:notes.txt",
+                output_artifact="echo.txt",
+            ),
+            # This step should be skipped because missing.txt does not exist
+            WorkflowStepConfig(
+                id="step_skipped",
+                agent="tester",
+                instruction="Should not run",
+                condition="artifact_exists:missing.txt",
+            ),
+        ],
+    )
+
+    mock_adapter = GenericCLIAdapter(
+        name="tester",
+        command=sys.executable,
+        default_args=["-c", "import sys; print('GOT:' + sys.stdin.read().strip())"],
+    )
+
+    runner = PipelineRunner(
+        config=config,
+        blackboard=board,
+        workspace_dir=tmp_path,
+        adapters_override={"tester": mock_adapter},
+    )
+
+    summary = runner.run()
+    assert summary["success"] is True
+    assert len(summary["steps"]) == 2
+    assert summary["steps"][0]["is_success"] is True
+    assert summary["steps"][1].get("skipped") is True
+    assert "Architecture Note 42" in board.read_artifact("echo.txt")
+
+
+def test_pipeline_fallback_agent(tmp_path: Path):
+    """Verify fallback agent handles task when primary agent fails."""
+    board = Blackboard(tmp_path / "blackboard")
+    board.initialize()
+
+    config = WorkflowConfig(
+        name="fallback-pipeline",
+        topology="pipeline",
+        agents={
+            "failing_primary": WorkflowAgentConfig(name="failing_primary", adapter="generic"),
+            "backup_hero": WorkflowAgentConfig(name="backup_hero", adapter="generic"),
+        },
+        steps=[
+            WorkflowStepConfig(
+                id="step_with_fallback",
+                agent="failing_primary",
+                fallback_agent="backup_hero",
+                instruction="Try primary then backup",
+                output_artifact="backup_out.txt",
+            )
+        ],
+    )
+
+    failing_adapter = GenericCLIAdapter(
+        name="failing_primary",
+        command=sys.executable,
+        default_args=["-c", "import sys; sys.exit(1)"],
+    )
+    backup_adapter = GenericCLIAdapter(
+        name="backup_hero",
+        command=sys.executable,
+        default_args=["-c", "print('RECOVERED_BY_BACKUP')"],
+    )
+
+    runner = PipelineRunner(
+        config=config,
+        blackboard=board,
+        workspace_dir=tmp_path,
+        adapters_override={
+            "failing_primary": failing_adapter,
+            "backup_hero": backup_adapter,
+        },
+    )
+
+    summary = runner.run()
+    assert summary["success"] is True
+    assert board.has_artifact("backup_out.txt")
+    assert "RECOVERED_BY_BACKUP" in board.read_artifact("backup_out.txt")

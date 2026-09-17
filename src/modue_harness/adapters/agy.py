@@ -13,11 +13,17 @@ class AGYCLIAdapter(BaseCLIAdapter):
         name: str = "agy",
         command: str = "agy",
         default_args: Optional[List[str]] = None,
+        model: Optional[str] = None,
+        system_instruction: Optional[str] = None,
     ) -> None:
         args = list(default_args or [])
+        if model:
+            args.extend(["--model", model])
+
         super().__init__(
             name=name,
             command=command,
             default_args=args,
             prompt_delivery="stdin",
+            system_instruction=system_instruction,
         )

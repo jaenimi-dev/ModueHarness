@@ -1,4 +1,4 @@
-"""Workflow definitions and configuration loader."""
+"""Workflow definitions and configuration loader with condition & retry support."""
 
 from dataclasses import dataclass, field
 import json
@@ -21,6 +21,8 @@ class WorkflowAgentConfig:
     command: Optional[str] = None
     args: List[str] = field(default_factory=list)
     role: str = "Agent"
+    model: Optional[str] = None
+    system_instruction: Optional[str] = None
 
     @classmethod
     def from_dict(cls, name: str, data: Dict[str, Any]) -> "WorkflowAgentConfig":
@@ -30,6 +32,8 @@ class WorkflowAgentConfig:
             command=data.get("command"),
             args=data.get("args", []),
             role=data.get("role", "Agent"),
+            model=data.get("model"),
+            system_instruction=data.get("system_instruction"),
         )
 
 
@@ -43,6 +47,9 @@ class WorkflowStepConfig:
     input_artifacts: List[str] = field(default_factory=list)
     output_artifact: Optional[str] = None
     timeout: float = 300.0
+    condition: Optional[str] = None  # e.g., "artifact_exists:plan.md" or None
+    retry_count: int = 0
+    fallback_agent: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], default_timeout: float = 300.0) -> "WorkflowStepConfig":
@@ -53,6 +60,9 @@ class WorkflowStepConfig:
             input_artifacts=data.get("input_artifacts", []),
             output_artifact=data.get("output_artifact"),
             timeout=float(data.get("timeout", default_timeout)),
+            condition=data.get("condition"),
+            retry_count=int(data.get("retry_count", 0)),
+            fallback_agent=data.get("fallback_agent"),
         )
 
 
@@ -103,7 +113,6 @@ class WorkflowConfig:
         elif suffix == ".json":
             data = json.loads(content)
         else:
-            # Attempt yaml safe_load first, fallback to json
             if HAS_YAML:
                 data = yaml.safe_load(content)
             else:

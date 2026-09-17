@@ -110,3 +110,24 @@ def test_adapter_timeout_handling(tmp_path: Path):
     assert not result.is_success
     assert result.exit_code == 124
     assert "timed out" in (result.error_message or "")
+
+
+def test_adapter_stream_execution(tmp_path: Path):
+    """Verify streaming execution yields output chunks."""
+    adapter = GenericCLIAdapter(
+        name="streamer",
+        command=sys.executable,
+        default_args=["-c", "print('Line1'); print('Line2')"],
+        prompt_delivery="stdin",
+    )
+    context = TurnContext(
+        step_id="step_stream",
+        instruction="Stream",
+        blackboard_dir=tmp_path,
+        workspace_dir=tmp_path,
+    )
+
+    gen = adapter.execute_stream(context)
+    lines = list(gen)
+    assert any("Line1" in l for l in lines)
+    assert any("Line2" in l for l in lines)

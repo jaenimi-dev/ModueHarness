@@ -5,18 +5,24 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from modue_harness.core.events import EventBus, EventType, HarnessEvent
 from modue_harness.core.types import Task, TaskStatus
 
 
 class Blackboard:
     """Manages the shared blackboard directory, state, tasks, artifacts, and logs."""
 
-    def __init__(self, root_dir: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        root_dir: Optional[Path] = None,
+        event_bus: Optional[EventBus] = None,
+    ) -> None:
         self.root_dir = (root_dir or Path.cwd() / "blackboard").resolve()
         self.state_file = self.root_dir / "state.json"
         self.tasks_dir = self.root_dir / "tasks"
         self.artifacts_dir = self.root_dir / "artifacts"
         self.logs_dir = self.root_dir / "logs"
+        self.event_bus = event_bus
 
     def initialize(self) -> None:
         """Create the blackboard folder hierarchy and initial state if not present."""
@@ -78,6 +84,16 @@ class Blackboard:
         task_path = self.tasks_dir / f"{task.id}.json"
         with open(task_path, "w", encoding="utf-8") as f:
             json.dump(task.to_dict(), f, indent=2, ensure_ascii=False)
+
+        if self.event_bus:
+            self.event_bus.publish(
+                HarnessEvent(
+                    event_type=EventType.TASK_STATUS_CHANGED,
+                    step_id=task.id,
+                    agent_name=task.assigned_agent,
+                    payload={"task_id": task.id, "status": task.status.value},
+                )
+            )
         return task
 
     def get_task(self, task_id: str) -> Optional[Task]:
@@ -101,7 +117,9 @@ class Blackboard:
         task.status = status
         if result is not None:
             task.result = result
-        return self.create_task(task)
+
+        updated = self.create_task(task)
+        return updated
 
     def list_tasks(self) -> List[Task]:
         """List all tasks sorted by task ID."""
@@ -123,12 +141,39 @@ class Blackboard:
         clean_path = relative_path.replace("blackboard/artifacts/", "").lstrip("/")
         return self.artifacts_dir / clean_path
 
-    def write_artifact(self, relative_path: str, content: str) -> Path:
-        """Write content to an artifact file within blackboard/artifacts/."""
+    def write_artifact(
+        self,
+        relative_path: str,
+        content: str,
+        metadata: Optional[Dict[str, Any]] = None,
+        author_agent: Optional[str] = None,
+    ) -> Path:
+        """Write content and companion metadata to blackboard/artifacts/."""
         target_path = self.resolve_artifact_path(relative_path)
         target_path.parent.mkdir(parents=True, exist_ok=True)
         with open(target_path, "w", encoding="utf-8") as f:
             f.write(content)
+
+        meta_file = target_path.with_name(f".{target_path.name}.meta.json")
+        meta_payload = {
+            "path": relative_path,
+            "author": author_agent or "unknown",
+            "size_bytes": len(content.encode("utf-8")),
+            "created_at": datetime.datetime.now().isoformat(),
+            "custom": metadata or {},
+        }
+        with open(meta_file, "w", encoding="utf-8") as f:
+            json.dump(meta_payload, f, indent=2, ensure_ascii=False)
+
+        if self.event_bus:
+            self.event_bus.publish(
+                HarnessEvent(
+                    event_type=EventType.ARTIFACT_PRODUCED,
+                    agent_name=author_agent,
+                    payload={"artifact_path": relative_path, "size_bytes": len(content)},
+                )
+            )
+
         return target_path
 
     def read_artifact(self, relative_path: str) -> str:
@@ -139,18 +184,27 @@ class Blackboard:
         with open(target_path, "r", encoding="utf-8") as f:
             return f.read()
 
+    def read_artifact_metadata(self, relative_path: str) -> Optional[Dict[str, Any]]:
+        """Read companion metadata for an artifact."""
+        target_path = self.resolve_artifact_path(relative_path)
+        meta_file = target_path.with_name(f".{target_path.name}.meta.json")
+        if not meta_file.exists():
+            return None
+        with open(meta_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+
     def has_artifact(self, relative_path: str) -> bool:
         """Check if an artifact exists."""
         return self.resolve_artifact_path(relative_path).exists()
 
     def list_artifacts(self) -> List[str]:
-        """List all artifact paths relative to artifacts/."""
+        """List all artifact paths relative to artifacts/ (excluding meta files)."""
         if not self.artifacts_dir.exists():
             return []
         return [
             str(p.relative_to(self.artifacts_dir))
             for p in sorted(self.artifacts_dir.rglob("*"))
-            if p.is_file()
+            if p.is_file() and not p.name.startswith(".")
         ]
 
     # ---------------- Logs Management ---------------- #
@@ -164,4 +218,15 @@ class Blackboard:
             f.write(f"[{timestamp}] === Step: {step_id} (Agent: {agent_name}) ===\n")
             f.write(content)
             f.write("\n\n")
+
+        if self.event_bus:
+            self.event_bus.publish(
+                HarnessEvent(
+                    event_type=EventType.LOG_EMITTED,
+                    step_id=step_id,
+                    agent_name=agent_name,
+                    payload={"log_file": str(log_file)},
+                )
+            )
+
         return log_file

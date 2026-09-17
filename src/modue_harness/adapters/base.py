@@ -1,11 +1,11 @@
-"""Base CLI Adapter interface and subprocess runner."""
+"""Base CLI Adapter interface, subprocess runner, and stream execution."""
 
-from abc import ABC, abstractmethod
+from abc import ABC
 import os
 import re
 import subprocess
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 from modue_harness.core.types import TaskStatus, TurnContext, TurnResult
 
@@ -28,12 +28,14 @@ class BaseCLIAdapter(ABC):
         default_args: Optional[List[str]] = None,
         prompt_delivery: str = "stdin",  # "stdin", "flag", or "positional"
         prompt_flag: Optional[str] = None,
+        system_instruction: Optional[str] = None,
     ) -> None:
         self.name = name
         self.command = command
         self.default_args = default_args or []
         self.prompt_delivery = prompt_delivery
         self.prompt_flag = prompt_flag
+        self.system_instruction = system_instruction
 
     def build_command(self, prompt: str, extra_args: Optional[List[str]] = None) -> List[str]:
         """Construct the CLI command argument list."""
@@ -52,10 +54,14 @@ class BaseCLIAdapter(ABC):
         """Compose the full prompt incorporating instructions and input artifacts."""
         prompt_parts = []
 
+        if self.system_instruction:
+            prompt_parts.append(f"### System / Role Directive:\n{self.system_instruction}\n")
+
         if context.input_artifacts:
             prompt_parts.append("### Input Artifacts / Context:")
             for artifact_rel_path in context.input_artifacts:
-                artifact_file = context.blackboard_dir / "artifacts" / artifact_rel_path.replace("blackboard/artifacts/", "")
+                clean_rel = artifact_rel_path.replace("blackboard/artifacts/", "")
+                artifact_file = context.blackboard_dir / "artifacts" / clean_rel
                 if artifact_file.exists():
                     try:
                         content = artifact_file.read_text(encoding="utf-8")
@@ -144,3 +150,64 @@ class BaseCLIAdapter(ABC):
                 duration_sec=duration,
                 error_message=f"Execution failed with exception: {str(e)}",
             )
+
+    def execute_stream(
+        self,
+        context: TurnContext,
+        extra_args: Optional[List[str]] = None,
+        custom_env: Optional[Dict[str, str]] = None,
+    ) -> Generator[str, None, TurnResult]:
+        """Execute the CLI process and yield lines from stdout in real time."""
+        full_prompt = self.prepare_prompt(context)
+        cmd = self.build_command(full_prompt, extra_args=extra_args)
+
+        env = os.environ.copy()
+        if context.env:
+            env.update(context.env)
+        if custom_env:
+            env.update(custom_env)
+
+        start_time = time.time()
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE if self.prompt_delivery == "stdin" else None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=str(context.workspace_dir),
+            env=env,
+            encoding="utf-8",
+            errors="replace",
+        )
+
+        if self.prompt_delivery == "stdin" and process.stdin:
+            try:
+                process.stdin.write(full_prompt)
+                process.stdin.flush()
+                process.stdin.close()
+            except Exception:
+                pass
+
+        accumulated_stdout: List[str] = []
+        if process.stdout:
+            for line in process.stdout:
+                clean_line = strip_ansi(line)
+                accumulated_stdout.append(clean_line)
+                yield clean_line
+
+        process.wait()
+        stderr_text = process.stderr.read() if process.stderr else ""
+        duration = time.time() - start_time
+
+        stdout_all = "".join(accumulated_stdout)
+        stderr_clean = strip_ansi(stderr_text or "")
+        status = TaskStatus.COMPLETED if process.returncode == 0 else TaskStatus.FAILED
+
+        return TurnResult(
+            status=status,
+            stdout=stdout_all,
+            stderr=stderr_clean,
+            exit_code=process.returncode or 0,
+            duration_sec=duration,
+            error_message=None if process.returncode == 0 else f"Process exited with {process.returncode}",
+        )

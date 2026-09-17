@@ -1,11 +1,13 @@
-"""Sequential pipeline execution runner."""
+"""Enhanced sequential pipeline execution runner with condition, retry, and event dispatch."""
 
 from pathlib import Path
+import re
 import time
 from typing import Any, Dict, List, Optional
 
 from modue_harness.adapters import BaseCLIAdapter, create_adapter
 from modue_harness.core.blackboard import Blackboard
+from modue_harness.core.events import EventBus, EventType, HarnessEvent
 from modue_harness.core.types import Task, TaskStatus, TurnContext, TurnResult
 from modue_harness.engine.workflow import WorkflowConfig, WorkflowStepConfig
 
@@ -19,10 +21,13 @@ class PipelineRunner:
         blackboard: Optional[Blackboard] = None,
         workspace_dir: Optional[Path] = None,
         adapters_override: Optional[Dict[str, BaseCLIAdapter]] = None,
+        event_bus: Optional[EventBus] = None,
     ) -> None:
         self.config = config
         self.workspace_dir = (workspace_dir or Path.cwd()).resolve()
-        self.blackboard = blackboard or Blackboard(self.workspace_dir / "blackboard")
+        self.event_bus = event_bus or EventBus()
+        self.blackboard = blackboard or Blackboard(self.workspace_dir / "blackboard", event_bus=self.event_bus)
+        self.blackboard.event_bus = self.event_bus
         self.adapters: Dict[str, BaseCLIAdapter] = {}
 
         # Initialize adapters from config
@@ -36,6 +41,11 @@ class PipelineRunner:
                 }
                 if agent_cfg.command:
                     kwargs["command"] = agent_cfg.command
+                if agent_cfg.model:
+                    kwargs["model"] = agent_cfg.model
+                if agent_cfg.system_instruction:
+                    kwargs["system_instruction"] = agent_cfg.system_instruction
+
                 self.adapters[agent_name] = create_adapter(agent_cfg.adapter, **kwargs)
 
         if adapters_override:
@@ -47,6 +57,13 @@ class PipelineRunner:
         """Execute the entire pipeline step by step."""
         self.blackboard.initialize()
         start_time = time.time()
+
+        self.event_bus.publish(
+            HarnessEvent(
+                event_type=EventType.WORKFLOW_STARTED,
+                payload={"workflow_name": self.config.name, "steps_count": len(self.config.steps)},
+            )
+        )
 
         self.blackboard.update_state({
             "workflow_name": self.config.name,
@@ -60,6 +77,19 @@ class PipelineRunner:
         overall_success = True
 
         for idx, step in enumerate(self.config.steps):
+            # Check condition if specified
+            if not self._evaluate_condition(step.condition):
+                results.append({
+                    "step_id": step.id,
+                    "agent": step.agent,
+                    "is_success": True,
+                    "skipped": True,
+                    "exit_code": 0,
+                    "duration_sec": 0.0,
+                    "error_message": "Skipped due to unsatisfied condition",
+                })
+                continue
+
             step_result = self._execute_step(step, step_index=idx)
             results.append(step_result)
 
@@ -74,8 +104,15 @@ class PipelineRunner:
             "status": final_status,
             "end_time": time.time(),
             "total_duration_sec": total_duration,
-            "completed_steps": len([r for r in results if r["is_success"]]),
+            "completed_steps": len([r for r in results if r["is_success"] and not r.get("skipped")]),
         })
+
+        self.event_bus.publish(
+            HarnessEvent(
+                event_type=EventType.WORKFLOW_COMPLETED if overall_success else EventType.WORKFLOW_FAILED,
+                payload={"status": final_status, "duration_sec": total_duration},
+            )
+        )
 
         return {
             "workflow_name": self.config.name,
@@ -85,15 +122,43 @@ class PipelineRunner:
             "success": overall_success,
         }
 
+    def _evaluate_condition(self, condition: Optional[str]) -> bool:
+        """Evaluate a step precondition string."""
+        if not condition or condition.lower() in ["always", "true"]:
+            return True
+
+        if condition.startswith("artifact_exists:"):
+            art_path = condition.split(":", 1)[1].strip()
+            return self.blackboard.has_artifact(art_path)
+
+        if condition.startswith("not_exists:"):
+            art_path = condition.split(":", 1)[1].strip()
+            return not self.blackboard.has_artifact(art_path)
+
+        return True
+
+    def _resolve_template_variables(self, text: str) -> str:
+        """Replace template variables such as ${artifact:path.md} in instructions."""
+        pattern = re.compile(r"\$\{artifact:([^}]+)\}")
+
+        def replacer(match):
+            art_name = match.group(1).strip()
+            try:
+                return self.blackboard.read_artifact(art_name)
+            except Exception:
+                return f"[Missing Artifact: {art_name}]"
+
+        return pattern.sub(replacer, text)
+
     def _execute_step(self, step: WorkflowStepConfig, step_index: int) -> Dict[str, Any]:
-        """Execute an individual step in the pipeline."""
+        """Execute a step with retry and fallback support."""
         agent_name = step.agent
         adapter = self.adapters.get(agent_name)
 
         if not adapter:
             raise ValueError(f"No adapter configured for agent '{agent_name}' in step '{step.id}'")
 
-        # 1. Record task on Blackboard
+        # Record task on Blackboard
         task = Task(
             id=step.id,
             title=f"Step {step_index + 1}: {step.id}",
@@ -106,30 +171,58 @@ class PipelineRunner:
         self.blackboard.create_task(task)
         self.blackboard.update_state({"current_step": step.id})
 
-        # 2. Build TurnContext
+        self.event_bus.publish(
+            HarnessEvent(
+                event_type=EventType.STEP_STARTED,
+                step_id=step.id,
+                agent_name=agent_name,
+            )
+        )
+
+        resolved_instruction = self._resolve_template_variables(step.instruction)
+
+        # Context
         context = TurnContext(
             step_id=step.id,
-            instruction=step.instruction,
+            instruction=resolved_instruction,
             blackboard_dir=self.blackboard.root_dir,
             workspace_dir=self.workspace_dir,
             input_artifacts=step.input_artifacts,
         )
 
-        # 3. Execute adapter
-        turn_result: TurnResult = adapter.execute(context=context, timeout=step.timeout)
+        # Execute with retries
+        max_attempts = max(1, 1 + step.retry_count)
+        turn_result: Optional[TurnResult] = None
 
-        # 4. Log execution details to Blackboard
+        for attempt in range(max_attempts):
+            turn_result = adapter.execute(context=context, timeout=step.timeout)
+            if turn_result.is_success:
+                break
+
+        # If primary failed and fallback agent provided
+        if turn_result and not turn_result.is_success and step.fallback_agent:
+            fallback_adapter = self.adapters.get(step.fallback_agent)
+            if fallback_adapter:
+                agent_name = step.fallback_agent
+                task.assigned_agent = agent_name
+                self.blackboard.create_task(task)
+                turn_result = fallback_adapter.execute(context=context, timeout=step.timeout)
+
+        # Log
         combined_logs = f"=== STDOUT ===\n{turn_result.stdout}\n\n=== STDERR ===\n{turn_result.stderr}"
         self.blackboard.append_log(agent_name=agent_name, step_id=step.id, content=combined_logs)
 
-        # 5. Handle output artifact creation if defined
+        # Output artifact
         if step.output_artifact and turn_result.is_success:
-            # If the tool generated text on stdout, and the artifact file doesn't exist yet, save stdout
             artifact_rel = step.output_artifact.replace("blackboard/artifacts/", "")
             if not self.blackboard.has_artifact(artifact_rel) and turn_result.stdout:
-                self.blackboard.write_artifact(artifact_rel, turn_result.stdout.strip())
+                self.blackboard.write_artifact(
+                    relative_path=artifact_rel,
+                    content=turn_result.stdout.strip(),
+                    author_agent=agent_name,
+                )
 
-        # 6. Update task status on Blackboard
+        # Final task update
         task_status = TaskStatus.COMPLETED if turn_result.is_success else TaskStatus.FAILED
         task_result_summary = {
             "exit_code": turn_result.exit_code,
@@ -137,6 +230,15 @@ class PipelineRunner:
             "error_message": turn_result.error_message,
         }
         self.blackboard.update_task_status(step.id, status=task_status, result=task_result_summary)
+
+        self.event_bus.publish(
+            HarnessEvent(
+                event_type=EventType.STEP_COMPLETED if turn_result.is_success else EventType.STEP_FAILED,
+                step_id=step.id,
+                agent_name=agent_name,
+                payload=task_result_summary,
+            )
+        )
 
         return {
             "step_id": step.id,
