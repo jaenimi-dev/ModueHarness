@@ -1,0 +1,27 @@
+# Task and Workflow Specification (workflow.yaml)
+version: "0.4.0"
+name: "data-pipeline-feature"
+
+# Reference to external AI team specification file
+agents_file: "agents_team.yaml"
+
+workflow:
+  topology: "pipeline"
+  timeout_per_step: 60
+  steps:
+    - id: "design_system"
+      agent: "architect"
+      instruction: "Draft system architecture design"
+      output_artifact: "architecture.md"
+
+    - id: "build_code"
+      agent: "engineer"
+      input_artifacts: ["architecture.md"]
+      instruction: "Implement components according to architecture.md"
+      output_artifact: "components.py"
+
+    - id: "review_build"
+      agent: "reviewer"
+      input_artifacts: ["components.py"]
+      instruction: "Review implemented components"
+      output_artifact: "review.md"

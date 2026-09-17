@@ -1,0 +1,22 @@
+# AI Team Specification (agents.yaml)
+version: "0.4.0"
+name: "modue-engineering-team"
+
+agents:
+  architect:
+    adapter: "generic"
+    command: "python3"
+    args: ["-c", "print('# System Architecture\\n1. Component A: Ingest.\\n2. Component B: Process.')"]
+    role: "System Architect"
+
+  engineer:
+    adapter: "generic"
+    command: "python3"
+    args: ["-c", "import sys; print('[ENGINEER] Built components from spec:\\n' + sys.stdin.read().strip())"]
+    role: "Software Engineer"
+
+  reviewer:
+    adapter: "generic"
+    command: "python3"
+    args: ["-c", "import sys; print('[REVIEWER] Verified output cleanly.')"]
+    role: "Quality Reviewer"

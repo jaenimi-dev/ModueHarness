@@ -82,10 +82,37 @@ PYTHONPATH=src python3 -m modue_harness.cli run --config examples/simple_pipelin
 
 ---
 
-## 📝 워크플로우 예시 (`workflow.yaml`)
+## 📝 명세 파일 구성 방식
 
+ModueHarness는 **AI 팀 명세(`agents.yaml`)**와 **작업/할 일 명세(`workflow.yaml`)**를 분리하여 높은 재사용성을 제공하며, 필요 시 하나의 단일 파일로도 정의할 수 있습니다.
+
+### 1) AI 팀 명세 (`agents.yaml`)
 ```yaml
+# agents.yaml
+version: "0.4.0"
+name: "engineering-team"
+
+agents:
+  planner:
+    adapter: "claude"
+    command: "claude"
+    role: "Architect & Planner"
+
+  coder:
+    adapter: "agy"
+    command: "agy"
+    role: "Implementation Engineer"
+```
+
+### 2) 작업/할 일 명세 (`workflow.yaml`)
+```yaml
+# workflow.yaml
 name: "feature-collaboration"
+version: "0.4.0"
+
+# AI 팀 명세 파일 참조 (CLI 옵션으로 오버라이드 가능)
+agents_file: "agents.yaml"
+
 workflow:
   topology: "pipeline"
   timeout_per_step: 300
@@ -99,15 +126,13 @@ workflow:
       agent: "coder"
       input_artifacts: ["spec.md"]
       instruction: "spec.md 명세에 맞춰 코드를 구현하고 테스트하라."
+```
 
-agents:
-  planner:
-    adapter: "claude"
-    command: "claude"
-    role: "Architect & Planner"
+### 3) 실행 명령
+```bash
+# workflow.yaml에 명시된 agents_file 자동 로드
+PYTHONPATH=src python3 -m modue_harness.cli run --config workflow.yaml
 
-  coder:
-    adapter: "agy"
-    command: "agy"
-    role: "Implementation Engineer"
+# 특정 AI 팀 명세 파일로 오버라이드 실행
+PYTHONPATH=src python3 -m modue_harness.cli run --config workflow.yaml --agents agents_local.yaml
 ```

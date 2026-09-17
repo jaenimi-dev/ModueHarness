@@ -61,6 +61,12 @@ def create_parser() -> argparse.ArgumentParser:
         help="Path to workflow YAML or JSON configuration file",
     )
     run_parser.add_argument(
+        "--agents", "-a",
+        type=str,
+        default=None,
+        help="Optional path to AI team specification file (overrides agents_file in workflow)",
+    )
+    run_parser.add_argument(
         "--dir", "-d",
         type=str,
         default="blackboard",
@@ -172,8 +178,10 @@ def handle_run(args: argparse.Namespace) -> int:
     board_dir = Path(args.dir).resolve()
     board = Blackboard(root_dir=board_dir)
 
+    agents_path = Path(args.agents).resolve() if getattr(args, "agents", None) else None
+
     try:
-        config = WorkflowConfig.load(config_path)
+        config = WorkflowConfig.load(config_path, agents_file_override=agents_path)
     except Exception as e:
         print(f"Error loading workflow config: {e}")
         return 1

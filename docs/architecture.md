@@ -184,16 +184,17 @@ blackboard/                 # 프로젝트 루트 내 AI 협업 공용 칠판 (�
 
 ---
 
-## 4. 설정 파일 명세 (선언적 YAML 예시)
+## 4. 설정 파일 명세 (AI 팀 명세와 작업 명세의 분리)
 
-사용자가 간단한 YAML 파일로 협업 팀과 흐름을 정의할 수 있습니다.
+ModueHarness는 높은 재사용성과 유연성을 위해 **AI 팀 명세(`agents.yaml`)**와 **작업 명세(`workflow.yaml`)**의 분리 구성을 지원합니다.
+
+### 4.1 AI 팀 명세 (`agents.yaml` / `team.yaml`)
+어떤 AI CLI 도구(Claude, AGY, Aider 등)와 모델, 권한, 시스템 지침을 사용할지 정의합니다. 여러 작업에서 공통으로 재사용할 수 있습니다.
 
 ```yaml
-# modue_harness.yaml
-version: "0.1.0"
+version: "0.4.0"
 name: "fullstack-feature-team"
 
-# 1. 협업에 참여할 AI CLI 프로필
 agents:
   planner:
     adapter: "claude"
@@ -210,12 +211,21 @@ agents:
     adapter: "claude"
     command: "claude"
     role: "Code Quality & Security Reviewer"
+```
 
-# 2. 작업 토폴로지 및 흐름 정의
+### 4.2 작업 및 흐름 명세 (`workflow.yaml` / `tasks.yaml`)
+구체적으로 어떤 작업을 수행하고, 단계별로 어떤 산출물을 생성·전달할지 정의합니다.
+
+```yaml
+version: "0.4.0"
+name: "feature-delivery-pipeline"
+
+# AI 팀 명세 파일 참조 (CLI --agents 옵션으로 오버라이드 가능)
+agents_file: "agents.yaml"
+
 workflow:
   topology: "pipeline"
   timeout_per_step: 300
-  isolation: "worktree"
   steps:
     - id: "spec_and_plan"
       agent: "planner"
