@@ -12,7 +12,7 @@ def test_cli_version_flag(capsys):
         main(["--version"])
     assert exc_info.value.code == 0
     captured = capsys.readouterr()
-    assert "0.3.0" in captured.out
+    assert "0.4.0" in captured.out
 
 
 def test_cli_default_run(capsys):
@@ -20,7 +20,7 @@ def test_cli_default_run(capsys):
     exit_code = main([])
     assert exit_code == 0
     captured = capsys.readouterr()
-    assert "ModueHarness v0.3.0" in captured.out
+    assert "ModueHarness v0.4.0" in captured.out
 
 
 def test_cli_init_and_status(tmp_path: Path, capsys):
@@ -75,3 +75,41 @@ def test_cli_run_workflow(tmp_path: Path, capsys):
     assert exit_code == 0
     captured = capsys.readouterr()
     assert "Workflow finished with status: completed" in captured.out
+
+
+def test_cli_run_with_report(tmp_path: Path, capsys):
+    """Test modue-harness run with --report flag."""
+    config_file = tmp_path / "workflow_rep.json"
+    report_file = tmp_path / "exec_report.md"
+    board_dir = tmp_path / "blackboard"
+
+    config_data = {
+        "name": "report-workflow",
+        "agents": {"tester": {"adapter": "generic", "command": "echo", "args": ["-n"]}},
+        "workflow": {"topology": "pipeline", "steps": [{"id": "s1", "agent": "tester", "instruction": "Hi"}]},
+    }
+    config_file.write_text(json.dumps(config_data), encoding="utf-8")
+
+    exit_code = main(["run", "--config", str(config_file), "--dir", str(board_dir), "--report", str(report_file)])
+    assert exit_code == 0
+    assert report_file.exists()
+    assert "# ModueHarness Execution Report" in report_file.read_text(encoding="utf-8")
+
+
+def test_cli_debate_command(tmp_path: Path, capsys):
+    """Test modue-harness debate subcommand."""
+    board_dir = tmp_path / "blackboard"
+    exit_code = main([
+        "debate",
+        "--topic", "Tabs vs Spaces",
+        "--proposer", "generic",
+        "--challenger", "generic",
+        "--judge", "generic",
+        "--rounds", "1",
+        "--dir", str(board_dir),
+    ])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "Starting Multi-AI Debate" in captured.out
+    assert "Debate concluded successfully" in captured.out
+    assert (board_dir / "artifacts" / "consensus.md").exists()

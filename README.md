@@ -1,6 +1,6 @@
 # ModueHarness (모두의 하네스)
 
-> **Current Version:** `0.3.0`
+> **Current Version:** `0.4.0`
 
 **ModueHarness**는 다양한 AI CLI 도구(예: `claude`, `agy`, `aider`, `copilot` 등)를 하나의 유기적인 팀으로 오케스트레이션하여 소프트웨어 엔지니어링 작업을 자율적·협업적으로 해결하는 Multi-AI CLI 하네스 프레임워크입니다.
 

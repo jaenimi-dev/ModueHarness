@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-09-18
+
+### Added
+- **Leader-Worker Conductor Topology (`engine/conductor.py`)**:
+  - `ConductorRunner` enabling dynamic goal breakdown into worker subtasks.
+  - Automatic JSON task extraction, worker delegation, and final Conductor synthesis.
+- **Debate & Consensus Topology (`engine/debate.py`)**:
+  - `DebateRunner` for multi-round adversarial or collaborative debate between Proposer and Challenger.
+  - Impartial Judge/Arbiter agent evaluating arguments and forging final `consensus.md`.
+- **Plugin Architecture & Lifecycle Hooks (`plugins/`)**:
+  - `BasePlugin` and `PluginManager` with event hooks across workflow, step, and artifact lifecycles.
+  - `MarkdownReportPlugin` automatically generating formatted markdown execution summaries.
+- **CLI Enhancements**:
+  - Added `modue-harness debate` subcommand for direct multi-AI debate execution.
+  - Added `--report` flag to `modue-harness run` for automated execution report generation.
+
 ## [0.3.0] - 2026-09-18
 
 ### Added

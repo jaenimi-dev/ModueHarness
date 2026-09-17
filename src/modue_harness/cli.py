@@ -1,4 +1,4 @@
-"""Command Line Interface for ModueHarness."""
+"""Command Line Interface for ModueHarness with Pipeline, Debate, and Report support."""
 
 import argparse
 from pathlib import Path
@@ -6,9 +6,12 @@ import sys
 from typing import List, Optional
 
 from modue_harness import __version__
+from modue_harness.adapters import create_adapter
 from modue_harness.core.blackboard import Blackboard
+from modue_harness.engine.debate import DebateRunner
 from modue_harness.engine.pipeline import PipelineRunner
 from modue_harness.engine.workflow import WorkflowConfig
+from modue_harness.plugins.reporter import MarkdownReportPlugin
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -58,6 +61,51 @@ def create_parser() -> argparse.ArgumentParser:
         help="Path to workflow YAML or JSON configuration file",
     )
     run_parser.add_argument(
+        "--dir", "-d",
+        type=str,
+        default="blackboard",
+        help="Path to blackboard directory (default: blackboard)",
+    )
+    run_parser.add_argument(
+        "--report", "-r",
+        type=str,
+        default=None,
+        help="Path to generate markdown execution report (e.g. report.md)",
+    )
+
+    # Command: debate
+    debate_parser = subparsers.add_parser("debate", help="Launch a multi-AI debate and consensus workflow")
+    debate_parser.add_argument(
+        "--topic", "-t",
+        type=str,
+        required=True,
+        help="Debate topic or problem statement",
+    )
+    debate_parser.add_argument(
+        "--proposer",
+        type=str,
+        default="claude",
+        help="Adapter for Proposer (default: claude)",
+    )
+    debate_parser.add_argument(
+        "--challenger",
+        type=str,
+        default="agy",
+        help="Adapter for Challenger (default: agy)",
+    )
+    debate_parser.add_argument(
+        "--judge",
+        type=str,
+        default="claude",
+        help="Adapter for Judge/Arbiter (default: claude)",
+    )
+    debate_parser.add_argument(
+        "--rounds",
+        type=int,
+        default=2,
+        help="Number of debate rounds (default: 2)",
+    )
+    debate_parser.add_argument(
         "--dir", "-d",
         type=str,
         default="blackboard",
@@ -134,8 +182,25 @@ def handle_run(args: argparse.Namespace) -> int:
     print(f"   Blackboard: {board.root_dir}")
     print(f"   Total steps: {len(config.steps)}")
 
+    report_plugin = None
+    if getattr(args, "report", None):
+        report_plugin = MarkdownReportPlugin(output_path=Path(args.report).resolve())
+
     runner = PipelineRunner(config=config, blackboard=board)
+    if report_plugin:
+        report_plugin.on_workflow_start(config.name, len(config.steps))
+
     summary = runner.run()
+
+    if report_plugin:
+        for s in summary["steps"]:
+            report_plugin.on_step_finish(
+                step_id=s["step_id"],
+                agent_name=s["agent"],
+                is_success=s["is_success"],
+            )
+        report_plugin.on_workflow_finish(summary)
+        print(f"📄 Markdown execution report generated at: {report_plugin.output_path}")
 
     print(f"\nWorkflow finished with status: {summary['status']} (took {summary['total_duration_sec']:.2f}s)")
     for step in summary["steps"]:
@@ -145,6 +210,34 @@ def handle_run(args: argparse.Namespace) -> int:
             print(f"      Error: {step['error_message']}")
 
     return 0 if summary["success"] else 1
+
+
+def handle_debate(args: argparse.Namespace) -> int:
+    """Handle 'debate' command."""
+    board_dir = Path(args.dir).resolve()
+    board = Blackboard(root_dir=board_dir)
+
+    proposer_adapter = create_adapter(args.proposer, name="proposer")
+    challenger_adapter = create_adapter(args.challenger, name="challenger")
+    judge_adapter = create_adapter(args.judge, name="judge")
+
+    runner = DebateRunner(
+        topic=args.topic,
+        proposer_adapter=proposer_adapter,
+        challenger_adapter=challenger_adapter,
+        judge_adapter=judge_adapter,
+        blackboard=board,
+        rounds=args.rounds,
+    )
+
+    print(f"⚖️ Starting Multi-AI Debate on topic: '{args.topic}'...")
+    print(f"   Proposer: {args.proposer} | Challenger: {args.challenger} | Judge: {args.judge}")
+    print(f"   Rounds: {args.rounds}")
+
+    result = runner.run()
+    print(f"\n✓ Debate concluded successfully ({result['total_duration_sec']:.2f}s)!")
+    print(f"   Consensus saved to: {board.root_dir / 'artifacts' / 'consensus.md'}")
+    return 0
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -158,6 +251,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return handle_status(args)
     elif args.command == "run":
         return handle_run(args)
+    elif args.command == "debate":
+        return handle_debate(args)
 
     if args.debug:
         print(f"[DEBUG] ModueHarness v{__version__} initialized in debug mode.")

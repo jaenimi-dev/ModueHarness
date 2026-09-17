@@ -1,6 +1,6 @@
 """ModueHarness - Multi-AI CLI Collaboration Harness Framework."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from modue_harness.adapters import (
     AGYCLIAdapter,
@@ -21,7 +21,17 @@ from modue_harness.core.types import (
     TurnContext,
     TurnResult,
 )
-from modue_harness.engine import PipelineRunner, WorkflowConfig
+from modue_harness.engine import (
+    ConductorRunner,
+    DebateRunner,
+    PipelineRunner,
+    WorkflowConfig,
+)
+from modue_harness.plugins import (
+    BasePlugin,
+    MarkdownReportPlugin,
+    PluginManager,
+)
 from modue_harness.workspace import GitWorkspaceManager
 
 __all__ = [
@@ -44,6 +54,11 @@ __all__ = [
     "AiderCLIAdapter",
     "create_adapter",
     "PipelineRunner",
+    "ConductorRunner",
+    "DebateRunner",
     "WorkflowConfig",
     "GitWorkspaceManager",
+    "BasePlugin",
+    "MarkdownReportPlugin",
+    "PluginManager",
 ]
