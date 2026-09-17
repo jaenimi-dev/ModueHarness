@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-09-18
+
+### Added
+- **Workspace Isolation & Git Management (`workspace/`)**:
+  - `GitWorkspaceManager` supporting isolated worktree creation (`git worktree add -b harness/...`), removal, and pruning.
+  - Temporary stash snapshots and rollback mechanism (`create_snapshot()`, `rollback_snapshot()`).
+  - Git diff extraction and modified files tracking.
+- **Process Supervisor & Safety Watchdog (`core/supervisor.py`)**:
+  - `ProcessSupervisor` with activity monitoring and stall detection.
+  - Infinite loop / repeating output runaway detection.
+  - Graceful subprocess termination (SIGTERM followed by SIGKILL).
+  - Human-in-the-loop checkpoint support (`requires_approval` with interactive approval callback).
+
 ## [0.2.0] - 2026-09-18
 
 ### Added

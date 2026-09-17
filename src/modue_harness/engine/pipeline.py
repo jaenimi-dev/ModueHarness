@@ -1,19 +1,21 @@
-"""Enhanced sequential pipeline execution runner with condition, retry, and event dispatch."""
+"""Enhanced sequential pipeline execution runner with condition, retry, isolation, and safety supervisor."""
 
 from pathlib import Path
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from modue_harness.adapters import BaseCLIAdapter, create_adapter
 from modue_harness.core.blackboard import Blackboard
 from modue_harness.core.events import EventBus, EventType, HarnessEvent
+from modue_harness.core.supervisor import ProcessSupervisor
 from modue_harness.core.types import Task, TaskStatus, TurnContext, TurnResult
 from modue_harness.engine.workflow import WorkflowConfig, WorkflowStepConfig
+from modue_harness.workspace import GitWorkspaceManager
 
 
 class PipelineRunner:
-    """Executes a linear sequence of workflow steps using AI CLI adapters and a Blackboard."""
+    """Executes a linear sequence of workflow steps using AI CLI adapters, Blackboard, and Workspaces."""
 
     def __init__(
         self,
@@ -22,12 +24,16 @@ class PipelineRunner:
         workspace_dir: Optional[Path] = None,
         adapters_override: Optional[Dict[str, BaseCLIAdapter]] = None,
         event_bus: Optional[EventBus] = None,
+        workspace_manager: Optional[GitWorkspaceManager] = None,
+        approval_callback: Optional[Callable[[str, str], bool]] = None,
     ) -> None:
         self.config = config
         self.workspace_dir = (workspace_dir or Path.cwd()).resolve()
         self.event_bus = event_bus or EventBus()
         self.blackboard = blackboard or Blackboard(self.workspace_dir / "blackboard", event_bus=self.event_bus)
         self.blackboard.event_bus = self.event_bus
+        self.workspace_manager = workspace_manager or GitWorkspaceManager(self.workspace_dir)
+        self.approval_callback = approval_callback
         self.adapters: Dict[str, BaseCLIAdapter] = {}
 
         # Initialize adapters from config
@@ -151,12 +157,31 @@ class PipelineRunner:
         return pattern.sub(replacer, text)
 
     def _execute_step(self, step: WorkflowStepConfig, step_index: int) -> Dict[str, Any]:
-        """Execute a step with retry and fallback support."""
+        """Execute a step with retry, fallback, worktree isolation, and supervisor."""
         agent_name = step.agent
         adapter = self.adapters.get(agent_name)
 
         if not adapter:
             raise ValueError(f"No adapter configured for agent '{agent_name}' in step '{step.id}'")
+
+        # Supervisor & Human-In-The-Loop Checkpoint
+        supervisor = ProcessSupervisor(
+            timeout=step.timeout,
+            stall_timeout=step.stall_timeout,
+            approval_callback=self.approval_callback,
+        )
+
+        if step.requires_approval:
+            approved = supervisor.request_approval(step.id, step.instruction)
+            if not approved:
+                return {
+                    "step_id": step.id,
+                    "agent": agent_name,
+                    "is_success": False,
+                    "exit_code": 130,
+                    "duration_sec": 0.0,
+                    "error_message": "Step rejected by human approval checkpoint",
+                }
 
         # Record task on Blackboard
         task = Task(
@@ -181,12 +206,29 @@ class PipelineRunner:
 
         resolved_instruction = self._resolve_template_variables(step.instruction)
 
+        # Worktree isolation setup if requested
+        step_workspace_dir = self.workspace_dir
+        isolated_worktree_path: Optional[Path] = None
+
+        if step.isolation == "worktree" and self.workspace_manager.is_git_repo():
+            isolated_worktree_path = self.workspace_dir / ".modue_worktrees" / step.id
+            try:
+                self.workspace_manager.create_worktree(
+                    branch_name=f"harness/{step.id}",
+                    target_dir=isolated_worktree_path,
+                )
+                step_workspace_dir = isolated_worktree_path
+            except Exception:
+                # If worktree creation fails, continue on main workspace
+                step_workspace_dir = self.workspace_dir
+                isolated_worktree_path = None
+
         # Context
         context = TurnContext(
             step_id=step.id,
             instruction=resolved_instruction,
             blackboard_dir=self.blackboard.root_dir,
-            workspace_dir=self.workspace_dir,
+            workspace_dir=step_workspace_dir,
             input_artifacts=step.input_artifacts,
         )
 
@@ -199,7 +241,7 @@ class PipelineRunner:
             if turn_result.is_success:
                 break
 
-        # If primary failed and fallback agent provided
+        # Fallback agent support
         if turn_result and not turn_result.is_success and step.fallback_agent:
             fallback_adapter = self.adapters.get(step.fallback_agent)
             if fallback_adapter:
@@ -207,6 +249,10 @@ class PipelineRunner:
                 task.assigned_agent = agent_name
                 self.blackboard.create_task(task)
                 turn_result = fallback_adapter.execute(context=context, timeout=step.timeout)
+
+        # Clean up isolated worktree if created
+        if isolated_worktree_path:
+            self.workspace_manager.remove_worktree(isolated_worktree_path)
 
         # Log
         combined_logs = f"=== STDOUT ===\n{turn_result.stdout}\n\n=== STDERR ===\n{turn_result.stderr}"

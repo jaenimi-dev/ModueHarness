@@ -15,8 +15,8 @@ def test_version_format():
 
 
 def test_version_value():
-    """Verify the current version is 0.2.0."""
-    assert modue_harness.__version__ == "0.2.0"
+    """Verify the current version is 0.3.0."""
+    assert modue_harness.__version__ == "0.3.0"
 
 
 def test_pyproject_version_matches():

@@ -1,6 +1,6 @@
 """ModueHarness - Multi-AI CLI Collaboration Harness Framework."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from modue_harness.adapters import (
     AGYCLIAdapter,
@@ -14,6 +14,7 @@ from modue_harness.core.blackboard import Blackboard
 from modue_harness.core.config import HarnessConfig
 from modue_harness.core.events import EventBus, EventType, HarnessEvent
 from modue_harness.core.harness import BaseHarness
+from modue_harness.core.supervisor import ProcessSupervisor
 from modue_harness.core.types import (
     Task,
     TaskStatus,
@@ -21,6 +22,7 @@ from modue_harness.core.types import (
     TurnResult,
 )
 from modue_harness.engine import PipelineRunner, WorkflowConfig
+from modue_harness.workspace import GitWorkspaceManager
 
 __all__ = [
     "__version__",
@@ -34,6 +36,7 @@ __all__ = [
     "EventBus",
     "EventType",
     "HarnessEvent",
+    "ProcessSupervisor",
     "BaseCLIAdapter",
     "GenericCLIAdapter",
     "ClaudeCLIAdapter",
@@ -42,4 +45,5 @@ __all__ = [
     "create_adapter",
     "PipelineRunner",
     "WorkflowConfig",
+    "GitWorkspaceManager",
 ]

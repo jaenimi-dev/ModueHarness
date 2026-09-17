@@ -31,5 +31,6 @@ htmlcov/
 .env.*
 !.env.example
 
-# ModueHarness local runtime data (blackboard workspace)
+# ModueHarness local runtime data (blackboard workspace & worktrees)
 blackboard/
+.modue_worktrees/

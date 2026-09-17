@@ -50,6 +50,9 @@ class WorkflowStepConfig:
     condition: Optional[str] = None  # e.g., "artifact_exists:plan.md" or None
     retry_count: int = 0
     fallback_agent: Optional[str] = None
+    isolation: Optional[str] = None  # "worktree" or None
+    requires_approval: bool = False
+    stall_timeout: Optional[float] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], default_timeout: float = 300.0) -> "WorkflowStepConfig":
@@ -63,6 +66,9 @@ class WorkflowStepConfig:
             condition=data.get("condition"),
             retry_count=int(data.get("retry_count", 0)),
             fallback_agent=data.get("fallback_agent"),
+            isolation=data.get("isolation"),
+            requires_approval=bool(data.get("requires_approval", False)),
+            stall_timeout=float(data["stall_timeout"]) if "stall_timeout" in data else None,
         )
 
 
