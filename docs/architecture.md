@@ -1,14 +1,14 @@
 # ModueHarness: Multi-AI CLI Collaboration Harness Architecture Design
 
-## 1. 개요 (Overview)
+## 1. 개요 및 핵심 가치 (Overview)
 
-**ModueHarness(모두의 하네스)**는 서로 다른 AI CLI 도구(예: `claude`, `agy`, `aider`, `copilot`, `gemini` 등)를 하나의 유기적인 팀으로 오케스트레이션하여 단일 AI 도구의 한계를 극복하고 복잡한 소프트웨어 엔지니어링 작업을 자율적·협업적으로 해결하는 하네스(Harness) 프레임워크입니다.
+**ModueHarness(모두의 하네스)**는 서로 다른 AI CLI 도구(예: `claude`, `agy`, `aider`, `copilot`, `gemini` 등)를 하나의 유기적인 팀으로 오케스트레이션하여 소프트웨어 엔지니어링 작업을 자율적·협업적으로 해결하는 하네스(Harness) 프레임워크입니다.
 
-### 1.1 핵심 가치 및 목표
-- **도구 독립성 (CLI-Agnostic Abstraction)**: 상이한 인터페이스(입출력 스트림, PTY 지원, 배치 플래그, 종료 조건 등)를 가진 다양한 AI CLI를 통일된 어댑터 인터페이스로 추상화.
-- **다양한 협업 토폴로지 (Flexible Collaboration Topologies)**: 파이프라인(순차), 리더-워커(계층형 분업), 교차 검증/토론(Consensus & Review), 블랙보드(작업 큐 공유) 지원.
-- **작업 격리 및 안전성 (Isolation & Workspace Safety)**: Git Worktree/브랜치 기반 작업 격리, 롤백 지원, 무한 루프 감지 및 타임아웃 감시.
-- **선언적 워크플로우 (Declarative Configuration)**: YAML/TOML을 통한 팀 구성, 역할 정의, 통신 채널, 단계별 워크플로우 정의.
+### 1.1 핵심 가치
+- **도구 독립성 (CLI-Agnostic Abstraction)**: 상이한 인터페이스(입출력 스트림, PTY 지원, 배치 플래그, 종료 조건 등)를 가진 다양한 AI CLI를 통일된 어댑터 인터페이스(`BaseCLIAdapter`)로 추상화.
+- **다양한 협업 토폴로지 (Flexible Collaboration Topologies)**: 파이프라인(순차 릴레이), 리더-워커(계층형 분업 및 종합), 교차 검증/토론(Debate & Consensus), 블랙보드(작업 큐 공유) 지원.
+- **작업 격리 및 안전성 (Isolation & Workspace Safety)**: Git Worktree 기반 임시 브랜치 격리, 원클릭 스냅샷 롤백(`git stash`), 무응답 및 무한 루프 감시.
+- **선언적 워크플로우 (Declarative Configuration)**: AI 팀 명세(`agents.yaml`)와 작업 명세(`workflow.yaml`)를 분리하여 재사용성과 유연성 극대화.
 
 ---
 
@@ -16,22 +16,26 @@
 
 ```mermaid
 flowchart TB
-    subgraph UserInterface["User & Orchestration Control"]
-        User["사용자 (CLI / Config)"] --> CoreEngine["ModueHarness Core Engine"]
+    subgraph UserInterface["사용자 및 CLI 제어"]
+        User["User / CLI"] --> CoreEngine["ModueHarness Core Engine"]
     end
 
     subgraph CoreEngine["ModueHarness Core Engine"]
-        WorkflowMgr["Workflow Manager\n(DAG / State Machine)"]
-        Blackboard["Shared State & Blackboard\n(Task Board, Artifacts, Events)"]
-        Supervisor["Supervisor & Safety Watchdog\n(Timeouts, Stalls, Health)"]
+        WorkflowMgr["Workflow Topologies\n(Pipeline / Conductor / Debate)"]
+        Blackboard["Shared State & Blackboard\n(state.json, tasks/, artifacts/, logs/)"]
+        EventBus["EventBus (Pub/Sub Lifecycle Events)"]
+        Supervisor["ProcessSupervisor & Safety Watchdog\n(Timeouts, Stalls, Loop Detection)"]
         WorkspaceMgr["Workspace & Git Isolation\n(Worktree, Diff, Snapshot)"]
+        Plugins["Plugin Manager\n(Markdown Report, Custom Hooks)"]
         
         WorkflowMgr <--> Blackboard
+        WorkflowMgr <--> EventBus
         WorkflowMgr <--> Supervisor
         WorkflowMgr <--> WorkspaceMgr
+        WorkflowMgr <--> Plugins
     end
 
-    subgraph AdapterLayer["CLI Adapter Layer (Subprocess & PTY)"]
+    subgraph AdapterLayer["CLI Adapter Layer (Subprocess & Streaming)"]
         BaseAdapter["BaseCLIAdapter (Interface)"]
         
         ClaudeAdapter["ClaudeCode Adapter\n(claude)"]
@@ -55,53 +59,24 @@ flowchart TB
 
 ---
 
-## 3. 핵심 컴포넌트 설계
+## 3. 핵심 컴포넌트 상세
 
 ### 3.1 CLI Adapter 계층 (`modue_harness.adapters`)
 각 AI CLI는 실행 방식(인터랙티브 vs 비인터랙티브), 프롬프트 입력 방식(STDIN, 인자), 스트리밍 출력 형식, ANSI 컬러 코드, 세션 유지 여부가 다릅니다. 이를 통일된 추상화로 다룹니다.
 
-```mermaid
-classDiagram
-    class BaseCLIAdapter {
-        <<abstract>>
-        +name: str
-        +cli_command: str
-        +capabilities: Set[str]
-        +execute_turn(prompt: str, context: TurnContext) TurnResult
-        +stream_execution(prompt: str, context: TurnContext) Generator
-        +terminate() void
-        +health_check() bool
-    }
-
-    class ClaudeCLIAdapter {
-        +execute_turn(prompt, context)
-    }
-    class AGYCLIAdapter {
-        +execute_turn(prompt, context)
-    }
-    class AiderCLIAdapter {
-        +execute_turn(prompt, context)
-    }
-    class GenericSubprocessAdapter {
-        +execute_turn(prompt, context)
-    }
-
-    BaseCLIAdapter <|-- ClaudeCLIAdapter
-    BaseCLIAdapter <|-- AGYCLIAdapter
-    BaseCLIAdapter <|-- AiderCLIAdapter
-    BaseCLIAdapter <|-- GenericSubprocessAdapter
-```
-
-- **입출력 정규화**:
-  - `TurnContext`: 이전 에이전트가 생성한 요약, 파일 변경 내역(Git Diff), 목표, 제약사항 주입.
-  - `TurnResult`: 표준화된 상태(성공, 실패, 추가입력 필요), 순수 텍스트 결과물(ANSI 제거), 수정된 파일 목록, 실행 소요 시간.
-- **실행 모드 지원**:
-  - **Batch/Headless Mode**: 단일 턴 실행 후 종료 (예: `claude -p "..."`, `aider --message "..." --yes-always`).
-  - **Persistent Session Mode**: 프로세스를 유지하고 파이프/PTY를 통해 대화형 통신 지속.
+- **`BaseCLIAdapter`**:
+  - `execute()`: 서브프로세스 격리 실행, ANSI 색상 시퀀스 자동 제거, 결과 정규화(`TurnResult`).
+  - `execute_stream()`: 실시간 라인 단위 stdout 스트리밍 제너레이터 제공.
+  - 시스템 디렉티브 및 아티팩트 자동 주입.
+- **특화 어댑터 구현체**:
+  - `ClaudeCLIAdapter`: Anthropic Claude Code (`claude -p`, `--permission-mode`, `--model`).
+  - `AGYCLIAdapter`: Google Antigravity CLI (`agy`, stdin 전달, `--model`).
+  - `AiderCLIAdapter`: Aider (`aider --message`, `--yes-always`, `--no-git`, `--model`).
+  - `GenericCLIAdapter`: 임의의 쉘 스크립트나 로컬 모델 CLI 실행.
 
 ---
 
-### 3.2 협업 토폴로지 모델 (`modue_harness.engine.topologies`)
+### 3.2 협업 토폴로지 모델 (`modue_harness.engine`)
 
 ```mermaid
 flowchart LR
@@ -110,7 +85,7 @@ flowchart LR
         P1["Planner AI\n(설계/명세)"] --> C1["Coder AI\n(구현)"] --> R1["Reviewer AI\n(리뷰/검증)"]
     end
 
-    subgraph Topology2["2. Leader - Workers (Hierarchical)"]
+    subgraph Topology2["2. Leader - Workers (Conductor)"]
         direction TB
         L["Leader / Conductor AI"]
         W1["Worker 1 (Frontend)"]
@@ -119,6 +94,9 @@ flowchart LR
         L --> W1
         L --> W2
         L --> W3
+        W1 --> S["Final Synthesis"]
+        W2 --> S
+        W3 --> S
     end
 
     subgraph Topology3["3. Debate & Consensus"]
@@ -129,36 +107,30 @@ flowchart LR
     end
 ```
 
-1. **파이프라인 (Pipeline / Relay)**:
+1. **파이프라인 (Pipeline / Relay - `PipelineRunner`)**:
    - 한 AI CLI의 산출물(명세서, 코드 diff, 테스트 결과)이 다음 AI CLI의 입력 컨텍스트로 전달.
-   - 예: `Claude Code`가 아키텍처/작업 계획 작성 -> `Aider`가 코드 작성 -> `AGY`가 테스트 및 코드 리뷰 수행.
-2. **계층형 지휘 (Leader-Worker)**:
-   - Conductor AI가 큰 태스크를 하위 태스크(Sub-tasks)로 쪼개고, 각 전문 CLI 워커에게 분배한 뒤 결과를 취합.
-3. **토론 및 상호 검증 (Debate & Consensus)**:
-   - 두 AI CLI가 동일한 문제에 대해 서로 다른 방안을 제시하고 교차 비판 후, 판정관(Judge) AI가 최종안 채택.
+   - 조건부 실행 (`condition: artifact_exists:...`), 템플릿 변수 치환 (`${artifact:...}`), 재시도(`retry_count`), 대체 위임(`fallback_agent`) 지원.
+2. **계층형 지휘 (Leader-Worker / Conductor - `ConductorRunner`)**:
+   - 지휘자(Conductor) AI가 큰 목표를 동적으로 하위 태스크(JSON)로 분해하고, 전문 워커 에이전트들에게 할당·수행 후 최종 결과를 종합 보고서(`synthesis_report.md`)로 취합.
+3. **토론 및 상호 검증 (Debate & Consensus - `DebateRunner`)**:
+   - 제안자(Proposer)와 도전자(Challenger) 간 다자 토론 라운드를 진행하고, 판정관(Judge) AI가 최적 합의안(`consensus.md`)을 도출.
 
 ---
 
-### 3.3 공유 상태 및 블랙보드 (`modue_harness.core.blackboard`)
+### 3.3 공유 상태 및 공용 칠판 (`modue_harness.core.blackboard`)
 AI CLI들이 직접 메모리를 공유할 수 없으므로, **프로젝트 폴더 내 가시적인 디렉터리(`blackboard/`)** 기반의 **Blackboard(공유 게시판)**를 매개체로 통신합니다.
 
-> **프로젝트 루트 가시 폴더(`blackboard/`) 네이밍 및 배치 이유**:
-> - **의미적 명확성 (Blackboard Architecture)**: 여러 전문 AI 에이전트들이 공용 칠판(Blackboard)을 보고 자신의 작업을 찾고, 결과물을 게시하며, 상호 피드백을 남기는 소프트웨어 아키텍처 패턴의 의미를 가장 직관적으로 전달합니다.
-> - **인덱싱 친화성**: 숨김 폴더(`.`)가 아니므로 Claude, AGY, Aider 등 모든 AI CLI가 무시하지 않고 즉시 읽고 참조할 수 있습니다.
-> - **직관적 검사**: 개발자가 탐색기나 터미널에서 `blackboard/`를 열어 현재 어떤 태스크가 진행 중이고 어떤 산출물(계획, 코드, 리뷰)이 나왔는지 바로 열람할 수 있습니다.
-> - 기본 디렉터리 경로는 `blackboard/`이며 설정 파일에서 커스텀 경로로 변경 가능합니다.
-
 ```
-blackboard/                 # 프로젝트 루트 내 AI 협업 공용 칠판 (공유 공간)
-├── state.json              # 현재 워크플로우 진행 상태, 활성 에이전트, 세션 메트릭
-├── tasks/                  # 분업 하위 태스크 명세 및 할당 상태
+blackboard/                 # 프로젝트 루트 내 AI 협업 공용 칠판 (가시적 폴더)
+├── state.json              # 현재 워크플로우 진행 상태, 세션 ID, 메트릭
+├── tasks/                  # 단계별 하위 태스크 명세 및 결과
 │   ├── task_001.json
 │   └── task_002.json
 ├── artifacts/              # 에이전트 간 전달되는 문서, 다이어그램, 패치
 │   ├── plan.md
-│   ├── patch_feature_x.diff
-│   └── review_feedback.md
-└── logs/                   # 각 AI CLI의 원시 실행 트랜스크립트
+│   ├── .plan.md.meta.json  # 산출물 작성자, 크기, 시각 메타데이터
+│   └── consensus.md
+└── logs/                   # 각 AI CLI의 원시 실행 덤프 로그 (git ignore 처리)
     ├── claude_step1.log
     └── agy_step2.log
 ```
@@ -166,100 +138,38 @@ blackboard/                 # 프로젝트 루트 내 AI 협업 공용 칠판 (�
 ---
 
 ### 3.4 워크스페이스 격리 및 Git 관리 (`modue_harness.workspace`)
-여러 AI CLI가 동일한 작업 디렉터리를 동시에 수정할 때 발생하는 충돌을 방지합니다.
+여러 AI CLI가 동일한 작업 디렉터리를 수정할 때 발생하는 충돌을 원천 차단합니다.
 
 - **Git Worktree 격리**:
-  - 각 AI CLI에게 별도의 `git worktree`(`branch: harness/<run-id>/<agent-role>`)를 제공.
-  - 작업 완료 시 Diff를 추출하거나 자동 리베이스/머지 수행.
+  - 각 AI CLI에게 별도의 `git worktree`(`branch: harness/<run-id>/<step-id>`)를 제공하여 변경을 분리.
+  - 작업 완료 후 Diff 추출 및 안전한 리소스 정리(Prune).
 - **스냅샷 및 롤백**:
-  - 각 에이전트 턴 시작 전 자동 `git stash` 또는 임시 커밋 생성.
+  - 턴 시작 전 자동 `git stash` 스냅샷 생성.
   - 에이전트가 잘못된 수정을 하거나 빌드가 깨질 경우 즉시 롤백 가능.
 
 ---
 
 ### 3.5 안전 감시자 (`modue_harness.core.supervisor`)
 - **타임아웃 감시 (Timeout Watchdog)**: 특정 CLI가 사용자 대기 또는 무한 응답 상태에 빠질 경우 감지 및 프로세스 강제 종료.
-- **루프 탐지 (Stall/Loop Detection)**: 동일한 파일 수정이나 반복된 에러 출력이 N회 이상 감지되면 개입.
-- **Human-In-The-Loop**: 중요 단계(예: 메인 브랜치 머지, 외부 배포) 전 사용자 승인 프롬프트 지원.
+- **무응답 지연 감지 (Stall Detection)**: 출력 없이 `stall_timeout`을 초과한 정체 프로세스 조기 감지.
+- **루프 탐지 (Loop Detection)**: 동일한 에러나 텍스트 출력이 임계치 이상 반복될 때 무한 루프로 판단하고 차단.
+- **Human-In-The-Loop**: 중요 단계(예: 메인 브랜치 반영, 외부 배포) 전 사용자 승인 프롬프트(`requires_approval`) 지원.
 
 ---
 
-## 4. 설정 파일 명세 (AI 팀 명세와 작업 명세의 분리)
-
-ModueHarness는 높은 재사용성과 유연성을 위해 **AI 팀 명세(`agents.yaml`)**와 **작업 명세(`workflow.yaml`)**의 분리 구성을 지원합니다.
-
-### 4.1 AI 팀 명세 (`agents.yaml` / `team.yaml`)
-어떤 AI CLI 도구(Claude, AGY, Aider 등)와 모델, 권한, 시스템 지침을 사용할지 정의합니다. 여러 작업에서 공통으로 재사용할 수 있습니다.
-
-```yaml
-version: "0.4.0"
-name: "fullstack-feature-team"
-
-agents:
-  planner:
-    adapter: "claude"
-    command: "claude"
-    args: ["--permission-mode", "auto"]
-    role: "System Architect & Planner"
-
-  coder:
-    adapter: "agy"
-    command: "agy"
-    role: "Core Implementation Engineer"
-
-  reviewer:
-    adapter: "claude"
-    command: "claude"
-    role: "Code Quality & Security Reviewer"
-```
-
-### 4.2 작업 및 흐름 명세 (`workflow.yaml` / `tasks.yaml`)
-구체적으로 어떤 작업을 수행하고, 단계별로 어떤 산출물을 생성·전달할지 정의합니다.
-
-```yaml
-version: "0.4.0"
-name: "feature-delivery-pipeline"
-
-# AI 팀 명세 파일 참조 (CLI --agents 옵션으로 오버라이드 가능)
-agents_file: "agents.yaml"
-
-workflow:
-  topology: "pipeline"
-  timeout_per_step: 300
-  steps:
-    - id: "spec_and_plan"
-      agent: "planner"
-      instruction: "사용자 요구사항을 분석하여 상세 구현 계획서(plan.md)를 작성하라."
-      output_artifact: "blackboard/artifacts/plan.md"
-
-    - id: "implementation"
-      agent: "coder"
-      input_artifacts: ["blackboard/artifacts/plan.md"]
-      instruction: "plan.md에 명시된 명세에 따라 코드를 작성하고 단위 테스트를 통과시켜라."
-
-    - id: "code_review"
-      agent: "reviewer"
-      input_artifacts: ["blackboard/artifacts/plan.md"]
-      instruction: "작성된 코드의 품질, 보안, 엣지 케이스를 리뷰하고 종합 평가를 작성하라."
-```
+### 3.6 생명주기 이벤트 및 플러그인 (`core.events`, `plugins`)
+- **`EventBus`**: `WORKFLOW_STARTED`, `STEP_COMPLETED`, `ARTIFACT_PRODUCED`, `TASK_STATUS_CHANGED` 등 실시간 생명주기 이벤트 브로커.
+- **`PluginManager`**:
+  - `BasePlugin`: 라이프사이클 전 단계에 결합 가능한 훅 인터페이스.
+  - `MarkdownReportPlugin`: 워크플로우 종료 시 세부 단계별 실행 시간, 성공 여부, 에러 노트를 담은 마크다운 종합 보고서 자동 생성.
 
 ---
 
-## 5. 단계별 개발 로드맵
+## 4. 단계별 개발 로드맵
 
-```mermaid
-flowchart TD
-    M1["v0.1.0: Foundation & Process Runner\n- BaseCLIAdapter & Subprocess Wrapper\n- Generic CLI 지원\n- 단일/순차 실행 기초"]
-    M2["v0.2.0: Core Topologies & Blackboard\n- Pipeline 토폴로지\n- Blackboard 상태 및 아티팩트 교환\n- Claude Code / AGY 전용 어댑터"]
-    M3["v0.3.0: Workspace Isolation & Supervisor\n- Git Worktree 기반 격리 및 머지\n- Timeout / 무한루프 Watchdog\n- 선언적 YAML 설정 로더"]
-    M4["v0.4.0: Full Orchestration & Multi-agent Mesh\n- 계층형 지휘(Leader-Worker) & Debate\n- 실시간 멀티 스트리밍 대시보드\n- 플러그인 생태계"]
-
-    M1 --> M2 --> M3 --> M4
-```
-
-| 마일스톤 | 버전 | 핵심 목표 |
-|---|---|---|
-| **Phase 1** | `0.1.0` | CLI Subprocess 어댑터 기본 추상화, 스트림 입출력 캡처, 기본 CLI 실행기 |
-| **Phase 2** | `0.2.0` | 릴레이/파이프라인 토폴로지, Blackboard 파일 기반 아티팩트 교환, 주요 CLI 어댑터(`claude`, `agy`) |
-| **Phase 3** | `0.3.0` | Git Worktree 격리, Supervisor 안전 감시(타임아웃/루프 방지), YAML 워크플로우 엔진 |
-| **Phase 4** | `0.4.0` | 동적 분업(Leader-Worker), 토론/합의 모델, 플러그인 확장 체계 |
+| 마일스톤 | 버전 | 핵심 목표 | 상태 |
+|---|---|---|---|
+| **Phase 1** | `0.1.0` | CLI Subprocess 어댑터 기본 추상화, 스트림 입출력 캡처, 기본 CLI 실행기 | ✅ 완료 |
+| **Phase 2** | `0.2.0` | 릴레이/파이프라인 토폴로지, Blackboard 파일 기반 아티팩트 교환, 주요 CLI 어댑터(`claude`, `agy`) | ✅ 완료 |
+| **Phase 3** | `0.3.0` | Git Worktree 격리, Supervisor 안전 감시(타임아웃/루프 방지), 조건부/재시도 엔진 | ✅ 완료 |
+| **Phase 4** | `0.4.0` | 동적 분업(Leader-Worker), 토론/합의 모델, 플러그인 확장 체계, 보고서 생성기 | ✅ 완료 |
