@@ -1,0 +1,30 @@
+# Example Multi-AI CLI Collaboration Workflow
+name: "hello-modue-collaboration"
+
+workflow:
+  topology: "pipeline"
+  timeout_per_step: 60
+  steps:
+    - id: "write_spec"
+      agent: "planner"
+      instruction: "Write a high-level plan for adding health check endpoint."
+      output_artifact: "plan.md"
+
+    - id: "implement_feature"
+      agent: "coder"
+      input_artifacts: ["plan.md"]
+      instruction: "Read plan.md and implement the requested feature."
+      output_artifact: "impl_report.txt"
+
+agents:
+  planner:
+    adapter: "generic"
+    command: "python3"
+    args: ["-c", "print('# Feature Specification\\n1. Add /healthz route.\\n2. Return 200 OK.')"]
+    role: "System Planner"
+
+  coder:
+    adapter: "generic"
+    command: "python3"
+    args: ["-c", "import sys; c = sys.stdin.read(); print('[CODER] Implemented healthz endpoint according to plan:\\n' + c)"]
+    role: "Implementation Coder"
