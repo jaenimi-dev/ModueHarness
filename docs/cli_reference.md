@@ -160,5 +160,95 @@ python3 -m modue_harness.cli run --config <workflow.yaml> [OPTIONS]
 둘 이상의 AI CLI 간의 토론 및 판정관 합의 워크플로우를 즉시 실행합니다.
 
 ```bash
-python3 -m modue_harness.cli debate --topic "Microservices vs Modular Monolith" [OPTIONS]
+python run.py debate --topic "Microservices vs Modular Monolith" [OPTIONS]
+# (또는: modue-harness debate --topic "Microservices vs Modular Monolith" [OPTIONS])
 ```
+
+---
+
+## 8. Web UI 대시보드 (`ui`, `--ui`)
+
+웹 브라우저에서 3분할 콕핏 화면(명령어 디스패처, 실시간 AI 실행 로그 스트림, 칠판 산출물 및 소스 코드 뷰어)을 통해 AI 팀을 제어하고 모니터링합니다.
+
+```bash
+# 기본 Web UI 실행 (기본 포트: 8080, 브라우저 자동 오픈)
+python run.py --ui
+# (또는: modue-harness ui)
+
+# 특정 프로젝트 및 호스트/포트 지정 실행
+python run.py --ui -P my-web-app --host 0.0.0.0 --port 9000
+# (또는: modue-harness ui -P my-web-app --host 0.0.0.0 --port 9000)
+
+# 브라우저 자동 팝업 없이 서버만 백그라운드로 띄울 때
+modue-harness ui --no-browser
+```
+
+### 의존성 설치 안내 및 트러블슈팅
+Web UI는 **NiceGUI** 라이브러리를 사용하며, CLI 핵심 코어의 경량화를 위해 **선택적 의존성(Optional Dependency)**으로 분리되어 있습니다.
+
+NiceGUI가 설치되지 않은 상태에서 `ui` 명령어를 실행하면 다음과 같은 친절한 가이드 메시지가 출력되고 종료됩니다:
+
+```text
+$ modue-harness ui
+🌐 Starting ModueHarness Web UI at http://127.0.0.1:8080 ...
+❌ NiceGUI is not installed. Please install it using: pip install 'modue-harness[ui]' or pip install nicegui
+```
+
+**해결 방법**:  
+터미널에서 아래 명령어 중 하나를 실행하여 UI 의존성을 설치합니다:
+```bash
+# 권장: ModueHarness UI 패키지 일괄 설치 (NiceGUI + Textual)
+pip install "modue-harness[ui]"
+# 또는 개발 설치 시: pip install -e ".[ui]"
+
+# 또는 NiceGUI만 단독 설치
+pip install nicegui
+```
+
+### 옵션
+- `-P`, `--project`: 초기 활성 프로젝트 이름 (기본값: `default`)
+- `--host`: 웹 서버 바인딩 호스트 (기본값: `127.0.0.1`)
+- `--port`: 웹 서버 포트 번호 (기본값: `8080`)
+- `--no-browser`: 웹 브라우저 자동 열기 비활성화
+- `--agents`, `-a`: AI 팀 명세 파일 경로
+- `--dir`, `-d`: 블랙보드 폴더 경로
+- `--projects-dir`: 프로젝트 베이스 디렉터리 경로
+
+---
+
+## 9. 터미널 TUI 대시보드 (`tui`, `--tui`)
+
+SSH 원격 세션이나 순수 터미널 콘솔 환경에서 전체 화면(Full-screen) TUI 콕핏을 제공합니다.
+
+```bash
+# 기본 터미널 TUI 실행
+python run.py --tui
+# (또는: modue-harness tui)
+
+# 특정 프로젝트를 지정하여 TUI 실행
+python run.py --tui -P my-service
+# (또는: modue-harness tui -P my-service)
+```
+
+### 의존성 설치 안내 및 트러블슈팅
+TUI는 **Textual** 라이브러리를 사용하며, 미설치 시 다음과 같은 안내 메시지가 출력됩니다:
+
+```text
+$ modue-harness tui
+❌ Textual is not installed. Please install it using: pip install 'modue-harness[ui]' or pip install textual
+```
+
+**해결 방법**:
+```bash
+# UI 패키지 일괄 설치
+pip install "modue-harness[ui]"
+# 또는 개발 설치 시: pip install -e ".[ui]"
+
+# 또는 Textual만 단독 설치
+pip install textual
+```
+
+### 단축키 안내
+- `q`: TUI 종료
+- `c`: 현재 실행 중인 AI 작업 즉시 취소
+- `Tab` / `Shift+Tab`: 입력 필드 및 버튼 간 포커스 전환

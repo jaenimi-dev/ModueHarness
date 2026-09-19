@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-65%20passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-74%20passed-brightgreen.svg)](tests/)
 
 **ModueHarness**는 Claude Code, Google Antigravity(AGY), Aider 등 다양한 AI CLI 도구들을 하나의 유기적인 팀으로 엮어 소프트웨어 엔지니어링 작업을 자율적·협업적으로 해결하는 Multi-AI CLI 하네스(Harness) 프레임워크입니다.
 
@@ -15,16 +15,26 @@
 ```bash
 git clone https://github.com/jaenimi-dev/ModueHarness.git
 cd ModueHarness
+
+# 기본 CLI 및 테스트 도구 설치
 pip install -e ".[dev]"
+
+# (선택) Web UI(NiceGUI) 및 Terminal TUI(Textual) 대시보드를 사용하려면 [ui] 패키지 추가 설치
+pip install -e ".[ui]"
+# 전체 패키지 한 번에 설치: pip install -e ".[all]"
 ```
+
+> ⚠️ **UI 실행 시 `NiceGUI is not installed` 또는 `Textual is not installed` 오류가 발생하는 경우**:  
+> UI 기능은 기본 의존성을 가볍게 유지하기 위해 선택적 의존성(`[ui]`)으로 분리되어 있습니다.  
+> `pip install "modue-harness[ui]"` (또는 `pip install nicegui`, `pip install textual`)을 실행하여 필요한 패키지를 설치해 주시면 즉시 정상 동작합니다.
 
 ### 2. 테스트 검증
 ```bash
 python3 -m pytest -q
-# 65 passed in ~3.5s
+# 74 passed
 ```
 
-### 3. CLI 실행 예시 (워크플로우 파일 없이 직접 명령 실행)
+### 3. CLI 및 UI 실행 예시 (워크플로우 파일 없이 직접 명령 실행)
 
 > 💡 **실행 방법 (아래 2가지 중 편한 방법 선택)**:
 > - **방법 A (루트 실행 파일, 환경변수 불필요)**: `python run.py [옵션]`
@@ -34,6 +44,14 @@ python3 -m pytest -q
 # [추천] 대화형 CLI 모드 실행 (REPL)
 python run.py -i -P my-web-app
 # (또는 pip 설치 후: modue-harness -i -P my-web-app)
+
+# 🌐 Web UI 대시보드 실행 (NiceGUI, 브라우저 화면)
+python run.py --ui -P my-web-app
+# (또는 pip 설치 후: modue-harness ui -P my-web-app)
+
+# 💻 Terminal TUI 대시보드 실행 (Textual, 터미널 콘솔/SSH 화면)
+python run.py --tui -P my-web-app
+# (또는 pip 설치 후: modue-harness tui -P my-web-app)
 
 # Google Antigravity(AGY)를 지정하여 실행
 python run.py -i -P my-web-app --agent agy -m gemini-3.8-flash-high -e high

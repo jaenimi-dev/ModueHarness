@@ -252,6 +252,50 @@ python run.py "기존 코드베이스 구조를 파악하고, 누락된 단위 �
 
 ---
 
+### 4. Web UI 및 터미널 TUI 대시보드 활용
+
+터미널 CLI 외에도 직관적인 그래픽/텍스트 기반 콕핏 대시보드를 통해 다중 AI 팀의 작업 현황과 산출물을 모니터링할 수 있습니다:
+
+- **Web UI 대시보드 (NiceGUI)**: 웹 브라우저에서 3분할 화면(명령 입력기, 실시간 AI 로그 스트림, 칠판 산출물 및 생성된 소스 코드 뷰어)을 제공합니다.
+  ```bash
+  python run.py --ui -P my-web-app
+  # (또는 pip 설치 후: modue-harness ui -P my-web-app)
+  ```
+- **Terminal TUI 대시보드 (Textual)**: SSH 원격 서버 또는 순수 터미널 콘솔에서 동작하는 풀스크린 대시보드입니다.
+  ```bash
+  python run.py --tui -P my-web-app
+  # (또는 pip 설치 후: modue-harness tui -P my-web-app)
+  ```
+
+#### ⚠️ UI 의존성 누락 시 해결 방법 (Troubleshooting)
+ModueHarness는 기본 코어 CLI를 최대한 가볍게 유지하기 위해 NiceGUI와 Textual을 **선택적 의존성(Optional Dependency)**으로 분리해 두었습니다.
+
+UI 패키지가 설치되지 않은 상태에서 UI 명령어를 실행하면 다음과 같은 친절한 가이드 메시지가 표시됩니다:
+
+```text
+$ modue-harness ui
+🌐 Starting ModueHarness Web UI at http://127.0.0.1:8080 ...
+❌ NiceGUI is not installed. Please install it using: pip install 'modue-harness[ui]' or pip install nicegui
+```
+
+```text
+$ modue-harness tui
+❌ Textual is not installed. Please install it using: pip install 'modue-harness[ui]' or pip install textual
+```
+
+**해결 방법**:  
+터미널에서 아래 명령어 중 하나를 실행하여 UI 의존성을 설치하면 즉시 정상 동작합니다:
+```bash
+# ModueHarness UI 패키지 일괄 설치 (NiceGUI + Textual)
+pip install "modue-harness[ui]"
+
+# 또는 소스 코드 개발 모드에서 설치 시
+pip install -e ".[ui]"
+# (전체 패키지 일괄 설치: pip install -e ".[all]")
+```
+
+---
+
 ## 4단계 (방법 B - 고급): 설정 폴더(`config/`) 기반 AI 팀 및 워크플로우 구성
 
 고정된 다단계 파이프라인(예: CI/CD 연계, 조건부 재시도 릴레이 등)이 필요한 경우, `config/` 디렉터리에 AI 팀 명세와 작업 명세를 선언적으로 작성할 수 있습니다.
