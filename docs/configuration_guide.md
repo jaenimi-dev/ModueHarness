@@ -223,28 +223,54 @@ workflow:
 
 ## 5단계: 실행 및 상태 점검
 
+> 💡 **Windows PowerShell 환경 주의**:  
+> `PYTHONPATH=src ...` 한 줄 문법은 Linux/macOS(Bash) 전용 문법입니다.  
+> 윈도우 PowerShell에서는 `$env:PYTHONPATH="src"` 환경 변수를 사용하거나, `pip install -e .` 설치 후 `python -m modue_harness.cli ...` 명령어로 실행합니다.
+
 ### 1. 공용 칠판(Blackboard) 초기화 (선택 사항)
-```bash
-PYTHONPATH=src python3 -m modue_harness.cli init
-```
+- **Windows PowerShell**:
+  ```powershell
+  $env:PYTHONPATH="src"; python -m modue_harness.cli init
+  # (pip install -e . 를 하셨다면 바로: python -m modue_harness.cli init)
+  ```
+- **Linux / macOS (Bash)**:
+  ```bash
+  PYTHONPATH=src python3 -m modue_harness.cli init
+  ```
 
 ### 2. 워크플로우 실행
-```bash
-# config/ 폴더의 워크플로우 실행
-PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml
+- **Windows PowerShell**:
+  ```powershell
+  # config/ 폴더의 워크플로우 실행
+  $env:PYTHONPATH="src"; python -m modue_harness.cli run --config config/workflow.yaml
 
-# 실행 보고서(Markdown) 자동 생성
-PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml --report report.md
+  # 실행 보고서(Markdown) 자동 생성
+  $env:PYTHONPATH="src"; python -m modue_harness.cli run --config config/workflow.yaml --report report.md
 
-# 필요 시 다른 AI 팀 명세로 교체하여 실행 (오버라이드)
-PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml --agents config/agents.example.yaml
-```
+  # 필요 시 다른 AI 팀 명세로 교체하여 실행 (오버라이드)
+  $env:PYTHONPATH="src"; python -m modue_harness.cli run --config config/workflow.yaml --agents config/agents.example.yaml
+  ```
+- **Linux / macOS (Bash)**:
+  ```bash
+  # config/ 폴더의 워크플로우 실행
+  PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml
+
+  # 실행 보고서(Markdown) 자동 생성
+  PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml --report report.md
+
+  # 필요 시 다른 AI 팀 명세로 교체하여 실행 (오버라이드)
+  PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml --agents config/agents.example.yaml
+  ```
 
 ### 3. 진행 상황 및 산출물 확인
-```bash
-# 전체 세션 및 태스크 상태 조회
-PYTHONPATH=src python3 -m modue_harness.cli status
-```
+- **Windows PowerShell**:
+  ```powershell
+  $env:PYTHONPATH="src"; python -m modue_harness.cli status
+  ```
+- **Linux / macOS (Bash)**:
+  ```bash
+  PYTHONPATH=src python3 -m modue_harness.cli status
+  ```
 
 생성된 파일은 프로젝트 내 `blackboard/` 폴더에서 바로 확인하실 수 있습니다:
 - `blackboard/artifacts/`: AI 에이전트들이 생성한 기획서, 코드, 보고서 등
@@ -277,3 +303,19 @@ PYTHONPATH=src python3 -m modue_harness.cli status
 
 ### Q4. API 비용이나 무한 루프가 걱정됩니다.
 - **해결책**: ModueHarness의 `ProcessSupervisor`가 동일한 에러나 텍스트가 20회 이상 반복 출력되면 무한 루프로 판단하고 프로세스를 강제 종료(`SIGKILL`)합니다. 또한 `timeout_per_step`을 통해 최대 실행 시간을 제어할 수 있습니다.
+
+### Q5. Windows PowerShell에서 `PYTHONPATH=src : 'PYTHONPATH=src' 용어가 cmdlet... 으로 인식되지 않습니다` 오류가 납니다.
+- **원인**: `PYTHONPATH=src python3 ...` 문법은 Linux/macOS(Bash) 전용 인라인 환경 변수 문법입니다. Windows PowerShell은 이를 하나의 실행 명령어 이름으로 오인하여 오류가 발생합니다. 또한 Windows에서는 `python3` 대신 `python`이 기본 실행 파일명입니다.
+- **해결책 (아래 2가지 중 택일)**:
+  - **방법 A (PowerShell 세미콜론 문법, 즉시 해결)**:
+    ```powershell
+    $env:PYTHONPATH="src"; python -m modue_harness.cli init
+    $env:PYTHONPATH="src"; python -m modue_harness.cli run --config config/workflow.yaml
+    ```
+  - **방법 B (패키지 개발 모드 설치 후 깔끔하게 실행, 가장 추천)**:
+    터미널에서 1회 설치를 해두면 `PYTHONPATH`를 아예 입력하지 않고 어디서든 깔끔하게 실행할 수 있습니다:
+    ```powershell
+    pip install -e .
+    python -m modue_harness.cli init
+    python -m modue_harness.cli run --config config/workflow.yaml
+    ```

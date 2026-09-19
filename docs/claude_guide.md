@@ -272,12 +272,14 @@ workflow:
 ```
 
 ### 3) 실행 명령어
-```bash
-# 워크플로우 실행 및 마크다운 종합 보고서 생성
-PYTHONPATH=src python3 -m modue_harness.cli run \
-  --config feature_pipeline.yaml \
-  --report final_report.md
-```
+- **Windows PowerShell**:
+  ```powershell
+  $env:PYTHONPATH="src"; python -m modue_harness.cli run --config feature_pipeline.yaml --report final_report.md
+  ```
+- **Linux / macOS (Bash)**:
+  ```bash
+  PYTHONPATH=src python3 -m modue_harness.cli run --config feature_pipeline.yaml --report final_report.md
+  ```
 
 실행이 완료되면 `blackboard/artifacts/`에 `rate_limiter_design.md`, `rate_limiter.py`, `review_report.md`가 순서대로 저장되며, 최종 요약본이 `final_report.md`로 생성됩니다.
 
