@@ -113,7 +113,22 @@ GEMINI_API_KEY=AIzaSy...
 
 어떤 AI CLI 도구와 모델, 역할을 가진 팀원들로 구성할지 정의합니다. 한 번 작성해 두면 여러 프로젝트나 작업에서 재사용할 수 있습니다.
 
-### 작성 예시 (`my_team.yaml`)
+### 파일 위치 (어디에 만들어야 하나요?)
+가장 권장하는 위치는 **프로젝트 루트 폴더(`ModueHarness/` 바로 아래)**입니다.  
+`workflow.yaml`과 `agents.yaml`을 같은 폴더에 나란히 배치하면 경로 충돌 없이 가장 깔끔하게 동작합니다:
+
+```text
+ModueHarness/
+├── agents.yaml          <-- [3단계] 여기에 생성 (AI 팀 명세)
+├── workflow.yaml        <-- [4단계] 여기에 생성 (작업 명세)
+├── blackboard/          <-- 산출물 및 로그가 저장될 공용 공간 (자동 생성)
+└── src/
+```
+
+> 💡 **경로 인식 규칙**:  
+> `workflow.yaml` 내부에서 `agents_file: "agents.yaml"`로 지정하면, ModueHarness는 **`workflow.yaml`이 위치한 동일 폴더를 기준으로 `agents.yaml`을 자동 탐색**합니다. 별도 폴더에 둘 경우 상대 경로(예: `config/agents.yaml`)로 적어주시면 됩니다.
+
+### 작성 예시 (`agents.yaml`)
 ```yaml
 version: "0.4.0"
 name: "my-engineering-team"
