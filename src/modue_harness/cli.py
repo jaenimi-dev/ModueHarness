@@ -525,6 +525,9 @@ def handle_ui(args: argparse.Namespace) -> int:
     try:
         run_app(controller=ctrl, host=host, port=port, open_browser=open_browser)
         return 0
+    except KeyboardInterrupt:
+        print("\n👋 ModueHarness Web UI 서버가 정상 종료되었습니다.")
+        return 0
     except ImportError as e:
         print(f"❌ {e}")
         return 1
@@ -556,6 +559,9 @@ def handle_tui(args: argparse.Namespace) -> int:
 
     try:
         run_tui_app(controller=ctrl)
+        return 0
+    except KeyboardInterrupt:
+        print("\n👋 ModueHarness TUI가 정상 종료되었습니다.")
         return 0
     except ImportError as e:
         print(f"❌ {e}")
@@ -729,26 +735,30 @@ def handle_debate(args: argparse.Namespace) -> int:
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Main CLI entrypoint."""
-    load_dotenv()
-    args = parse_cli_args(argv)
+    try:
+        load_dotenv()
+        args = parse_cli_args(argv)
 
-    if args.command == "init":
-        return handle_init(args)
-    elif args.command == "status":
-        return handle_status(args)
-    elif args.command == "projects":
-        return handle_projects(args)
-    elif args.command == "ui":
-        return handle_ui(args)
-    elif args.command == "tui":
-        return handle_tui(args)
-    elif args.command == "run":
-        return handle_run(args)
-    elif args.command == "debate":
-        return handle_debate(args)
+        if args.command == "init":
+            return handle_init(args)
+        elif args.command == "status":
+            return handle_status(args)
+        elif args.command == "projects":
+            return handle_projects(args)
+        elif args.command == "ui":
+            return handle_ui(args)
+        elif args.command == "tui":
+            return handle_tui(args)
+        elif args.command == "run":
+            return handle_run(args)
+        elif args.command == "debate":
+            return handle_debate(args)
 
-    # If no subcommand, handle direct CLI prompt or interactive session
-    return handle_interactive_or_prompt(args)
+        # If no subcommand, handle direct CLI prompt or interactive session
+        return handle_interactive_or_prompt(args)
+    except KeyboardInterrupt:
+        print("\n👋 작업을 종료했습니다 (Ctrl+C).")
+        return 0
 
 
 if __name__ == "__main__":

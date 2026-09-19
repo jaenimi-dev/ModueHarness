@@ -137,4 +137,7 @@ def run_tui_app(controller: Optional[UIController] = None) -> None:
             log.write("\n[bold red]Task cancellation requested via 'c'.[/bold red]")
 
     app = ModueHarnessTUI()
-    app.run()
+    try:
+        app.run()
+    except (KeyboardInterrupt, Exception):
+        pass

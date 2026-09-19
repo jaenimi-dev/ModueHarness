@@ -179,6 +179,18 @@ def test_cli_ui_command_success(monkeypatch):
     assert mock_run.call_args[1]["open_browser"] is False
 
 
+def test_cli_ui_keyboard_interrupt(monkeypatch, capsys):
+    """Test 'modue-harness ui' gracefully handles KeyboardInterrupt."""
+    def mock_run_app(*args, **kwargs):
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr("modue_harness.ui.web.app.run_app", mock_run_app)
+    ret = main(["ui", "-P", "myproj"])
+    out, _ = capsys.readouterr()
+    assert ret == 0
+    assert "정상 종료되었습니다" in out
+
+
 def test_cli_tui_command_missing_dep(capsys):
     """Test 'modue-harness tui' command prints installation instructions and exits 1."""
     ret = main(["tui", "-P", "testproj"])

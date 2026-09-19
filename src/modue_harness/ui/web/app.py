@@ -206,4 +206,7 @@ def run_app(
     else:
         ui.page("/")(build_dashboard)
 
-    ui.run(**run_kwargs)
+    try:
+        ui.run(**run_kwargs)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
