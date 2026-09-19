@@ -210,7 +210,7 @@ Claude Code 하나만으로도 역할을 분리하여 **기획자(Architect) - �
 
 ### 1) AI 팀 명세: `claude_team.yaml`
 ```yaml
-version: "0.4.0"
+version: "0.5.0"
 name: "claude-all-stars"
 
 agents:
@@ -241,7 +241,7 @@ agents:
 
 ### 2) 작업 워크플로우 명세: `feature_pipeline.yaml`
 ```yaml
-version: "0.4.0"
+version: "0.5.0"
 name: "build-token-bucket-ratelimiter"
 agents_file: "claude_team.yaml"
 

@@ -225,7 +225,7 @@ cp config/workflow.example.yaml config/workflow.yaml
 
 ### 2. AI 팀 명세(`config/agents.yaml`)
 ```yaml
-version: "0.4.0"
+version: "0.5.0"
 name: "my-engineering-team"
 
 agents:
@@ -253,7 +253,7 @@ agents:
 
 ### 3. 작업 명세(`config/workflow.yaml`)
 ```yaml
-version: "0.4.0"
+version: "0.5.0"
 name: "feature-delivery-pipeline"
 agents_file: "agents.yaml"
 

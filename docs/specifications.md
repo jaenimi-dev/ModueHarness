@@ -19,7 +19,7 @@ ModueHarness는 정적 파이프라인 및 복잡한 배치 자동화를 위해 
 어떤 AI CLI 도구(Claude, AGY, Aider 등)와 모델, 권한, 역할을 가진 팀원들로 구성할지 선언합니다.
 
 ```yaml
-version: "0.4.0"
+version: "0.5.0"
 name: "modue-engineering-team"
 
 agents:
@@ -50,7 +50,7 @@ agents:
 실제 프로젝트에서 수행할 태스크, 산출물 입출력 연계, 실행 조건, 격리 옵션을 정의합니다.
 
 ```yaml
-version: "0.4.0"
+version: "0.5.0"
 name: "data-pipeline-feature"
 
 # 사용할 AI 팀 명세 파일 지정 (상대 경로 가능)

@@ -26,7 +26,7 @@ def test_harness_config_defaults():
     """Verify default configurations."""
     config = HarnessConfig()
     assert config.name == "default-harness"
-    assert config.version == "0.4.0"
+    assert config.version == "0.5.0"
     assert config.debug is False
     assert config.options == {}
 

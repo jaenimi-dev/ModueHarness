@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-09-20
+
+### Added
+- **Interactive REPL Mode (`-i` / `--interactive`)**:
+  - Interactive command-line REPL loop allowing users to direct AI agents with ad-hoc instructions without predefined workflow YAML files.
+  - Built-in slash commands: `/help`, `/status`, `/artifacts`, `/agents`, `/run`, `/clean`, `/jobs`, `/cancel`, `/bg`, `/exit`, `/quit`.
+- **Project Workspace & Blackboard Separation (`-P` / `--project-name`)**:
+  - Separation of code generation into isolated project workspaces (`projects/<project-name>/`).
+  - Preserved `blackboard/` purely for inter-agent context sharing, specs, tasks, and state.
+- **Live Progress Streaming (`core/events.py`, `cli.py`)**:
+  - Terminal real-time event streaming during interactive and CLI executions.
+  - Immediate visual feedback on workflow status, agent invocations, and artifact updates.
+- **Background Async Job Management**:
+  - Support for executing tasks asynchronously in background with trailing `&` or `/bg <command>`.
+  - Non-blocking REPL prompt allowing concurrent command entry while tasks execute.
+  - `/jobs` to list active/completed background tasks and `/cancel <job_id>` to abort executions.
+- **Direct Entrypoint Script (`run.py`)**:
+  - Convenient root launcher resolving Python package pathing without requiring prior `pip install -e .`.
+
 ## [0.4.0] - 2026-09-18
 
 ### Added
