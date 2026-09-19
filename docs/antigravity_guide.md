@@ -48,7 +48,14 @@ PowerShell을 실행하고 다음 명령어를 실행합니다:
 irm https://antigravity.google/cli/install.ps1 | iex
 ```
 * **기본 설치 위치**: `C:\Users\<username>\AppData\Local\agy\bin` (또는 `%LOCALAPPDATA%\agy\bin`)
-* **PATH 자동 등록**: 설치 스크립트가 사용자 환경 변수 `Path`에 해당 디렉터리를 자동 등록합니다. 설치 후 새 터미널을 열어 적용합니다.
+* **PATH 자동 등록**: 설치 스크립트가 사용자 환경 변수(Registry) `Path`에 해당 디렉터리를 자동 등록합니다.
+* **⚠️ 주의 (PATH 반영 안내)**:
+  - 이미 열려 있는 기존 터미널 창에는 변경된 시스템 환경 변수가 즉시 반영되지 않아 `Warning: ... is not present in your active Environment PATH` 경고가 표시됩니다.
+  - **터미널 재시작**: 열려 있는 터미널(또는 VS Code)을 완전히 닫고 다시 열면 자동으로 정상 인식됩니다.
+  - **현재 창에서 즉시 적용**: 터미널을 닫지 않고 바로 적용하려면 현재 PowerShell 창에 아래 명령을 실행합니다:
+    ```powershell
+    $env:Path += ";$env:LOCALAPPDATA\agy\bin"
+    ```
 
 ### 3) Windows (CMD / 명령 프롬프트)
 기본 명령 프롬프트(CMD)를 사용할 경우:
