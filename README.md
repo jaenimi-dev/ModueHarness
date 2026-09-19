@@ -24,15 +24,21 @@ python3 -m pytest -q
 ```
 
 ### 3. CLI 실행 예시 (워크플로우 파일 없이 직접 명령 실행)
-```bash
-# 대화형 CLI 모드 실행 (REPL)
-PYTHONPATH=src python3 -m modue_harness.cli -i -P my-web-app
 
-# 또는 단일 명령어로 즉시 작업 실행
-PYTHONPATH=src python3 -m modue_harness.cli "FastAPI 기반 REST API와 테스트 코드를 작성해줘" -P my-api
+> 💡 **실행 방법 (아래 2가지 중 편한 방법 선택)**:
+> - **방법 A (루트 실행 파일, 환경변수 불필요)**: `python run.py [옵션]`
+> - **방법 B (전용 CLI 명령어, pip 설치 후)**: `modue-harness [옵션]`
+
+```bash
+# [추천] 대화형 CLI 모드 실행 (REPL)
+python run.py -i -P my-web-app
+# (또는 pip 설치 후: modue-harness -i -P my-web-app)
+
+# 단일 명령어로 즉시 프로젝트에 작업 구현
+python run.py "FastAPI 기반 REST API와 테스트 코드를 작성해줘" -P my-api
 
 # Multi-AI 토론 및 합의 (Debate) 실행
-PYTHONPATH=src python3 -m modue_harness.cli debate --topic "REST vs GraphQL for Mobile Backend"
+python run.py debate --topic "REST vs GraphQL for Mobile Backend"
 ```
 
 ---

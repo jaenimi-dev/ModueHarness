@@ -13,16 +13,26 @@ ModueHarness는 **AI 간의 정보 교환**과 **실제 프로젝트 코드 구�
 
 ---
 
+> 💡 **실행 명령어 표기 안내**:  
+> 본 문서의 모든 명령어는 아래 3가지 방식으로 동일하게 실행할 수 있습니다:  
+> - **방법 1 (루트 실행 파일, 가장 간편)**: `python run.py [명령어/옵션]` (환경변수 불필요)  
+> - **방법 2 (전용 CLI 명령어)**: `modue-harness [명령어/옵션]` (`pip install -e .` 설치 후)  
+> - **방법 3 (파이썬 모듈)**: `python -m modue_harness.cli [명령어/옵션]` (Windows는 `$env:PYTHONPATH="src"` 필요)
+
+---
+
 ## 1. 대화형 CLI 모드 (Interactive REPL)
 
 워크플로우 YAML 설정 파일 없이 터미널에서 대화형으로 AI 팀에게 자연어 명령을 내릴 수 있습니다.
 
 ```bash
 # 기본 대화형 모드 시작
-python3 -m modue_harness.cli -i
+python run.py -i
+# (또는: modue-harness -i)
 
 # 특정 프로젝트를 지정하여 시작
-python3 -m modue_harness.cli -i -P my-web-app
+python run.py -i -P my-web-app
+# (또는: modue-harness -i -P my-web-app)
 ```
 
 ### 대화형 세션 내 특수 명령어
@@ -41,13 +51,13 @@ CLI 명령줄에서 작업을 한 줄로 즉시 전달하여 실행합니다.
 
 ```bash
 # 기본 프로젝트(default)에 작업 실행
-python3 -m modue_harness.cli "간단한 사칙연산 계산기 모듈과 테스트 코드를 작성해줘"
+python run.py "간단한 사칙연산 계산기 모듈과 테스트 코드를 작성해줘"
 
 # 특정 프로젝트(projects/calculator/)를 지정하여 실행
-python3 -m modue_harness.cli "간단한 사칙연산 계산기 모듈과 테스트 코드를 작성해줘" -P calculator
+python run.py "간단한 사칙연산 계산기 모듈과 테스트 코드를 작성해줘" -P calculator
 
 # -p 플래그 사용 예시
-python3 -m modue_harness.cli -p "FastAPI 기반 회원가입 API 구현" -P user-service
+python run.py -p "FastAPI 기반 회원가입 API 구현" -P user-service
 ```
 
 ### 공통 옵션

@@ -119,17 +119,39 @@ GEMINI_API_KEY=AIzaSy...
 
 ModueHarness는 복잡한 YAML 설정 파일을 작성하지 않고도, **CLI에서 직접 자연어로 명령을 내려 프로젝트 개발 작업을 수행**할 수 있습니다. 시스템에 설치된 `claude` 또는 `agy`를 자동으로 감지하여 팀을 구성합니다.
 
+> 💡 **실행 방식 선택 (아래 3가지 중 가장 편한 방법을 사용하세요)**:  
+> 1. **루트 실행 파일 (`python run.py [옵션]`, 가장 추천)**:  
+>    Windows, macOS, Linux 어디서든 환경 변수 설정이나 사전 설치 없이 즉시 실행할 수 있습니다.
+> 2. **전용 CLI 명령어 (`modue-harness [옵션]`)**:  
+>    `pip install -e .` 설치 후 터미널 어디서든 전용 명령어로 바로 실행할 수 있습니다.
+> 3. **파이썬 모듈 실행 (`python -m modue_harness.cli [옵션]`)**:  
+>    - Linux/macOS: `PYTHONPATH=src python3 -m modue_harness.cli ...`
+>    - Windows PowerShell: `$env:PYTHONPATH="src"; python -m modue_harness.cli ...`
+
+> ⚠️ **`ModuleNotFoundError: No module named 'modue_harness'` 오류 해결**:  
+> Windows에서 `python -m modue_harness.cli` 실행 시 이 에러가 발생한다면 파이썬이 `src/` 경로를 찾지 못하는 상태입니다.  
+> - **해결 1**: `python run.py -i -P <프로젝트명>` 명령어로 실행 (자동으로 `src/` 경로 인식).  
+> - **해결 2**: 프로젝트 폴더에서 `pip install -e .` 명령어를 1회 실행하여 패키지 등록.  
+> - **해결 3**: PowerShell에서 `$env:PYTHONPATH="src"` 환경 변수 등록 후 실행.
+
+---
+
 ### 1. 대화형 CLI 모드 (Interactive REPL)
 터미널에서 대화형 프롬프트를 띄우고 연속적으로 지시를 내립니다:
 
-- **Linux / macOS (Bash)**:
-  ```bash
-  PYTHONPATH=src python3 -m modue_harness.cli -i -P my-web-app
-  ```
-- **Windows PowerShell**:
-  ```powershell
-  $env:PYTHONPATH="src"; python -m modue_harness.cli -i -P my-web-app
-  ```
+```bash
+# [가장 간편] 루트 실행 파일 사용 (Windows / Mac / Linux 공통)
+python run.py -i -P my-web-app
+
+# [전용 CLI] pip install -e . 설치 후 사용
+modue-harness -i -P my-web-app
+
+# [모듈 직접 실행]
+# Linux / macOS (Bash)
+PYTHONPATH=src python3 -m modue_harness.cli -i -P my-web-app
+# Windows PowerShell
+$env:PYTHONPATH="src"; python -m modue_harness.cli -i -P my-web-app
+```
 
 **대화형 화면 예시:**
 ```text
@@ -160,14 +182,16 @@ ModueHarness는 복잡한 YAML 설정 파일을 작성하지 않고도, **CLI에
 ### 2. 단일 명령 직접 실행 (One-shot Command)
 대화형 모드에 진입하지 않고 터미널 한 줄로 작업을 지시합니다:
 
-- **Linux / macOS (Bash)**:
-  ```bash
-  PYTHONPATH=src python3 -m modue_harness.cli "계산기 파이썬 모듈과 pytest 테스트를 구현해줘" -P calculator
-  ```
-- **Windows PowerShell**:
-  ```powershell
-  $env:PYTHONPATH="src"; python -m modue_harness.cli "계산기 파이썬 모듈과 pytest 테스트를 구현해줘" -P calculator
-  ```
+```bash
+# [가장 간편] 루트 실행 파일 사용 (Windows / Mac / Linux 공통)
+python run.py "계산기 파이썬 모듈과 pytest 테스트를 구현해줘" -P calculator
+
+# [전용 CLI] pip install -e . 설치 후 사용
+modue-harness "계산기 파이썬 모듈과 pytest 테스트를 구현해줘" -P calculator
+
+# [플래그 사용 예시]
+python run.py -p "REST API 서버 구현" -P my-api
+```
 
 ---
 
