@@ -44,6 +44,17 @@ Anthropic에서는 백그라운드 자동 업데이트가 지원되는 **공식 
   ```powershell
   irm https://claude.ai/install.ps1 | iex
   ```
+  > 💡 **Windows PATH 환경 변수 자동 등록 (중요)**:  
+  > 설치 후 `... \.local\bin is not in your PATH` 알림이 뜨면 특정 사용자 계정명에 구애받지 않는 범용 환경 변수(`$HOME` 또는 `%USERPROFILE%`)를 사용하여 등록합니다:
+  > - **PowerShell 명령어 (추천)**:
+  >   ```powershell
+  >   $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+  >   [Environment]::SetEnvironmentVariable("Path", "$userPath;$HOME\.local\bin", "User")
+  >   $env:Path += ";$HOME\.local\bin"
+  >   ```
+  > - **Windows GUI 수동 등록**:
+  >   `Win + R` → `sysdm.cpl` 실행 → [고급] → [환경 변수] → 사용자 변수의 `Path` 편집 → [새로 만들기] → `%USERPROFILE%\.local\bin` 입력 후 저장 및 터미널 재시작
+
 - **Windows CMD**:
   ```batch
   curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd
@@ -291,15 +302,24 @@ PYTHONPATH=src python3 -m modue_harness.cli run \
     irm https://claude.ai/install.ps1 | iex
     ```
 
-### Q4. Windows에서 설치 후 `C:\Users\<사용자>\.local\bin is not in your PATH` 알림이 뜹니다.
+### Q4. Windows에서 설치 후 `... \.local\bin is not in your PATH` 알림이 뜹니다.
 - **원인**: Claude Code 설치 파일(`claude.exe`)은 정상 다운로드되었으나, 윈도우 환경 변수 `Path`에 해당 디렉터리가 등록되지 않아 터미널이 `claude` 명령을 찾지 못하는 상태입니다.
-- **해결책 (PowerShell에서 1줄로 영구 등록)**:
-  PowerShell 창을 열고 아래 명령어를 실행한 뒤, 터미널을 다시 시작(Restart)합니다:
-  ```powershell
-  $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-  [Environment]::SetEnvironmentVariable("Path", "$userPath;$HOME\.local\bin", "User")
-  ```
-  *(현재 열려 있는 세션에 즉시 반영하려면 `$env:Path += ";$HOME\.local\bin"` 입력 후 `claude --version` 확인)*
+- **해결책 (특정 사용자 계정명에 종속되지 않는 범용 등록 방법)**:
+  - **방법 1 (PowerShell에서 1줄로 영구 등록, 추천)**:
+    ```powershell
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    [Environment]::SetEnvironmentVariable("Path", "$userPath;$HOME\.local\bin", "User")
+    $env:Path += ";$HOME\.local\bin"
+    ```
+  - **방법 2 (윈도우 그래픽 창 GUI 방식)**:
+    1. `Win + R`을 누르고 `sysdm.cpl` 입력 후 엔터
+    2. [고급] 탭 → [환경 변수(N)...] 클릭
+    3. 사용자 변수 목록에서 `Path` 선택 후 [편집(E)...]
+    4. [새로 만들기(N)] 클릭 후 아래 범용 환경 변수 경로 입력:
+       ```text
+       %USERPROFILE%\.local\bin
+       ```
+    5. [확인]을 눌러 저장하고, **새 터미널 창을 열어** `claude --version` 실행
 
 ### Q5. Claude의 컨텍스트 윈도우가 넘치거나 토큰 비용이 걱정됩니다.
 - **해결책**:
