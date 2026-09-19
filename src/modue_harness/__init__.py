@@ -24,8 +24,10 @@ from modue_harness.core.types import (
 from modue_harness.engine import (
     ConductorRunner,
     DebateRunner,
+    InteractiveSession,
     PipelineRunner,
     WorkflowConfig,
+    load_or_detect_agents,
 )
 from modue_harness.plugins import (
     BasePlugin,
@@ -56,6 +58,8 @@ __all__ = [
     "PipelineRunner",
     "ConductorRunner",
     "DebateRunner",
+    "InteractiveSession",
+    "load_or_detect_agents",
     "WorkflowConfig",
     "GitWorkspaceManager",
     "BasePlugin",

@@ -23,10 +23,13 @@ pip install -e ".[dev]"
 python3 -m pytest -q
 ```
 
-### 3. 워크플로우 실행 예시
+### 3. CLI 실행 예시 (워크플로우 파일 없이 직접 명령 실행)
 ```bash
-# 다중 AI 협업 파이프라인 실행
-PYTHONPATH=src python3 -m modue_harness.cli run --config examples/feature_workflow.yaml
+# 대화형 CLI 모드 실행 (REPL)
+PYTHONPATH=src python3 -m modue_harness.cli -i -P my-web-app
+
+# 또는 단일 명령어로 즉시 작업 실행
+PYTHONPATH=src python3 -m modue_harness.cli "FastAPI 기반 REST API와 테스트 코드를 작성해줘" -P my-api
 
 # Multi-AI 토론 및 합의 (Debate) 실행
 PYTHONPATH=src python3 -m modue_harness.cli debate --topic "REST vs GraphQL for Mobile Backend"
@@ -36,11 +39,10 @@ PYTHONPATH=src python3 -m modue_harness.cli debate --topic "REST vs GraphQL for 
 
 ## 💡 핵심 아키텍처 요약
 
-- **공용 칠판 (`blackboard/`)**: AI CLI 프로세스들이 투명하게 상태(`state.json`), 태스크(`tasks/`), 산출물(`artifacts/`), 로그(`logs/`)를 교환하는 프로젝트 내 가시 공간.
-- **다양한 협업 토폴로지**:
-  - **파이프라인 (Pipeline)**: 산출물 연쇄 전달 및 조건부/재시도 릴레이
-  - **지휘자-워커 (Conductor)**: Leader AI의 동적 태스크 분해 및 종합
-  - **토론 및 합의 (Debate)**: 다자 교차 토론 및 판정관 최종 합의안 도출
+- **공용 칠판 (`blackboard/`)**: AI 프로세스 간 상태(`state.json`), 태스크(`tasks/`), 교환 산출물(`artifacts/`), 로그(`logs/`)를 공유하는 팀 협업 전용 공간.
+- **프로젝트 격리 작업 공간 (`projects/<프로젝트명>/`)**: AI 팀이 실제 소스 코드, 패키지, 테스트 파일 등을 생성·수정하는 프로젝트별 독립 공간.
+- **CLI 중심 자율 협업**: 별도의 워크플로우 YAML 파일 작성 없이, 터미널에서 자연어 명령을 입력받아 Conductor(Leader)가 기획하고 Worker들이 분담 구현.
+- **다양한 협업 토폴로지**: 지휘자-워커(Conductor), 토론 및 합의(Debate), 파이프라인(Pipeline).
 - **안전 감시자 & Git 격리**: Git Worktree 기반 변경 분리, 스냅샷 롤백, 무응답/무한 루프 방지.
 
 ---

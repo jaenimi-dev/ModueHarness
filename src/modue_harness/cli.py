@@ -1,4 +1,7 @@
-"""Command Line Interface for ModueHarness with Pipeline, Debate, and Report support."""
+"""Command Line Interface for ModueHarness with direct CLI command execution,
+
+interactive REPL, project workspace separation, Pipeline, Debate, and Report support.
+"""
 
 import argparse
 from pathlib import Path
@@ -10,16 +13,19 @@ from modue_harness.adapters import create_adapter
 from modue_harness.core.blackboard import Blackboard
 from modue_harness.core.config import load_dotenv
 from modue_harness.engine.debate import DebateRunner
+from modue_harness.engine.interactive import InteractiveSession
 from modue_harness.engine.pipeline import PipelineRunner
 from modue_harness.engine.workflow import WorkflowConfig
 from modue_harness.plugins.reporter import MarkdownReportPlugin
 
+KNOWN_SUBCOMMANDS = {"init", "status", "projects", "run", "debate"}
+
 
 def create_parser() -> argparse.ArgumentParser:
-    """Build and configure the CLI argument parser with subcommands."""
+    """Build and configure the CLI argument parser with subcommands and root command options."""
     parser = argparse.ArgumentParser(
         prog="modue-harness",
-        description="ModueHarness - Multi-AI CLI Collaboration Harness",
+        description="ModueHarness - Multi-AI CLI Collaboration Harness (Interactive & Direct Command Execution)",
     )
     parser.add_argument(
         "-v", "--version",
@@ -33,28 +39,92 @@ def create_parser() -> argparse.ArgumentParser:
         help="Enable debug mode",
     )
 
+    # Root command flags for direct/interactive execution
+    parser.add_argument(
+        "-p", "--prompt",
+        type=str,
+        default=None,
+        help="Task instruction or command to execute directly in the target project",
+    )
+    parser.add_argument(
+        "-P", "--project",
+        type=str,
+        default="default",
+        help="Target project name (saved in projects/<project_name>, default: 'default')",
+    )
+    parser.add_argument(
+        "--projects-dir",
+        type=str,
+        default="projects",
+        help="Path to projects base directory (default: projects)",
+    )
+    parser.add_argument(
+        "--dir", "-d",
+        type=str,
+        default="blackboard",
+        help="Path to shared blackboard directory for AI coordination (default: blackboard)",
+    )
+    parser.add_argument(
+        "--agents", "-a",
+        type=str,
+        default=None,
+        help="Path to AI team specification file (default: config/agents.yaml or auto-detect)",
+    )
+    parser.add_argument(
+        "--agent",
+        type=str,
+        default=None,
+        help="Override with a specific single AI agent adapter (e.g. claude, agy, aider, generic)",
+    )
+    parser.add_argument(
+        "-i", "--interactive",
+        action="store_true",
+        help="Start interactive CLI REPL session",
+    )
+
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
     # Command: init
-    init_parser = subparsers.add_parser("init", help="Initialize blackboard workspace directory")
+    init_parser = subparsers.add_parser("init", help="Initialize blackboard and projects directory")
     init_parser.add_argument(
         "--dir", "-d",
         type=str,
         default="blackboard",
         help="Path to blackboard directory (default: blackboard)",
     )
+    init_parser.add_argument(
+        "--projects-dir",
+        type=str,
+        default="projects",
+        help="Path to projects directory (default: projects)",
+    )
 
     # Command: status
-    status_parser = subparsers.add_parser("status", help="Display current blackboard status and tasks")
+    status_parser = subparsers.add_parser("status", help="Display current blackboard status, projects, and tasks")
     status_parser.add_argument(
         "--dir", "-d",
         type=str,
         default="blackboard",
         help="Path to blackboard directory (default: blackboard)",
     )
+    status_parser.add_argument(
+        "--projects-dir",
+        type=str,
+        default="projects",
+        help="Path to projects directory (default: projects)",
+    )
 
-    # Command: run
-    run_parser = subparsers.add_parser("run", help="Run a multi-AI collaboration workflow")
+    # Command: projects
+    projects_parser = subparsers.add_parser("projects", help="List existing projects in projects directory")
+    projects_parser.add_argument(
+        "--projects-dir",
+        type=str,
+        default="projects",
+        help="Path to projects directory (default: projects)",
+    )
+
+    # Command: run (legacy workflow support)
+    run_parser = subparsers.add_parser("run", help="Run a multi-AI collaboration workflow specification file")
     run_parser.add_argument(
         "--config", "-c",
         type=str,
@@ -122,29 +192,107 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def parse_cli_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    """Parse CLI arguments supporting positional task prompts and root execution."""
+    parser = create_parser()
+    raw_args = list(sys.argv[1:] if argv is None else argv)
+
+    # Fast path for version
+    if "-v" in raw_args or "--version" in raw_args:
+        return parser.parse_args(raw_args)
+
+    # Check if a known subcommand is present at the front
+    is_subcmd = False
+    for a in raw_args:
+        if a in KNOWN_SUBCOMMANDS:
+            is_subcmd = True
+            break
+        if not a.startswith("-"):
+            break
+
+    if not is_subcmd:
+        cleaned_args = []
+        positional_prompt: Optional[str] = None
+        i = 0
+        valued_flags = {
+            "-P", "--project",
+            "--projects-dir",
+            "--dir", "-d",
+            "--agents", "-a",
+            "--agent",
+            "-p", "--prompt",
+        }
+
+        while i < len(raw_args):
+            arg = raw_args[i]
+            if arg in valued_flags:
+                cleaned_args.append(arg)
+                if i + 1 < len(raw_args):
+                    cleaned_args.append(raw_args[i + 1])
+                    i += 2
+                    continue
+            elif arg.startswith("-"):
+                cleaned_args.append(arg)
+            else:
+                if positional_prompt is None:
+                    positional_prompt = arg
+                else:
+                    positional_prompt += " " + arg
+            i += 1
+
+        parsed = parser.parse_args(cleaned_args)
+        if positional_prompt and not parsed.prompt:
+            parsed.prompt = positional_prompt
+        return parsed
+
+    return parser.parse_args(raw_args)
+
+
 def handle_init(args: argparse.Namespace) -> int:
-    """Handle 'init' command."""
-    board_dir = Path(args.dir).resolve()
+    """Handle 'init' command: Initialize blackboard and projects directory."""
+    board_dir = Path(getattr(args, "dir", "blackboard")).resolve()
     board = Blackboard(root_dir=board_dir)
     board.initialize()
+
+    projects_dir = Path(getattr(args, "projects_dir", "projects")).resolve()
+    projects_dir.mkdir(parents=True, exist_ok=True)
+
     print(f"✓ Initialized ModueHarness blackboard at: {board.root_dir}")
+    print(f"✓ Initialized projects directory at:       {projects_dir}")
     return 0
 
 
 def handle_status(args: argparse.Namespace) -> int:
-    """Handle 'status' command."""
-    board_dir = Path(args.dir).resolve()
+    """Handle 'status' command: Display blackboard status, projects, tasks, and artifacts."""
+    board_dir = Path(getattr(args, "dir", "blackboard")).resolve()
     board = Blackboard(root_dir=board_dir)
     if not board.is_initialized():
         print(f"Blackboard at '{board_dir}' is not initialized. Run 'modue-harness init' first.")
         return 1
 
     state = board.load_state()
+    projects_dir = Path(getattr(args, "projects_dir", "projects")).resolve()
+    existing_projects = (
+        sorted([p.name for p in projects_dir.iterdir() if p.is_dir() and not p.name.startswith(".")])
+        if projects_dir.exists()
+        else []
+    )
+
     print(f"=== ModueHarness Blackboard Status ===")
     print(f"Location: {board.root_dir}")
+    print(f"Projects Directory: {projects_dir}")
     print(f"Session ID: {state.get('session_id', 'N/A')}")
     print(f"Workflow Status: {state.get('status', 'unknown')}")
     print(f"Current Step: {state.get('current_step', 'None')}")
+    if state.get("current_project"):
+        print(f"Active Project: {state.get('current_project')}")
+
+    print(f"\n--- Projects ({len(existing_projects)}) ---")
+    if not existing_projects:
+        print("  (No project directories yet)")
+    for p in existing_projects:
+        active = " [ACTIVE]" if p == state.get("current_project") else ""
+        print(f"  • {p}{active}")
 
     tasks = board.list_tasks()
     print(f"\n--- Tasks ({len(tasks)}) ---")
@@ -169,8 +317,91 @@ def handle_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_projects(args: argparse.Namespace) -> int:
+    """Handle 'projects' command: List projects in projects directory."""
+    projects_dir = Path(getattr(args, "projects_dir", "projects")).resolve()
+    if not projects_dir.exists():
+        print(f"Projects directory at '{projects_dir}' does not exist.")
+        return 0
+    projects = sorted([p.name for p in projects_dir.iterdir() if p.is_dir() and not p.name.startswith(".")])
+    print(f"=== ModueHarness Projects ({len(projects)}) ===")
+    print(f"Base Directory: {projects_dir}")
+    if not projects:
+        print("  (No projects created yet. Run with '-P <project_name>' to create one.)")
+    for p in projects:
+        print(f"  • {p}")
+    return 0
+
+
+def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
+    """Handle direct CLI command execution or interactive REPL session."""
+    project_name = getattr(args, "project", "default") or "default"
+    projects_dir = Path(getattr(args, "projects_dir", "projects")).resolve()
+    board_dir = Path(getattr(args, "dir", "blackboard")).resolve()
+    agents_file = Path(args.agents).resolve() if getattr(args, "agents", None) else None
+    specific_agent = getattr(args, "agent", None)
+
+    session = InteractiveSession(
+        project_name=project_name,
+        projects_root=projects_dir,
+        blackboard_dir=board_dir,
+        agents_file=agents_file,
+        specific_agent=specific_agent,
+    )
+
+    # 1. User requested interactive session explicitly or running in a TTY terminal without args
+    if getattr(args, "interactive", False) or (not getattr(args, "prompt", None) and sys.stdin.isatty()):
+        session.start_repl()
+        return 0
+
+    # 2. User supplied a prompt/command
+    if getattr(args, "prompt", None):
+        prompt = args.prompt.strip()
+        print(f"🚀 [ModueHarness] 작업 실행 (프로젝트: '{project_name}')")
+        print(f"   구현 디렉터리: {session.project_dir}")
+        print(f"   공용 칠판:     {session.blackboard_dir}")
+        print(f"   작업 명령:     {prompt}\n")
+
+        summary = session.execute_command(prompt)
+
+        print("\n" + "=" * 64)
+        status_text = "SUCCESS" if summary["success"] else "FAILED"
+        print(f"상태: {status_text} (소요 시간: {summary['total_duration_sec']:.2f}s)")
+        print(f"프로젝트 구현 폴더: {summary['project_dir']}")
+
+        if summary.get("subtasks"):
+            print(f"\n[실행된 서브태스크 ({len(summary['subtasks'])})]")
+            for st in summary["subtasks"]:
+                mark = "✓" if st.get("is_success") else "✗"
+                print(f"  [{mark}] {st.get('task_id')} ({st.get('agent')})")
+
+        if summary.get("project_files"):
+            print(f"\n[프로젝트 내 생성/수정된 파일 ({len(summary['project_files'])})]")
+            for pf in summary["project_files"]:
+                print(f"  📄 {pf}")
+
+        if summary.get("artifacts"):
+            print(f"\n[블랙보드 정보교환 산출물 ({len(summary['artifacts'])})]")
+            for af in summary["artifacts"]:
+                print(f"  📌 {af}")
+        print("=" * 64)
+
+        return 0 if summary["success"] else 1
+
+    # 3. Non-interactive without prompt (e.g. headless script or default run in test)
+    print(f"ModueHarness v{__version__}")
+    print("Multi-AI CLI Collaboration Framework (Interactive CLI & Project-Isolated)")
+    print("\n사용법:")
+    print("  modue-harness \"<작업 명령>\" [-P <프로젝트명>]   # 프로젝트에 코드 직접 구현")
+    print("  modue-harness -i                                # 대화형 CLI 프롬프트 실행")
+    print("  modue-harness projects                          # 생성된 프로젝트 목록")
+    print("  modue-harness status                            # 상태 및 태스크 현황")
+    print("  modue-harness --help                            # 전체 옵션 도움말")
+    return 0
+
+
 def handle_run(args: argparse.Namespace) -> int:
-    """Handle 'run' command."""
+    """Handle 'run' command (legacy workflow runner)."""
     config_path = Path(args.config).resolve()
     if not config_path.exists():
         print(f"Error: Configuration file not found at {config_path}")
@@ -252,23 +483,21 @@ def handle_debate(args: argparse.Namespace) -> int:
 def main(argv: Optional[List[str]] = None) -> int:
     """Main CLI entrypoint."""
     load_dotenv()
-    parser = create_parser()
-    args = parser.parse_args(argv)
+    args = parse_cli_args(argv)
 
     if args.command == "init":
         return handle_init(args)
     elif args.command == "status":
         return handle_status(args)
+    elif args.command == "projects":
+        return handle_projects(args)
     elif args.command == "run":
         return handle_run(args)
     elif args.command == "debate":
         return handle_debate(args)
 
-    if args.debug:
-        print(f"[DEBUG] ModueHarness v{__version__} initialized in debug mode.")
-    else:
-        print(f"ModueHarness v{__version__}")
-    return 0
+    # If no subcommand, handle direct CLI prompt or interactive session
+    return handle_interactive_or_prompt(args)
 
 
 if __name__ == "__main__":

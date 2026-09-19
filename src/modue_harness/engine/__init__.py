@@ -2,6 +2,7 @@
 
 from modue_harness.engine.conductor import ConductorRunner
 from modue_harness.engine.debate import DebateRunner
+from modue_harness.engine.interactive import InteractiveSession, load_or_detect_agents
 from modue_harness.engine.pipeline import PipelineRunner
 from modue_harness.engine.workflow import (
     WorkflowAgentConfig,
@@ -16,4 +17,6 @@ __all__ = [
     "PipelineRunner",
     "ConductorRunner",
     "DebateRunner",
+    "InteractiveSession",
+    "load_or_detect_agents",
 ]

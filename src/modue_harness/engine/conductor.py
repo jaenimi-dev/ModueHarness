@@ -68,13 +68,20 @@ class ConductorRunner:
             raise ValueError(f"Conductor agent '{self.conductor_name}' not found in provided adapters.")
 
         available_workers = [k for k in self.worker_adapters.keys() if k != self.conductor_name]
+        if not available_workers:
+            available_workers = [self.conductor_name]
 
         # Phase 1: Planning / Task Decomposition
         decomposition_prompt = (
             f"You are the Conductor/Leader AI.\n"
             f"Goal: {self.goal}\n"
+            f"Target Project Directory: {self.workspace_dir}\n"
+            f"Shared Blackboard Directory: {self.blackboard.root_dir}\n"
             f"Available Worker Agents: {', '.join(available_workers)}\n\n"
             f"Please decompose this goal into concrete subtasks for the workers.\n"
+            f"Important:\n"
+            f"- All actual source code and implementation files must be created in the project directory: {self.workspace_dir}\n"
+            f"- Use the blackboard directory ({self.blackboard.root_dir}) only for coordination, planning, and task artifacts.\n\n"
             f"Output your plan as a JSON array of task objects:\n"
             f"[\n"
             f'  {{"id": "subtask_1", "assigned_agent": "<agent_name>", "instruction": "...", "output_artifact": "artifact_name.md"}}\n'
@@ -176,10 +183,21 @@ class ConductorRunner:
         total_duration = time.time() - start_time
         final_status = "completed" if overall_success else "failed"
 
+        # Collect created/modified files in project workspace
+        project_files = []
+        if self.workspace_dir.exists():
+            for p in self.workspace_dir.rglob("*"):
+                if p.is_file() and not any(part.startswith(".") for part in p.parts):
+                    try:
+                        project_files.append(str(p.relative_to(self.workspace_dir)))
+                    except Exception:
+                        pass
+
         return {
             "status": final_status,
             "success": overall_success,
             "goal": self.goal,
             "subtasks": worker_results,
             "total_duration_sec": total_duration,
+            "project_files": sorted(project_files),
         }

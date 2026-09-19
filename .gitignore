@@ -37,6 +37,7 @@ config/*
 agents.yaml
 workflow.yaml
 
-# ModueHarness local runtime data (blackboard workspace & worktrees)
+# ModueHarness local runtime data (blackboard workspace, projects & worktrees)
 blackboard/
+projects/
 .modue_worktrees/
