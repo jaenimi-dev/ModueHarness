@@ -2,6 +2,10 @@
 
 ModueHarness는 설정의 재사용성과 유연성을 극대화하기 위해 **AI 팀 명세(`agents.yaml`)**와 **작업/할 일 명세(`workflow.yaml`)**의 분리 구성을 기본으로 지원합니다.
 
+> 📁 **설정 파일 위치 권장사항 (`config/`)**:  
+> 명세 파일들은 프로젝트 내 `config/` 폴더(`config/agents.yaml`, `config/workflow.yaml`)에 관리하는 것을 권장합니다.  
+> `config/` 폴더는 `.gitignore`가 설정되어 있어 예제 템플릿(`*.example.yaml`) 외의 실제 설정 파일은 GitHub에 커밋되지 않고 로컬에 안전하게 보관됩니다.
+
 ---
 
 ## 1. AI 팀 명세 (`agents.yaml`)

@@ -109,26 +109,36 @@ GEMINI_API_KEY=AIzaSy...
 
 ---
 
-## 3단계: AI 팀 명세(`agents.yaml`) 작성
+## 3단계: 설정 폴더(`config/`) 템플릿 복사 및 AI 팀 명세(`agents.yaml`) 작성
 
-어떤 AI CLI 도구와 모델, 역할을 가진 팀원들로 구성할지 정의합니다. 한 번 작성해 두면 여러 프로젝트나 작업에서 재사용할 수 있습니다.
+ModueHarness는 사용자가 AI 팀 및 작업 명세를 체계적으로 관리할 수 있도록 **`config/` 전용 설정 폴더**를 제공합니다.
 
-### 파일 위치 (어디에 만들어야 하나요?)
-가장 권장하는 위치는 **프로젝트 루트 폴더(`ModueHarness/` 바로 아래)**입니다.  
-`workflow.yaml`과 `agents.yaml`을 같은 폴더에 나란히 배치하면 경로 충돌 없이 가장 깔끔하게 동작합니다:
+### 🛡️ 설정 파일 보안 (.gitignore 자동 보호)
+- `config/` 디렉터리 내의 **`*.example.yaml` 템플릿 파일만 Git(GitHub)에 공개**됩니다.
+- 사용자가 복사하여 생성한 **실제 설정 파일(`config/agents.yaml`, `config/workflow.yaml` 등)은 `.gitignore`에 의해 자동으로 보호**되어 GitHub에 커밋/유출되지 않습니다.
 
+### 📂 권장 디렉터리 구조
 ```text
 ModueHarness/
-├── agents.yaml          <-- [3단계] 여기에 생성 (AI 팀 명세)
-├── workflow.yaml        <-- [4단계] 여기에 생성 (작업 명세)
-├── blackboard/          <-- 산출물 및 로그가 저장될 공용 공간 (자동 생성)
+├── config/
+│   ├── agents.example.yaml     <-- [제공되는 템플릿] GitHub 관리
+│   ├── workflow.example.yaml   <-- [제공되는 템플릿] GitHub 관리
+│   ├── agents.yaml             <-- [복사해서 사용] .gitignore로 로컬 보호
+│   └── workflow.yaml           <-- [복사해서 사용] .gitignore로 로컬 보호
+├── blackboard/                 <-- 산출물 및 로그가 저장될 공용 공간 (자동 생성)
 └── src/
 ```
 
-> 💡 **경로 인식 규칙**:  
-> `workflow.yaml` 내부에서 `agents_file: "agents.yaml"`로 지정하면, ModueHarness는 **`workflow.yaml`이 위치한 동일 폴더를 기준으로 `agents.yaml`을 자동 탐색**합니다. 별도 폴더에 둘 경우 상대 경로(예: `config/agents.yaml`)로 적어주시면 됩니다.
+### 1. 템플릿 복사로 빠르게 시작하기
+터미널에서 아래 명령어를 실행하여 템플릿을 복사합니다:
+```bash
+cp config/agents.example.yaml config/agents.yaml
+cp config/workflow.example.yaml config/workflow.yaml
+```
 
-### 작성 예시 (`agents.yaml`)
+### 2. AI 팀 명세(`config/agents.yaml`) 내용 확인 및 수정
+어떤 AI CLI 도구와 모델, 역할을 가진 팀원들로 구성할지 정의합니다:
+
 ```yaml
 version: "0.4.0"
 name: "my-engineering-team"
@@ -140,20 +150,23 @@ agents:
     command: "claude"
     args: ["--permission-mode", "auto"]  # 프롬프트 입력 자동 승인 모드
     role: "System Architect & Technical Planner"
-    system_instruction: "You design clean, modular software architecture."
+    system_instruction: "You design clean, modular software architecture specifications."
 
-  # 2. 구현 엔지니어 (Antigravity CLI)
+  # 2. 구현 엔지니어 (Claude Code 또는 AGY)
   developer:
-    adapter: "agy"
-    command: "agy"
+    adapter: "claude"
+    command: "claude"
+    args: ["--permission-mode", "auto"]
     role: "Core Implementation Engineer"
+    system_instruction: "You write robust, production-ready code matching the specifications."
 
-  # 3. 코드 리뷰어 (Claude Code 또는 Aider)
+  # 3. 코드 리뷰어 (Claude Code)
   reviewer:
     adapter: "claude"
     command: "claude"
     args: ["--permission-mode", "auto"]
-    role: "Security and Quality Reviewer"
+    role: "Quality and Security Reviewer"
+    system_instruction: "You critically review code for edge cases and security vulnerabilities."
 ```
 
 > 💡 **핵심 팁 (프롬프트 멈춤 방지)**:
@@ -163,45 +176,48 @@ agents:
 
 ---
 
-## 4단계: 작업 명세(`workflow.yaml`) 작성
+## 4단계: 작업 명세(`config/workflow.yaml`) 작성
 
 실제 수행할 비즈니스 작업, 단계별 입출력 아티팩트 전달, 실행 조건 등을 정의합니다.
 
-### 작성 예시 (`mission.yaml`)
+### 작성 예시 (`config/workflow.yaml`)
 ```yaml
 version: "0.4.0"
-name: "implement-healthcheck-feature"
+name: "feature-delivery-pipeline"
 
-# 3단계에서 작성한 AI 팀 명세 파일 지정
-agents_file: "my_team.yaml"
+# 같은 config/ 폴더 내의 AI 팀 명세 파일 지정 (상대 경로로 자동 탐색)
+agents_file: "agents.yaml"
 
 workflow:
-  topology: "pipeline"      # pipeline(순차 릴레이) 또는 conductor, debate
+  topology: "pipeline"      # pipeline(순차 릴레이), conductor, debate
   timeout_per_step: 300     # 스텝당 최대 제한 시간(초)
   steps:
     # 스텝 1: 아키텍트가 기획서 작성
     - id: "step_plan"
       agent: "architect"
-      instruction: "Write a technical specification for adding a /healthz endpoint."
-      output_artifact: "health_spec.md"
+      instruction: "Write a technical specification in markdown for a token-bucket rate limiter utility in spec.md."
+      output_artifact: "spec.md"
 
     # 스텝 2: 개발자가 기획서를 읽고 코드 구현
     - id: "step_code"
       agent: "developer"
-      condition: "artifact_exists:health_spec.md"  # 선행 산출물 확인
-      input_artifacts: ["health_spec.md"]         # 기획서 내용 자동 주입
-      instruction: "Read health_spec.md and implement the /healthz endpoint in app.py."
-      output_artifact: "app.py"
-      retry_count: 1                              # 실패 시 1회 재시도
-      fallback_agent: "architect"                 # 재시도 실패 시 아키텍트에 대체 위임
+      condition: "artifact_exists:spec.md"        # 선행 산출물 확인
+      input_artifacts: ["spec.md"]               # 기획서 내용 자동 주입
+      instruction: "Read spec.md and implement the rate limiter in ratelimiter.py."
+      output_artifact: "ratelimiter.py"
+      retry_count: 1                             # 실패 시 1회 재시도
+      fallback_agent: "architect"                # 재시도 실패 시 아키텍트에 대체 위임
 
-    # 스텝 3: 리뷰어가 코드 검토 (사용자 승인 체크포인트)
+    # 스텝 3: 리뷰어가 코드 검토
     - id: "step_review"
       agent: "reviewer"
-      input_artifacts: ["health_spec.md", "app.py"]
-      instruction: "Review the implementation in app.py against health_spec.md."
+      input_artifacts: ["spec.md", "ratelimiter.py"]
+      instruction: "Review ratelimiter.py against spec.md and write a review report in review.md."
       output_artifact: "review.md"
 ```
+
+> 💡 **경로 인식 규칙**:  
+> `config/workflow.yaml` 내부에서 `agents_file: "agents.yaml"`로 지정하면, ModueHarness는 **`workflow.yaml`이 위치한 `config/` 폴더를 기준으로 `agents.yaml`을 자동 탐색**하므로 별도의 복잡한 경로를 입력할 필요가 없습니다.
 
 ---
 
@@ -214,14 +230,14 @@ PYTHONPATH=src python3 -m modue_harness.cli init
 
 ### 2. 워크플로우 실행
 ```bash
-# 기본 실행
-PYTHONPATH=src python3 -m modue_harness.cli run --config mission.yaml
+# config/ 폴더의 워크플로우 실행
+PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml
 
 # 실행 보고서(Markdown) 자동 생성
-PYTHONPATH=src python3 -m modue_harness.cli run --config mission.yaml --report report.md
+PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml --report report.md
 
-# 다른 AI 팀 명세로 교체하여 실행 (오버라이드)
-PYTHONPATH=src python3 -m modue_harness.cli run --config mission.yaml --agents local_team.yaml
+# 필요 시 다른 AI 팀 명세로 교체하여 실행 (오버라이드)
+PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml --agents config/agents.example.yaml
 ```
 
 ### 3. 진행 상황 및 산출물 확인

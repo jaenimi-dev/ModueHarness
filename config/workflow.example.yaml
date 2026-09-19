@@ -1,0 +1,38 @@
+# Workflow Specification Template (작업/파이프라인 명세 템플릿)
+# 사용법: 이 파일을 config/workflow.yaml 로 복사하여 사용하세요.
+# 명령어 예: cp config/workflow.example.yaml config/workflow.yaml
+# (참고: config/workflow.yaml 파일은 .gitignore에 의해 깃허브에 커밋되지 않고 안전하게 보관됩니다)
+
+version: "0.4.0"
+name: "feature-delivery-pipeline"
+
+# 같은 config/ 폴더 내의 AI 팀 명세 파일(agents.yaml) 참조
+agents_file: "agents.yaml"
+
+workflow:
+  topology: "pipeline"      # pipeline(순차 릴레이), conductor(지휘자-워커), debate(다자 토론)
+  timeout_per_step: 300     # 스텝당 최대 실행 시간(초)
+
+  steps:
+    # 1단계: 아키텍트가 기술 기획서 작성
+    - id: "step_spec"
+      agent: "architect"
+      instruction: "Draft a concise technical specification in markdown for a token-bucket rate limiter utility in spec.md."
+      output_artifact: "spec.md"
+
+    # 2단계: 개발자가 기획서를 읽고 실제 코드 구현
+    - id: "step_code"
+      agent: "developer"
+      condition: "artifact_exists:spec.md"
+      input_artifacts: ["spec.md"]
+      instruction: "Read spec.md and implement the rate limiter in ratelimiter.py with a self-test block."
+      output_artifact: "ratelimiter.py"
+      retry_count: 1
+      fallback_agent: "architect"
+
+    # 3단계: 리뷰어가 기획서와 구현 코드를 비교 검토
+    - id: "step_review"
+      agent: "reviewer"
+      input_artifacts: ["spec.md", "ratelimiter.py"]
+      instruction: "Review ratelimiter.py against spec.md and write a comprehensive review report in review.md."
+      output_artifact: "review.md"

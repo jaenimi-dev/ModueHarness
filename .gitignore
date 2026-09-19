@@ -31,6 +31,12 @@ htmlcov/
 .env.*
 !.env.example
 
+# User configurations (preserve only example templates)
+config/*
+!config/*.example.yaml
+agents.yaml
+workflow.yaml
+
 # ModueHarness local runtime data (blackboard workspace & worktrees)
 blackboard/
 .modue_worktrees/
