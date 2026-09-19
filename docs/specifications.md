@@ -3,9 +3,9 @@
 ModueHarness는 정적 파이프라인 및 복잡한 배치 자동화를 위해 **AI 팀 명세(`agents.yaml`)**와 **작업/할 일 명세(`workflow.yaml`)**의 분리 구성을 지원합니다.
 
 > 💡 **명세 파일이 항상 필요한가요? (자연어 대화형 모드 vs 워크플로우)**:  
-> - **대화형 CLI 및 직접 명령 모드 (`modue-harness -i` 또는 `modue-harness "<명령어>" -P <프로젝트명>`)**:  
+> - **대화형 CLI 및 직접 명령 모드 (`python run.py -i` 또는 `python run.py "<명령어>" -P <프로젝트명>`, pip 설치 후 `modue-harness` 동일)**:  
 >   `workflow.yaml` 파일을 **작성할 필요가 전혀 없습니다**. 시스템에 설치된 AI CLI를 자동 감지하여 Conductor(Leader)가 명령을 해석하고 Worker들이 `projects/<프로젝트명>/`에 직접 구현합니다.
-> - **정적 파이프라인 모드 (`modue-harness run -c workflow.yaml`)**:  
+> - **정적 파이프라인 모드 (`python run.py run -c workflow.yaml` 또는 `modue-harness run -c workflow.yaml`)**:  
 >   CI/CD 연동, 정형화된 다단계 조건부 릴레이, 특정 스텝 재시도 및 승인 체크포인트가 필요한 경우에 아래 가이드에 따라 명세 파일을 작성합니다.
 
 > 📁 **설정 파일 위치 권장사항 (`config/`)**:  

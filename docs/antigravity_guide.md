@@ -241,11 +241,18 @@ agents:
 ## 8. 트러블슈팅
 
 ### Q1. `agy` 명령을 찾을 수 없다는 오류가 발생합니다.
-* ModueHarness는 `~/.local/bin/agy`와 `~/.gemini/antigravity-cli/bin/agy` 경로를 자동으로 탐색합니다.
+* ModueHarness는 시스템 `PATH` 외에도 다음 위치의 실행 파일을 자동으로 탐색합니다:
+  - **macOS / Linux**: `~/.local/bin/agy`, `~/.gemini/antigravity-cli/bin/agy`, `/usr/local/bin/agy`, `/usr/bin/agy`
+  - **Windows**: `%LOCALAPPDATA%\agy\bin\agy.exe`, `C:\Users\<username>\AppData\Local\agy\bin\agy.exe`
 * 만약 다른 특수 경로에 설치되어 있다면, `agents.yaml`에서 `command: "/절대경로/agy"`로 지정하거나 셸의 `PATH`에 등록하세요:
-  ```bash
-  export PATH="$HOME/.local/bin:$PATH"
-  ```
+  - Linux/macOS:
+    ```bash
+    export PATH="$HOME/.local/bin:$PATH"
+    ```
+  - Windows PowerShell:
+    ```powershell
+    $env:Path += ";$env:LOCALAPPDATA\agy\bin"
+    ```
 
 ### Q2. Antigravity가 사용자 입력을 기다리며 멈춥니다.
 * `AGYCLIAdapter`는 기본적으로 `--dangerously-skip-permissions` 플래그를 자동으로 추가하여 사용자 확인 팝업 없이 작업을 자율 진행합니다.

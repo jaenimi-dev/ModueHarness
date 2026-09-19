@@ -313,14 +313,30 @@ workflow:
 ```
 
 ### 3) 실행 명령어
-- **Windows PowerShell**:
-  ```powershell
-  $env:PYTHONPATH="src"; python -m modue_harness.cli run --config feature_pipeline.yaml --report final_report.md
-  ```
-- **Linux / macOS (Bash)**:
-  ```bash
-  PYTHONPATH=src python3 -m modue_harness.cli run --config feature_pipeline.yaml --report final_report.md
-  ```
+
+#### 방법 A. 자연어 대화형 또는 단일 명령 실행 (가장 간편, YAML 작성 불필요)
+```bash
+# 대화형 REPL 모드로 시작
+python run.py -i -P rate-limiter
+
+# 또는 단일 명령으로 즉시 Sonnet 모델 + 높은 추론 노력으로 실행
+python run.py "토큰 버킷 기반 RateLimiter 모듈과 pytest 테스트를 작성해줘" -P rate-limiter -m sonnet -e high
+```
+
+#### 방법 B. 정적 워크플로우 명세 파일 실행
+```bash
+# [가장 간편] 루트 실행 파일 사용 (Windows / Mac / Linux 공통, 환경변수 불필요)
+python run.py run --config feature_pipeline.yaml --report final_report.md
+
+# [전용 CLI] pip install -e . 설치 후 사용
+modue-harness run --config feature_pipeline.yaml --report final_report.md
+
+# [모듈 직접 실행]
+# Linux / macOS (Bash)
+PYTHONPATH=src python3 -m modue_harness.cli run --config feature_pipeline.yaml --report final_report.md
+# Windows PowerShell
+$env:PYTHONPATH="src"; python -m modue_harness.cli run --config feature_pipeline.yaml --report final_report.md
+```
 
 실행이 완료되면 `blackboard/artifacts/`에 `rate_limiter_design.md`, `rate_limiter.py`, `review_report.md`가 순서대로 저장되며, 최종 요약본이 `final_report.md`로 생성됩니다.
 

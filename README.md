@@ -78,7 +78,7 @@ python run.py debate --topic "REST vs GraphQL for Mobile Backend" --proposer cla
 - 📝 **[명세 파일 작성 가이드 (Specifications Guide)](docs/specifications.md)**  
   AI 팀 명세(`agents.yaml`)와 작업 명세(`workflow.yaml`)의 분리 구성, Claude/Antigravity 혼합 구성 및 템플릿 변수 활용법
 - 🛠️ **[CLI 명령어 레퍼런스 (CLI Reference)](docs/cli_reference.md)**  
-  대화형 REPL(`/model`, `/effort`, `/jobs`, `/cmd`), `init`, `status`, `run`, `debate` 명령어 및 전체 옵션 가이드
+  대화형 REPL(`/model`, `/effort`, `/timeout`, `/cmd`, `/jobs`, `/cancel`), `init`, `status`, `run`, `debate` 명령어 및 전체 옵션 가이드
 
 
 ---
