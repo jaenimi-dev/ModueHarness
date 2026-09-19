@@ -9,14 +9,19 @@ ModueHarness 설치를 마친 후, 실제로 다양한 AI CLI(Claude Code, Googl
 ```text
 [1단계: AI CLI 도구 준비 및 인증]
        ↓
-[2단계: 환경 변수(.env) 설정]
+[2단계: 환경 변수(.env) 설정 (선택 사항: API 키 직접 사용 시)]
        ↓
-[3단계: AI 팀 명세(agents.yaml) 작성]
+[3단계: AI 팀 명세(agents.yaml) 작성 (필수)]
        ↓
-[4단계: 작업 명세(workflow.yaml) 작성]
+[4단계: 작업 명세(workflow.yaml) 작성 (필수)]
        ↓
 [5단계: 실행 및 블랙보드 산출물 확인]
 ```
+
+> 💡 **핵심 설정 안내 (YAML vs .env)**:  
+> - **AI 설정 및 작업 명세**: AI CLI 도구 지정, 실행 인자, 모델, 역할, 파이프라인 단계는 `.env`가 아니라 **`agents.yaml`과 `workflow.yaml`이라는 2개의 별도 YAML 파일**에 작성합니다.  
+> - **.env 파일의 역할**: 브라우저 로그인 없이 `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` 같은 비공개 API 키를 직접 주입해야 할 때만 사용합니다.  
+> - **건너뛰기(Skip) 가능 여부**: 1단계에서 `claude` 브라우저 로그인을 마쳤다면 `.env`를 생성할 필요가 없으므로, **2단계를 건너뛰고 곧바로 3단계(agents.yaml)로 이동**하십시오.
 
 ---
 
@@ -76,9 +81,13 @@ ModueHarness는 사용자의 시스템에 설치된 실제 AI CLI 명령어를 �
 
 ---
 
-## 2단계: 환경 변수(`.env`) 설정
+## 2단계: 환경 변수(`.env`) 설정 (선택 사항)
 
-ModueHarness는 CLI 실행 시 프로젝트 루트의 `.env` 파일을 자동으로 감지하여 하위 AI CLI 프로세스에 전달합니다.
+> ⚡ **잠깐! 이 단계를 건너뛰어도 되나요?**  
+> - **건너뛰기 가능 (Skip)**: 1단계에서 터미널을 통해 `claude` 브라우저 로그인을 완료하셨다면 인증 토큰이 로컬에 보관되므로 **`.env` 파일이 필요 없습니다. 바로 3단계로 넘어가세요.**  
+> - **설정 필요**: Claude Console 선불 API 키(`ANTHROPIC_API_KEY`)를 직접 쓰거나, Aider를 사용하기 위해 `OPENAI_API_KEY`를 등록해야 할 때만 아래 과정을 진행합니다.
+
+ModueHarness는 CLI 실행 시 프로젝트 루트의 `.env` 파일을 자동으로 감지하여 하위 AI CLI 서브프로세스에 환경 변수로 전달합니다.
 
 ### 1. 템플릿 복사
 ```bash
@@ -87,7 +96,7 @@ cp .env.example .env
 
 ### 2. API 키 입력 (`.env`)
 ```bash
-# Anthropic Claude
+# Anthropic Claude (브라우저 로그인 대신 API 키를 사용할 경우에만 입력)
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
 # OpenAI (Aider 등에서 사용)

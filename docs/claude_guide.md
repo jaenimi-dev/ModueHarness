@@ -109,7 +109,7 @@ Claude Console API 키를 사용하는 경우, 환경 변수로 설정해 두면
 # 터미널 또는 .env 파일에 등록
 export ANTHROPIC_API_KEY="sk-ant-api03-..."
 ```
-> ModueHarness는 실행 시 프로젝트 루트의 `.env` 파일을 자동으로 읽어 하위 `claude` 프로세스에 환경 변수를 전달합니다.
+> 💡 **참고**: 방법 A(브라우저 로그인)로 인증한 경우 로컬 토큰을 사용하므로 `.env` 파일이 필요 없습니다. Console API 키(방법 B)를 사용할 경우에만 프로젝트 루트의 `.env` 파일에 키를 등록하면 ModueHarness가 자동으로 하위 `claude` 프로세스에 전달합니다.
 
 ---
 
