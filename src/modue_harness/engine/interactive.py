@@ -1,12 +1,15 @@
-"""Interactive CLI execution session and project-aware runner without workflow files."""
+"""Interactive CLI execution session, background job management, and live progress streaming."""
 
+from dataclasses import dataclass, field
 import datetime
 import json
 import os
 from pathlib import Path
 import shutil
 import sys
-from typing import Any, Dict, List, Optional
+import threading
+import time
+from typing import Any, Callable, Dict, List, Optional
 
 from modue_harness.adapters import (
     BaseCLIAdapter,
@@ -20,6 +23,29 @@ from modue_harness.core.blackboard import Blackboard
 from modue_harness.core.events import EventBus
 from modue_harness.engine.conductor import ConductorRunner
 from modue_harness.engine.workflow import _parse_file
+
+
+@dataclass
+class BackgroundJob:
+    """Represents an asynchronous background job executed by the harness."""
+
+    id: str
+    command: str
+    project: str
+    project_dir: Path
+    status: str = "running"  # "running", "completed", "failed", "cancelled"
+    stage: str = "planning"  # "planning", "task: ...", "synthesis", "done"
+    started_at: float = field(default_factory=time.time)
+    ended_at: Optional[float] = None
+    runner: Optional[ConductorRunner] = None
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+    thread: Optional[threading.Thread] = None
+
+    @property
+    def duration_sec(self) -> float:
+        end = self.ended_at or time.time()
+        return max(0.0, end - self.started_at)
 
 
 def load_or_detect_agents(
@@ -138,9 +164,9 @@ def load_or_detect_agents(
 
 
 class InteractiveSession:
-    """Manages an interactive session where commands are executed directly into a project folder
+    """Manages an interactive session where commands are executed directly into a project folder,
 
-    while using the blackboard strictly for AI coordination and communication.
+    using the blackboard strictly for AI coordination, with support for live progress and background jobs.
     """
 
     def __init__(
@@ -176,6 +202,11 @@ class InteractiveSession:
             self.conductor_name = "conductor"
         else:
             self.conductor_name = next(iter(self.agents.keys()))
+
+        # Background Job Management
+        self.jobs: Dict[str, BackgroundJob] = {}
+        self._job_counter: int = 0
+        self._active_foreground_runner: Optional[ConductorRunner] = None
 
     def switch_project(self, project_name: str) -> Path:
         """Switch current target project to a new or existing project folder."""
@@ -216,11 +247,14 @@ class InteractiveSession:
                     pass
         return sorted(files)
 
-    def execute_command(self, command: str) -> Dict[str, Any]:
-        """Execute a user natural-language command using AI agents.
+    def execute_command(
+        self,
+        command: str,
+        live_progress: bool = True,
+    ) -> Dict[str, Any]:
+        """Execute a user natural-language command synchronously.
 
-        Implementation files are generated in `project_dir`.
-        Information, tasks, and state are exchanged via `blackboard`.
+        Live progress updates are printed to stdout if live_progress is True.
         """
         command = command.strip()
         if not command:
@@ -238,6 +272,35 @@ class InteractiveSession:
             "last_command_at": datetime.datetime.now().isoformat(),
         })
 
+        def _console_progress(event: str, data: Dict[str, Any]) -> None:
+            if not live_progress:
+                return
+            if event == "planning_start":
+                print(f"  [1/3] 🧠 Conductor({data.get('conductor')}) 작업 목표 분석 및 계획 수립 중...")
+            elif event == "planning_end":
+                if data.get("is_success"):
+                    tasks = data.get("tasks", [])
+                    print(f"  ✓ 기획 완료: {len(tasks)}개 서브태스크 생성 (blackboard/tasks)")
+                    for t in tasks:
+                        desc = (t.get("instruction") or "")[:50]
+                        print(f"    • [{t.get('id')}] {t.get('assigned_agent')}: {desc}")
+                else:
+                    print(f"  ✗ 기획 실패: {data.get('error')}")
+            elif event == "task_start":
+                idx = data.get("index", 1)
+                tot = data.get("total", 1)
+                desc = (data.get("instruction") or "")[:60]
+                print(f"  [2/3] 🛠️ [{idx}/{tot}] {data.get('agent')} 실행 중 ({data.get('task_id')})...")
+                print(f"        지시: {desc}")
+            elif event == "task_end":
+                mark = "✓" if data.get("is_success") else "✗"
+                dur = data.get("duration_sec", 0.0)
+                print(f"  {mark} [{data.get('task_id')}] 실행 완료 ({dur:.1f}s)")
+            elif event == "synthesis_start":
+                print(f"  [3/3] 📝 Conductor({data.get('conductor')}) 최종 검토 및 종합 보고서 작성 중...")
+            elif event == "synthesis_end":
+                print(f"  ✓ 최종 종합 보고서 저장: blackboard/artifacts/synthesis_report.md")
+
         # Run Leader-Worker Conductor
         runner = ConductorRunner(
             goal=command,
@@ -246,9 +309,14 @@ class InteractiveSession:
             blackboard=self.blackboard,
             workspace_dir=self.project_dir,
             event_bus=self.event_bus,
+            progress_callback=_console_progress,
         )
+        self._active_foreground_runner = runner
 
-        result = runner.run()
+        try:
+            result = runner.run()
+        finally:
+            self._active_foreground_runner = None
 
         # Gather created files and artifacts
         project_files = self.list_project_files()
@@ -271,8 +339,107 @@ class InteractiveSession:
             "artifacts": artifacts,
         }
 
+    def execute_command_async(self, command: str) -> BackgroundJob:
+        """Submit a command to run asynchronously in a background thread."""
+        command = command.strip()
+        self._job_counter += 1
+        job_id = f"job_{self._job_counter}"
+
+        job = BackgroundJob(
+            id=job_id,
+            command=command,
+            project=self.project_name,
+            project_dir=self.project_dir,
+            status="running",
+            stage="planning",
+        )
+        self.jobs[job_id] = job
+
+        # Ensure project and blackboard directories exist
+        self.project_dir.mkdir(parents=True, exist_ok=True)
+        self.blackboard.initialize()
+
+        def _bg_worker():
+            def _bg_progress(event: str, data: Dict[str, Any]):
+                if event == "planning_start":
+                    job.stage = "기획 중 (planning)"
+                elif event == "task_start":
+                    idx = data.get("index", 1)
+                    tot = data.get("total", 1)
+                    job.stage = f"태스크 [{idx}/{tot}] {data.get('agent')} ({data.get('task_id')})"
+                elif event == "synthesis_start":
+                    job.stage = "최종 종합 보고서 작성 중 (synthesis)"
+
+            runner = ConductorRunner(
+                goal=command,
+                conductor_agent_name=self.conductor_name,
+                worker_agents=self.agents,
+                blackboard=self.blackboard,
+                workspace_dir=self.project_dir,
+                event_bus=self.event_bus,
+                progress_callback=_bg_progress,
+            )
+            job.runner = runner
+
+            try:
+                res = runner.run()
+                job.result = res
+                job.status = res.get("status", "completed")
+                job.stage = "done"
+            except Exception as e:
+                job.status = "failed"
+                job.error = str(e)
+                job.stage = "error"
+            finally:
+                job.ended_at = time.time()
+                # Print async completion toast to terminal
+                print(
+                    f"\n🔔 [알림] 백그라운드 작업 '{job.id}' 종료 ({job.status}, {job.duration_sec:.1f}s)\n"
+                    f"   결과 확인: /jobs 또는 /status\n"
+                    f"[{self.project_name}] > ",
+                    end="",
+                    flush=True,
+                )
+
+        t = threading.Thread(target=_bg_worker, name=f"HarnessJob-{job_id}", daemon=True)
+        job.thread = t
+        t.start()
+        return job
+
+    def cancel_job(self, job_id: Optional[str] = None) -> bool:
+        """Cancel a running background job or active foreground runner."""
+        if job_id:
+            job = self.jobs.get(job_id)
+            if job and job.status == "running" and job.runner:
+                job.runner.cancel()
+                job.status = "cancelled"
+                job.stage = "cancelled"
+                job.ended_at = time.time()
+                return True
+            return False
+
+        # Cancel any active running job
+        cancelled_any = False
+        if self._active_foreground_runner:
+            self._active_foreground_runner.cancel()
+            cancelled_any = True
+
+        for j in self.jobs.values():
+            if j.status == "running" and j.runner:
+                j.runner.cancel()
+                j.status = "cancelled"
+                j.stage = "cancelled"
+                j.ended_at = time.time()
+                cancelled_any = True
+
+        return cancelled_any
+
+    def list_jobs(self) -> List[BackgroundJob]:
+        """Return list of all submitted background jobs."""
+        return list(self.jobs.values())
+
     def start_repl(self) -> None:
-        """Start an interactive CLI REPL session for entering instructions."""
+        """Start an interactive CLI REPL session with live status feedback and background jobs."""
         self.project_dir.mkdir(parents=True, exist_ok=True)
         self.blackboard.initialize()
 
@@ -285,7 +452,8 @@ class InteractiveSession:
         print(f"• 참여 AI 팀:               {agent_names} (Leader: {self.conductor_name})")
         print("-" * 64)
         print("명령어를 입력하면 AI 팀이 프로젝트 디렉터리에 직접 구현합니다.")
-        print("특수 명령어: /project <이름>, /projects, /files, /status, /help, exit")
+        print("💡 팁: 명령 끝에 '&'를 붙이면 백그라운드로 실행되어 논블로킹으로 다른 작업을 계속할 수 있습니다!")
+        print("특수 명령어: /jobs, /cancel, /project <이름>, /projects, /files, /status, /help, exit")
         print("=" * 64 + "\n")
 
         while True:
@@ -304,18 +472,31 @@ class InteractiveSession:
                     self._handle_special_command(user_input)
                     continue
 
-                # Normal task execution
+                # Check if user requested background execution via '&' or '/bg '
+                is_bg = user_input.endswith("&")
+                if is_bg:
+                    cmd_to_run = user_input[:-1].strip()
+                    job = self.execute_command_async(cmd_to_run)
+                    print(f"\n🚀 백그라운드 작업 '{job.id}' 실행이 시작되었습니다!")
+                    print(f"• 작업: '{cmd_to_run}'")
+                    print(f"• 프로젝트: {self.project_dir}")
+                    print(f"• 진행 상태 확인: /jobs 또는 /status")
+                    print(f"• 작업 취소:     /cancel {job.id}\n")
+                    continue
+
+                # Normal task execution (with live progress callbacks)
                 print(f"\n🚀 작업 수신: '{user_input}'")
                 print(f"📁 구현 디렉터리: {self.project_dir}")
                 print(f"📋 공용 칠판:     {self.blackboard_dir}\n")
 
-                summary = self.execute_command(user_input)
+                summary = self.execute_command(user_input, live_progress=True)
 
                 print("\n" + "-" * 64)
                 if summary["success"]:
                     print(f"✓ 작업 완료! (소요 시간: {summary['total_duration_sec']:.2f}s)")
                 else:
-                    print(f"✗ 작업 실패 또는 중단 (소요 시간: {summary['total_duration_sec']:.2f}s)")
+                    status_desc = summary.get("status", "failed")
+                    print(f"✗ 작업 종료 ({status_desc}, 소요 시간: {summary['total_duration_sec']:.2f}s)")
 
                 if summary.get("subtasks"):
                     print(f"\n[실행된 서브태스크: {len(summary['subtasks'])}개]")
@@ -335,7 +516,14 @@ class InteractiveSession:
 
                 print("-" * 64 + "\n")
 
-            except (KeyboardInterrupt, EOFError):
+            except KeyboardInterrupt:
+                if self._active_foreground_runner:
+                    print("\n⚠️ 실행 중인 작업을 취소하는 중...")
+                    self.cancel_job()
+                else:
+                    print("\n👋 세션을 종료합니다.")
+                    break
+            except EOFError:
                 print("\n👋 세션을 종료합니다.")
                 break
             except Exception as e:
@@ -347,7 +535,38 @@ class InteractiveSession:
         cmd = parts[0].lower()
         arg = parts[1].strip() if len(parts) > 1 else ""
 
-        if cmd in ["/project", "/p"]:
+        if cmd in ["/bg", "/async"]:
+            if not arg:
+                print("사용법: /bg <명령어> (백그라운드 비동기 작업 실행)")
+            else:
+                job = self.execute_command_async(arg)
+                print(f"\n🚀 백그라운드 작업 '{job.id}' 실행이 시작되었습니다!")
+                print(f"• 작업: '{arg}'")
+                print(f"• 상태 확인: /jobs 또는 /status")
+                print(f"• 작업 취소: /cancel {job.id}\n")
+
+        elif cmd == "/jobs":
+            jobs = self.list_jobs()
+            print(f"\n📋 백그라운드 작업 목록 ({len(jobs)}개):")
+            if not jobs:
+                print("  (등록된 백그라운드 작업이 없습니다)")
+            for j in jobs:
+                marker = {"running": "▶", "completed": "✓", "failed": "✗", "cancelled": "⊘"}.get(j.status, "?")
+                print(f"  [{marker}] {j.id} ({j.status}, {j.duration_sec:.1f}s) - {j.project}: '{j.command[:35]}'")
+                if j.status == "running":
+                    print(f"      현재 단계: {j.stage}")
+            print()
+
+        elif cmd in ["/cancel", "/stop"]:
+            target_id = arg if arg else None
+            ok = self.cancel_job(target_id)
+            if ok:
+                target_msg = f"'{target_id}'" if target_id else "활성 작업"
+                print(f"✓ {target_msg} 취소 신호를 전달했습니다.")
+            else:
+                print(f"⚠️ 취소할 수 있는 실행 중인 작업을 찾을 수 없습니다: {arg or 'N/A'}")
+
+        elif cmd in ["/project", "/p"]:
             if not arg:
                 print(f"현재 프로젝트: {self.project_name} ({self.project_dir})")
             else:
@@ -379,21 +598,31 @@ class InteractiveSession:
             state = self.blackboard.load_state()
             tasks = self.blackboard.list_tasks()
             artifacts = self.blackboard.list_artifacts()
+            running_jobs = [j for j in self.jobs.values() if j.status == "running"]
+
             print(f"\n=== ModueHarness 상태 요약 ===")
             print(f"• 활성 프로젝트: {self.project_name} ({self.project_dir})")
             print(f"• 공용 칠판:     {self.blackboard_dir}")
             print(f"• 세션 ID:       {state.get('session_id', 'N/A')}")
             print(f"• 진행 상태:     {state.get('status', 'unknown')}")
+            if running_jobs:
+                print(f"• 백그라운드 실행 중: {len(running_jobs)}개 작업")
+                for rj in running_jobs:
+                    print(f"    - [{rj.id}] {rj.stage} ({rj.duration_sec:.1f}s 경과)")
             print(f"• 등록된 태스크: {len(tasks)}개")
             print(f"• 칠판 아티팩트: {len(artifacts)}개\n")
 
         elif cmd in ["/help", "/?"]:
             print("\n=== 사용 가능한 명령어 ===")
-            print("  자연어 명령 입력      : AI 팀에게 코드 생성/수정/테스트 작업 요청")
+            print("  자연어 명령 입력        : 동기 방식으로 즉시 실행 (실시간 단계 표시)")
+            print("  자연어 명령 &          : 백그라운드 비동기 실행 (프롬프트 즉시 반환)")
+            print("  /bg <명령어>           : 백그라운드 비동기 실행")
+            print("  /jobs                 : 백그라운드 작업 진행 현황 및 목록")
+            print("  /cancel [job_id]      : 실행 중인 작업 취소 및 중단")
             print("  /project <이름>        : 대상 프로젝트 전환 (폴더 자동 생성)")
             print("  /projects             : 전체 프로젝트 목록 조회")
             print("  /files (또는 /ls)     : 현재 프로젝트 내 구현 파일 목록")
-            print("  /status               : 칠판 상태 및 태스크 현황 조회")
+            print("  /status               : 칠판 상태 및 백그라운드 작업 현황")
             print("  /help                 : 도움말 출력")
             print("  exit, quit, q         : 종료\n")
 

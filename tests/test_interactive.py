@@ -207,3 +207,68 @@ def test_interactive_repl_special_commands(tmp_path: Path, capsys, monkeypatch):
     assert "사용 가능한 명령어" in captured.out
     assert "new_app" in captured.out
     assert "대화형 세션을 종료합니다" in captured.out
+
+
+def test_interactive_session_live_progress(tmp_path: Path, capsys):
+    """Verify real-time progress callbacks emit during foreground execution."""
+    projects_dir = tmp_path / "projects"
+    board_dir = tmp_path / "blackboard"
+
+    conductor = GenericCLIAdapter(
+        name="conductor",
+        command=sys.executable,
+        default_args=["-c", "print('[]')"],
+    )
+
+    session = InteractiveSession(
+        project_name="prog_app",
+        projects_root=projects_dir,
+        blackboard_dir=board_dir,
+        agents={"conductor": conductor},
+        conductor_name="conductor",
+    )
+
+    summary = session.execute_command("Run progress test", live_progress=True)
+    captured = capsys.readouterr()
+
+    assert "작업 목표 분석 및 계획 수립 중" in captured.out
+    assert summary["project"] == "prog_app"
+
+
+def test_interactive_session_background_job_and_cancel(tmp_path: Path):
+    """Verify background job execution and cancel capability."""
+    import time
+    projects_dir = tmp_path / "projects"
+    board_dir = tmp_path / "blackboard"
+
+    # Worker that sleeps
+    sleeper = GenericCLIAdapter(
+        name="sleeper",
+        command=sys.executable,
+        default_args=["-c", "import time; time.sleep(0.5); print('Done')"],
+    )
+
+    session = InteractiveSession(
+        project_name="bg_app",
+        projects_root=projects_dir,
+        blackboard_dir=board_dir,
+        agents={"conductor": sleeper},
+        conductor_name="conductor",
+    )
+
+    job = session.execute_command_async("Sleep in background")
+    assert job.id in session.jobs
+    assert job.status == "running"
+
+    # Wait for completion
+    if job.thread:
+        job.thread.join(timeout=5.0)
+    assert job.status in ["completed", "failed"]
+
+    # Test cancellation on new job
+    job2 = session.execute_command_async("Long task to cancel")
+    time.sleep(0.1)
+    cancelled = session.cancel_job(job2.id)
+    assert cancelled is True
+    assert job2.status == "cancelled"
+

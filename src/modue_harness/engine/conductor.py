@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from modue_harness.adapters import BaseCLIAdapter, create_adapter
 from modue_harness.core.blackboard import Blackboard
@@ -25,6 +25,7 @@ class ConductorRunner:
         workspace_dir: Optional[Path] = None,
         event_bus: Optional[EventBus] = None,
         max_subtasks: int = 10,
+        progress_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
     ) -> None:
         self.goal = goal
         self.conductor_name = conductor_agent_name
@@ -34,6 +35,20 @@ class ConductorRunner:
         self.blackboard = blackboard or Blackboard(self.workspace_dir / "blackboard", event_bus=self.event_bus)
         self.blackboard.event_bus = self.event_bus
         self.max_subtasks = max_subtasks
+        self.progress_callback = progress_callback
+        self._is_cancelled: bool = False
+
+    def cancel(self) -> None:
+        """Request cancellation of running workflow."""
+        self._is_cancelled = True
+
+    def _notify(self, event: str, data: Dict[str, Any]) -> None:
+        """Emit real-time progress event to registered callback."""
+        if self.progress_callback:
+            try:
+                self.progress_callback(event, data)
+            except Exception:
+                pass
 
     def _extract_tasks_json(self, text: str) -> List[Dict[str, Any]]:
         """Extract JSON task list from conductor response."""
@@ -88,6 +103,11 @@ class ConductorRunner:
             f"]"
         )
 
+        if self._is_cancelled:
+            return {"status": "cancelled", "success": False, "goal": self.goal, "subtasks": []}
+
+        # Phase 1: Planning / Task Decomposition
+        self._notify("planning_start", {"conductor": self.conductor_name, "goal": self.goal})
         plan_context = TurnContext(
             step_id="conductor_planning",
             instruction=decomposition_prompt,
@@ -97,6 +117,7 @@ class ConductorRunner:
 
         plan_result = conductor_adapter.execute(plan_context)
         if not plan_result.is_success:
+            self._notify("planning_end", {"conductor": self.conductor_name, "is_success": False, "error": plan_result.error_message})
             return {
                 "status": "failed",
                 "stage": "planning",
@@ -120,11 +141,18 @@ class ConductorRunner:
                 }
             ]
 
+        self._notify("planning_end", {"conductor": self.conductor_name, "is_success": True, "tasks": subtasks_data[:self.max_subtasks]})
+
         # Phase 2: Execute Workers
         worker_results: List[Dict[str, Any]] = []
         overall_success = True
+        total_subtasks = len(subtasks_data[:self.max_subtasks])
 
-        for task_info in subtasks_data[:self.max_subtasks]:
+        for idx, task_info in enumerate(subtasks_data[:self.max_subtasks]):
+            if self._is_cancelled:
+                overall_success = False
+                break
+
             task_id = task_info.get("id", f"task_{len(worker_results)+1}")
             assigned = task_info.get("assigned_agent", available_workers[0] if available_workers else self.conductor_name)
             instruction = task_info.get("instruction", "")
@@ -142,6 +170,14 @@ class ConductorRunner:
             )
             self.blackboard.create_task(task)
 
+            self._notify("task_start", {
+                "task_id": task_id,
+                "agent": assigned,
+                "instruction": instruction,
+                "index": idx + 1,
+                "total": total_subtasks,
+            })
+
             turn_ctx = TurnContext(
                 step_id=task_id,
                 instruction=instruction,
@@ -155,33 +191,53 @@ class ConductorRunner:
                     self.blackboard.write_artifact(output_art, res.stdout.strip(), author_agent=assigned)
                 self.blackboard.update_task_status(task_id, TaskStatus.COMPLETED)
                 worker_results.append({"task_id": task_id, "agent": assigned, "is_success": True})
+                self._notify("task_end", {
+                    "task_id": task_id,
+                    "agent": assigned,
+                    "is_success": True,
+                    "duration_sec": res.duration_sec,
+                })
             else:
                 self.blackboard.update_task_status(task_id, TaskStatus.FAILED, {"error": res.error_message})
                 worker_results.append({"task_id": task_id, "agent": assigned, "is_success": False})
+                self._notify("task_end", {
+                    "task_id": task_id,
+                    "agent": assigned,
+                    "is_success": False,
+                    "duration_sec": res.duration_sec,
+                    "error": res.error_message,
+                })
                 overall_success = False
                 break
 
         # Phase 3: Conductor Synthesis / Review
-        synthesis_prompt = (
-            f"You are the Conductor AI.\n"
-            f"All worker subtasks have concluded.\n"
-            f"Goal: {self.goal}\n"
-            f"Subtasks execution status: {json.dumps(worker_results, indent=2)}\n"
-            f"Provide your final evaluation, synthesis, and status report."
-        )
+        if not self._is_cancelled and overall_success:
+            self._notify("synthesis_start", {"conductor": self.conductor_name})
+            synthesis_prompt = (
+                f"You are the Conductor AI.\n"
+                f"All worker subtasks have concluded.\n"
+                f"Goal: {self.goal}\n"
+                f"Subtasks execution status: {json.dumps(worker_results, indent=2)}\n"
+                f"Provide your final evaluation, synthesis, and status report."
+            )
 
-        synth_ctx = TurnContext(
-            step_id="conductor_synthesis",
-            instruction=synthesis_prompt,
-            blackboard_dir=self.blackboard.root_dir,
-            workspace_dir=self.workspace_dir,
-        )
-        synth_res = conductor_adapter.execute(synth_ctx)
-        if synth_res.is_success:
-            self.blackboard.write_artifact("synthesis_report.md", synth_res.stdout.strip(), author_agent=self.conductor_name)
+            synth_ctx = TurnContext(
+                step_id="conductor_synthesis",
+                instruction=synthesis_prompt,
+                blackboard_dir=self.blackboard.root_dir,
+                workspace_dir=self.workspace_dir,
+            )
+            synth_res = conductor_adapter.execute(synth_ctx)
+            if synth_res.is_success:
+                self.blackboard.write_artifact("synthesis_report.md", synth_res.stdout.strip(), author_agent=self.conductor_name)
+            self._notify("synthesis_end", {"conductor": self.conductor_name, "is_success": synth_res.is_success})
 
         total_duration = time.time() - start_time
-        final_status = "completed" if overall_success else "failed"
+        if self._is_cancelled:
+            final_status = "cancelled"
+            overall_success = False
+        else:
+            final_status = "completed" if overall_success else "failed"
 
         # Collect created/modified files in project workspace
         project_files = []
