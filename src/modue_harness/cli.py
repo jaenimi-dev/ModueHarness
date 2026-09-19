@@ -384,6 +384,8 @@ def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
         status_text = "SUCCESS" if summary["success"] else "FAILED"
         print(f"상태: {status_text} (소요 시간: {summary['total_duration_sec']:.2f}s)")
         print(f"프로젝트 구현 폴더: {summary['project_dir']}")
+        if not summary["success"] and summary.get("error"):
+            print(f"❌ [실패 상세 원인]: {summary.get('error')}")
 
         if summary.get("subtasks"):
             print(f"\n[실행된 서브태스크 ({len(summary['subtasks'])})]")
@@ -391,6 +393,8 @@ def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
                 mark = "✓" if st.get("is_success") else "✗"
                 cmd_line = f"\n      💻 CLI: {st.get('command')}" if st.get("command") else ""
                 print(f"  [{mark}] {st.get('task_id')} ({st.get('agent')}){cmd_line}")
+                if not st.get("is_success") and st.get("error"):
+                    print(f"      ❌ 오류 상세: {st.get('error')}")
 
         if summary.get("project_files"):
             print(f"\n[프로젝트 내 생성/수정된 파일 ({len(summary['project_files'])})]")

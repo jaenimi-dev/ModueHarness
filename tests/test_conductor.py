@@ -79,3 +79,51 @@ def test_conductor_runner_decomposition_and_execution(tmp_path: Path):
     tasks = board.list_tasks()
     assert len(tasks) == 2
     assert all(t.status == TaskStatus.COMPLETED for t in tasks)
+
+
+def test_conductor_runner_subtask_failure_reports_reason(tmp_path: Path):
+    """Verify conductor reports failure reason when a worker subtask fails."""
+    board = Blackboard(tmp_path / "blackboard")
+    board.initialize()
+
+    tasks_json = json.dumps([
+        {
+            "id": "failing_task",
+            "assigned_agent": "failing_dev",
+            "instruction": "Do something that crashes",
+            "output_artifact": "fail.txt",
+        },
+    ])
+
+    conductor_adapter = GenericCLIAdapter(
+        name="conductor",
+        command=sys.executable,
+        default_args=["-c", f"print('{tasks_json}')"],
+    )
+
+    failing_adapter = GenericCLIAdapter(
+        name="failing_dev",
+        command=sys.executable,
+        default_args=["-c", "import sys; sys.stderr.write('ModuleNotFoundError: No module named fake_package\\n'); sys.exit(1)"],
+    )
+
+    runner = ConductorRunner(
+        goal="Run failing task",
+        conductor_agent_name="conductor",
+        worker_agents={
+            "conductor": conductor_adapter,
+            "failing_dev": failing_adapter,
+        },
+        blackboard=board,
+        workspace_dir=tmp_path,
+    )
+
+    summary = runner.run()
+    assert summary["success"] is False
+    assert summary["status"] == "failed"
+    assert "ModuleNotFoundError" in summary["error_message"]
+    assert "failing_task" in summary["error_message"]
+    assert len(summary["subtasks"]) == 1
+    assert summary["subtasks"][0]["is_success"] is False
+    assert "ModuleNotFoundError" in summary["subtasks"][0]["error"]
+

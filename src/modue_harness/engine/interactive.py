@@ -352,7 +352,8 @@ class InteractiveSession:
                         desc = (t.get("instruction") or "")[:50]
                         print(f"    • [{t.get('id')}] {t.get('assigned_agent')}: {desc}")
                 else:
-                    print(f"  ✗ 기획 실패: {data.get('error')}")
+                    err_msg = data.get("error") or "계획 수립 실패"
+                    print(f"  ✗ 기획 실패: {err_msg}")
             elif event == "task_start":
                 idx = data.get("index", 1)
                 tot = data.get("total", 1)
@@ -368,9 +369,13 @@ class InteractiveSession:
                         "command": data.get("full_command_str") or data.get("command"),
                     })
             elif event == "task_end":
-                mark = "✓" if data.get("is_success") else "✗"
                 dur = data.get("duration_sec", 0.0)
-                print(f"  {mark} [{data.get('task_id')}] 실행 완료 ({dur:.1f}s)")
+                if data.get("is_success"):
+                    print(f"  ✓ [{data.get('task_id')}] 실행 완료 ({dur:.1f}s)")
+                else:
+                    err_str = data.get("error") or "서브태스크 실행 실패"
+                    print(f"  ✗ [{data.get('task_id')}] 실행 실패 ({dur:.1f}s)")
+                    print(f"        ❌ 서브태스크 실패 원인: {err_str}")
             elif event == "synthesis_start":
                 print(f"  [3/3] 📝 Conductor({data.get('conductor')}) 최종 검토 및 종합 보고서 작성 중...")
                 if data.get("command"):
@@ -382,7 +387,11 @@ class InteractiveSession:
                         "command": data.get("full_command_str") or data.get("command"),
                     })
             elif event == "synthesis_end":
-                print(f"  ✓ 최종 종합 보고서 저장: blackboard/artifacts/synthesis_report.md")
+                if data.get("is_success"):
+                    print(f"  ✓ 최종 종합 보고서 저장: blackboard/artifacts/synthesis_report.md")
+                else:
+                    err_str = data.get("error") or "종합 보고서 작성 실패"
+                    print(f"  ✗ 최종 종합 보고서 작성 실패: {err_str}")
 
         # Run Leader-Worker Conductor
         runner = ConductorRunner(
@@ -420,6 +429,7 @@ class InteractiveSession:
             "total_duration_sec": result.get("total_duration_sec", 0.0),
             "project_files": project_files,
             "artifacts": artifacts,
+            "error": result.get("error_message") or result.get("error"),
         }
 
     def execute_command_async(self, command: str) -> BackgroundJob:
@@ -468,6 +478,8 @@ class InteractiveSession:
                 res = runner.run()
                 job.result = res
                 job.status = res.get("status", "completed")
+                if not res.get("success", False) and not job.error:
+                    job.error = res.get("error_message") or res.get("error")
                 job.stage = "done"
             except Exception as e:
                 job.status = "failed"
@@ -591,6 +603,8 @@ class InteractiveSession:
                 else:
                     status_desc = summary.get("status", "failed")
                     print(f"✗ 작업 종료 ({status_desc}, 소요 시간: {summary['total_duration_sec']:.2f}s)")
+                    if summary.get("error"):
+                        print(f"❌ [실패 상세 원인]: {summary.get('error')}")
 
                 if summary.get("subtasks"):
                     print(f"\n[실행된 서브태스크: {len(summary['subtasks'])}개]")
@@ -598,6 +612,8 @@ class InteractiveSession:
                         mark = "✓" if st.get("is_success") else "✗"
                         cmd_line = f"\n      💻 CLI: {st.get('command')}" if st.get("command") else ""
                         print(f"  [{mark}] {st.get('task_id')} ({st.get('agent')}){cmd_line}")
+                        if not st.get("is_success") and st.get("error"):
+                            print(f"      ❌ 오류 상세: {st.get('error')}")
 
                 if summary.get("project_files"):
                     print(f"\n[프로젝트 파일 ({self.project_dir.name})]")
@@ -650,6 +666,8 @@ class InteractiveSession:
                 print(f"  [{marker}] {j.id} ({j.status}, {j.duration_sec:.1f}s) - {j.project}: '{j.command[:35]}'")
                 if j.status == "running":
                     print(f"      현재 단계: {j.stage}")
+                elif j.status == "failed" and j.error:
+                    print(f"      ❌ 실패 사유: {j.error}")
             print()
 
         elif cmd in ["/cancel", "/stop"]:

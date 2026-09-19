@@ -146,7 +146,19 @@ class BaseCLIAdapter(ABC):
             stderr_clean = strip_ansi(process.stderr or "")
 
             status = TaskStatus.COMPLETED if process.returncode == 0 else TaskStatus.FAILED
-            error_msg = None if process.returncode == 0 else f"CLI exited with status {process.returncode}"
+            if process.returncode == 0:
+                error_msg = None
+            else:
+                err_detail = stderr_clean.strip() or stdout_clean.strip()
+                if err_detail:
+                    lines = [l for l in err_detail.splitlines() if l.strip()]
+                    if len(lines) > 5:
+                        summary_lines = "\n        ".join(lines[:5]) + f"\n        ... ({len(lines) - 5} lines truncated)"
+                    else:
+                        summary_lines = "\n        ".join(lines)
+                    error_msg = f"CLI exited with status {process.returncode}:\n        {summary_lines}"
+                else:
+                    error_msg = f"CLI exited with status {process.returncode} (no output)"
 
             return TurnResult(
                 status=status,

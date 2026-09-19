@@ -105,7 +105,14 @@ class ConductorRunner:
         )
 
         if self._is_cancelled:
-            return {"status": "cancelled", "success": False, "goal": self.goal, "subtasks": []}
+            return {
+                "status": "cancelled",
+                "success": False,
+                "goal": self.goal,
+                "subtasks": [],
+                "error_message": "작업이 취소되었습니다 (User cancelled)",
+                "total_duration_sec": time.time() - start_time,
+            }
 
         # Phase 1: Planning / Task Decomposition
         plan_context = TurnContext(
@@ -137,6 +144,9 @@ class ConductorRunner:
                 "stage": "planning",
                 "error_message": plan_result.error_message or "Conductor failed during planning",
                 "success": False,
+                "goal": self.goal,
+                "subtasks": [],
+                "total_duration_sec": time.time() - start_time,
             }
 
         # Save plan to blackboard
@@ -160,11 +170,13 @@ class ConductorRunner:
         # Phase 2: Execute Workers
         worker_results: List[Dict[str, Any]] = []
         overall_success = True
+        failure_reason: Optional[str] = None
         total_subtasks = len(subtasks_data[:self.max_subtasks])
 
         for idx, task_info in enumerate(subtasks_data[:self.max_subtasks]):
             if self._is_cancelled:
                 overall_success = False
+                failure_reason = "작업이 취소되었습니다 (User cancelled)"
                 break
 
             task_id = task_info.get("id", f"task_{len(worker_results)+1}")
@@ -232,6 +244,7 @@ class ConductorRunner:
                 })
             else:
                 self.blackboard.update_task_status(task_id, TaskStatus.FAILED, {"error": res.error_message})
+                task_record["error"] = res.error_message
                 worker_results.append(task_record)
                 self._notify("task_end", {
                     "task_id": task_id,
@@ -243,6 +256,7 @@ class ConductorRunner:
                     "full_command_str": worker_full_cmd_str,
                 })
                 overall_success = False
+                failure_reason = f"서브태스크 [{task_id}] 실행 실패: {res.error_message}"
                 break
 
         # Phase 3: Conductor Synthesis / Review
@@ -277,9 +291,15 @@ class ConductorRunner:
             synth_res = conductor_adapter.execute(synth_ctx)
             if synth_res.is_success:
                 self.blackboard.write_artifact("synthesis_report.md", synth_res.stdout.strip(), author_agent=self.conductor_name)
+            else:
+                overall_success = False
+                if not failure_reason:
+                    failure_reason = f"Conductor 종합 보고서 작성 실패: {synth_res.error_message}"
+
             self._notify("synthesis_end", {
                 "conductor": self.conductor_name,
                 "is_success": synth_res.is_success,
+                "error": synth_res.error_message if not synth_res.is_success else None,
                 "command": synth_cmd_display,
                 "full_command_str": synth_full_cmd_str,
             })
@@ -288,6 +308,8 @@ class ConductorRunner:
         if self._is_cancelled:
             final_status = "cancelled"
             overall_success = False
+            if not failure_reason:
+                failure_reason = "작업이 취소되었습니다 (User cancelled)"
         else:
             final_status = "completed" if overall_success else "failed"
 
@@ -308,4 +330,5 @@ class ConductorRunner:
             "subtasks": worker_results,
             "total_duration_sec": total_duration,
             "project_files": sorted(project_files),
+            "error_message": failure_reason,
         }

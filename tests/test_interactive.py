@@ -367,4 +367,118 @@ def test_interactive_session_command_display(tmp_path: Path, capsys):
     assert sys.executable in captured_cmd.out
 
 
+def test_interactive_session_failure_reason_displayed(tmp_path: Path, capsys):
+    """Test that failure reason is captured and printed in interactive session."""
+    projects_dir = tmp_path / "projects"
+    board_dir = tmp_path / "blackboard"
+
+    tasks_json = json.dumps([
+        {
+            "id": "crash_task",
+            "assigned_agent": "crasher",
+            "instruction": "Trigger error",
+        }
+    ])
+    conductor = GenericCLIAdapter(
+        name="conductor",
+        command=sys.executable,
+        default_args=["-c", f"print('{tasks_json}')"],
+    )
+    crasher = GenericCLIAdapter(
+        name="crasher",
+        command=sys.executable,
+        default_args=["-c", "import sys; sys.stderr.write('FatalError: database connection refused\\n'); sys.exit(2)"],
+    )
+
+    session = InteractiveSession(
+        project_name="fail_app",
+        projects_root=projects_dir,
+        blackboard_dir=board_dir,
+        agents={"conductor": conductor, "crasher": crasher},
+        conductor_name="conductor",
+    )
+
+    summary = session.execute_command("Run crashing command", live_progress=True)
+    captured = capsys.readouterr()
+
+    assert summary["success"] is False
+    assert "FatalError: database connection refused" in summary["error"]
+    assert "database connection refused" in captured.out
+    assert "서브태스크 실패 원인" in captured.out
+
+
+def test_cli_prompt_mode_failure_output(tmp_path: Path, capsys):
+    """Test that CLI prompt mode prints failure reason clearly on stderr/stdout."""
+    projects_dir = tmp_path / "projects"
+    board_dir = tmp_path / "blackboard"
+    agents_file = tmp_path / "agents.json"
+
+    tasks_json = json.dumps([
+        {
+            "id": "fail_subtask",
+            "assigned_agent": "broken_worker",
+            "instruction": "Fail badly",
+        }
+    ])
+    agents_data = {
+        "agents": {
+            "conductor": {
+                "adapter": "generic",
+                "command": sys.executable,
+                "args": ["-c", f"print('{tasks_json}')"],
+            },
+            "broken_worker": {
+                "adapter": "generic",
+                "command": sys.executable,
+                "args": ["-c", "import sys; sys.stderr.write('SyntaxError: invalid syntax\\n'); sys.exit(1)"],
+            }
+        }
+    }
+    agents_file.write_text(json.dumps(agents_data), encoding="utf-8")
+
+    exit_code = main([
+        "-p", "Run breaking workflow",
+        "-P", "broken_proj",
+        "--projects-dir", str(projects_dir),
+        "--dir", str(board_dir),
+        "--agents", str(agents_file),
+    ])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "상태: FAILED" in captured.out
+    assert "❌ [실패 상세 원인]:" in captured.out
+    assert "SyntaxError: invalid syntax" in captured.out
+    assert "❌ 오류 상세:" in captured.out
+
+
+def test_jobs_slash_command_displays_failure_reason(tmp_path: Path, capsys):
+    """Test that /jobs displays the failure reason for failed background jobs."""
+    projects_dir = tmp_path / "projects"
+    board_dir = tmp_path / "blackboard"
+
+    session = InteractiveSession(
+        project_name="job_fail_proj",
+        projects_root=projects_dir,
+        blackboard_dir=board_dir,
+    )
+    from modue_harness.engine.interactive import BackgroundJob
+    failed_job = BackgroundJob(
+        id="job_99",
+        command="Failing background task",
+        project="job_fail_proj",
+        project_dir=session.project_dir,
+        status="failed",
+        stage="done",
+        error="ConnectionTimeout: network timeout after 30s",
+    )
+    session.jobs["job_99"] = failed_job
+
+    session._handle_special_command("/jobs")
+    captured = capsys.readouterr()
+    assert "job_99" in captured.out
+    assert "❌ 실패 사유: ConnectionTimeout: network timeout after 30s" in captured.out
+
+
+
 
