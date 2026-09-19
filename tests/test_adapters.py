@@ -131,3 +131,32 @@ def test_adapter_stream_execution(tmp_path: Path):
     lines = list(gen)
     assert any("Line1" in l for l in lines)
     assert any("Line2" in l for l in lines)
+
+
+def test_claude_adapter_model_and_effort():
+    """Verify Claude adapter configures and updates model and reasoning effort."""
+    claude = ClaudeCLIAdapter(model="claude-3-7-sonnet-latest", effort="high")
+    cmd = claude.build_command("Hello")
+    assert "--model" in cmd
+    assert "claude-3-7-sonnet-latest" in cmd
+    assert "--effort" in cmd
+    assert "high" in cmd
+    assert "-p" in cmd
+
+    # Test dynamic model update
+    claude.set_model("opus")
+    cmd2 = claude.build_command("Hello")
+    assert "opus" in cmd2
+    assert "claude-3-7-sonnet-latest" not in cmd2
+
+    # Test dynamic effort update
+    claude.set_effort("max")
+    cmd3 = claude.build_command("Hello")
+    assert "max" in cmd3
+    assert "high" not in cmd3
+
+    # Test clearing effort
+    claude.set_effort(None)
+    cmd4 = claude.build_command("Hello")
+    assert "--effort" not in cmd4
+

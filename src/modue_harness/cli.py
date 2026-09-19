@@ -77,6 +77,18 @@ def create_parser() -> argparse.ArgumentParser:
         help="Override with a specific single AI agent adapter (e.g. claude, agy, aider, generic)",
     )
     parser.add_argument(
+        "--model", "-m",
+        type=str,
+        default=None,
+        help="Model to use for Claude/AI agents (e.g. sonnet, opus, haiku, claude-3-7-sonnet-latest)",
+    )
+    parser.add_argument(
+        "--effort", "-e",
+        type=str,
+        default=None,
+        help="Reasoning/thinking effort level for Claude (choices: low, medium, high, xhigh, max)",
+    )
+    parser.add_argument(
         "-i", "--interactive",
         action="store_true",
         help="Start interactive CLI REPL session",
@@ -220,6 +232,8 @@ def parse_cli_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
             "--dir", "-d",
             "--agents", "-a",
             "--agent",
+            "-m", "--model",
+            "-e", "--effort",
             "-p", "--prompt",
         }
 
@@ -347,6 +361,8 @@ def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
         blackboard_dir=board_dir,
         agents_file=agents_file,
         specific_agent=specific_agent,
+        model=getattr(args, "model", None),
+        effort=getattr(args, "effort", None),
     )
 
     # 1. User requested interactive session explicitly or running in a TTY terminal without args

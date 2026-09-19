@@ -12,6 +12,8 @@ agents:
     adapter: "claude"
     command: "claude"
     args: ["--permission-mode", "auto"]  # 대화형 프롬프트 대기 없이 자동 승인
+    model: "claude-3-7-sonnet-latest"    # 사용할 모델 (예: sonnet, opus, haiku, claude-3-7-sonnet-latest)
+    effort: "high"                       # 생각/추론 노력 수준 (low, medium, high, xhigh, max)
     role: "System Architect & Technical Planner"
     system_instruction: "You design clean, modular, and maintainable software architecture specifications."
 
@@ -20,6 +22,8 @@ agents:
     adapter: "claude"
     command: "claude"
     args: ["--permission-mode", "auto"]
+    model: "claude-3-7-sonnet-latest"
+    effort: "medium"                     # 구현을 위한 적정 추론 수준
     role: "Core Implementation Engineer"
     system_instruction: "You write robust, production-ready code matching the architectural specifications."
 
@@ -28,5 +32,7 @@ agents:
     adapter: "claude"
     command: "claude"
     args: ["--permission-mode", "auto"]
+    model: "claude-3-7-sonnet-latest"
+    effort: "high"                       # 심층 검증을 위한 높은 추론 노력
     role: "Quality & Security Reviewer"
     system_instruction: "You critically review code for edge cases, performance bottlenecks, and security vulnerabilities."

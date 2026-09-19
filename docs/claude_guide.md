@@ -155,6 +155,41 @@ agents:
     args: ["--permission-mode", "auto"]  # 승인 대기 없이 자동 실행 보장
 ```
 
+### 3) 모델(Model) 및 생각/추론 노력(Effort) 설정
+Claude Code 2.1+ (Claude 3.7 Sonnet 등)는 문제 해결 시 내부 숙고를 얼마나 깊게 할지 결정하는 **추론 노력(Reasoning Effort)** 기능을 지원합니다.
+
+- **모델 지정 (`--model`)**:
+  - `claude-3-7-sonnet-latest`, `sonnet`, `opus`, `haiku`
+- **추론 노력 지정 (`--effort`)**:
+  - `low`: 빠른 응답, 단순 문법 수정 및 스크립트 작성에 적합 (비용/시간 절약)
+  - `medium`: 기본 균형 모드
+  - `high`: 복잡한 아키텍처 설계, 동시성/보안/알고리즘 문제에 적합 (권장)
+  - `xhigh` / `max`: 최고 수준의 심층 추론
+
+#### ModueHarness에서 설정하는 3가지 방법
+1. **`agents.yaml` 명세 파일에서 에이전트별로 설정**:
+   ```yaml
+   agents:
+     architect:
+       adapter: "claude"
+       model: "claude-3-7-sonnet-latest"
+       effort: "high"   # 아키텍트는 깊이 생각하도록 설정
+     developer:
+       adapter: "claude"
+       model: "claude-3-7-sonnet-latest"
+       effort: "medium" # 구현 엔지니어는 신속하게 코드 작성
+   ```
+2. **CLI 실행 시 명령행 옵션 지정**:
+   ```bash
+   python run.py -i -P my-web-app --model sonnet --effort high
+   ```
+3. **대화형 REPL 세션 중 슬래시 명령어로 실시간 변경**:
+   ```text
+   [my-web-app] > /model sonnet
+   [my-web-app] > /effort high
+   [my-web-app] > /effort architect max
+   ```
+
 ---
 
 ## 6. 프롬프팅 모범 사례 및 워크플로우
@@ -214,27 +249,33 @@ version: "0.5.0"
 name: "claude-all-stars"
 
 agents:
-  # 설계 및 기획 에이전트
+  # 설계 및 기획 에이전트 (깊은 심층 추론)
   architect:
     adapter: "claude"
     command: "claude"
     args: ["--permission-mode", "auto"]
+    model: "claude-3-7-sonnet-latest"
+    effort: "high"
     role: "System Architect"
     system_instruction: "You are a software architect. Focus on clean interfaces, SOLID principles, and modular designs."
 
-  # 구현 에이전트
+  # 구현 에이전트 (빠르고 정확한 구현)
   developer:
     adapter: "claude"
     command: "claude"
     args: ["--permission-mode", "auto"]
+    model: "claude-3-7-sonnet-latest"
+    effort: "medium"
     role: "Software Implementation Engineer"
     system_instruction: "You write production-quality, tested code matching the architectural specifications."
 
-  # 품질 및 보안 검토 에이전트
+  # 품질 및 보안 검토 에이전트 (빈틈없는 엣지케이스 검토)
   reviewer:
     adapter: "claude"
     command: "claude"
     args: ["--permission-mode", "auto"]
+    model: "claude-3-7-sonnet-latest"
+    effort: "high"
     role: "Code & Security Reviewer"
     system_instruction: "You critically review code for edge cases, performance bottlenecks, and security vulnerabilities."
 ```

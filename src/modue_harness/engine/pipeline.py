@@ -49,6 +49,8 @@ class PipelineRunner:
                     kwargs["command"] = agent_cfg.command
                 if agent_cfg.model:
                     kwargs["model"] = agent_cfg.model
+                if agent_cfg.effort:
+                    kwargs["effort"] = agent_cfg.effort
                 if agent_cfg.system_instruction:
                     kwargs["system_instruction"] = agent_cfg.system_instruction
 

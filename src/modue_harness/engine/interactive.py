@@ -51,6 +51,8 @@ class BackgroundJob:
 def load_or_detect_agents(
     agents_file: Optional[Path] = None,
     specific_agent: Optional[str] = None,
+    model: Optional[str] = None,
+    effort: Optional[str] = None,
     cwd: Optional[Path] = None,
 ) -> Dict[str, BaseCLIAdapter]:
     """Load agents from YAML file or auto-detect available AI CLI tools on the system."""
@@ -63,10 +65,18 @@ def load_or_detect_agents(
             kwargs = {"command": sys.executable, "default_args": ["-c", "import sys; print('[]')"]}
         elif specific_agent.lower() in ["claude", "claude-code"]:
             kwargs = {"command": "claude", "default_args": ["--permission-mode", "auto"]}
+            if model:
+                kwargs["model"] = model
+            if effort:
+                kwargs["effort"] = effort
         elif specific_agent.lower() == "agy":
             kwargs = {"command": "agy"}
+            if model:
+                kwargs["model"] = model
         elif specific_agent.lower() == "aider":
             kwargs = {"command": "aider"}
+            if model:
+                kwargs["model"] = model
         return {specific_agent: create_adapter(specific_agent, name=specific_agent, **kwargs)}
 
     # 2. User specified agents file
@@ -86,11 +96,15 @@ def load_or_detect_agents(
             for name, cfg in agents_dict.items():
                 if isinstance(cfg, dict):
                     adapter_type = cfg.get("adapter", "generic")
-                    kwargs: Dict[str, Any] = {"name": name, "default_args": cfg.get("args", [])}
+                    kwargs = {"name": name, "default_args": cfg.get("args", [])}
                     if cfg.get("command"):
                         kwargs["command"] = cfg["command"]
-                    if cfg.get("model"):
-                        kwargs["model"] = cfg["model"]
+                    agent_model = model or cfg.get("model")
+                    if agent_model:
+                        kwargs["model"] = agent_model
+                    agent_effort = effort or cfg.get("effort")
+                    if agent_effort:
+                        kwargs["effort"] = agent_effort
                     if cfg.get("system_instruction"):
                         kwargs["system_instruction"] = cfg["system_instruction"]
                     loaded[name] = create_adapter(adapter_type, **kwargs)
@@ -109,18 +123,24 @@ def load_or_detect_agents(
             "architect": ClaudeCLIAdapter(
                 name="architect",
                 command="claude",
+                model=model,
+                effort=effort,
                 default_args=["--permission-mode", "auto"],
                 system_instruction="You design modular software architecture and decompose tasks clearly.",
             ),
             "developer": ClaudeCLIAdapter(
                 name="developer",
                 command="claude",
+                model=model,
+                effort=effort,
                 default_args=["--permission-mode", "auto"],
                 system_instruction="You write clean, tested, production-ready code in the project directory.",
             ),
             "reviewer": ClaudeCLIAdapter(
                 name="reviewer",
                 command="claude",
+                model=model,
+                effort=effort,
                 default_args=["--permission-mode", "auto"],
                 system_instruction="You verify and review implementation code and write test validations.",
             ),
@@ -178,6 +198,8 @@ class InteractiveSession:
         agents_file: Optional[Path] = None,
         specific_agent: Optional[str] = None,
         conductor_name: Optional[str] = None,
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
         event_bus: Optional[EventBus] = None,
     ) -> None:
         self.projects_root = (projects_root or (Path.cwd() / "projects")).resolve()
@@ -188,9 +210,13 @@ class InteractiveSession:
         self.event_bus = event_bus or EventBus()
         self.blackboard = Blackboard(root_dir=self.blackboard_dir, event_bus=self.event_bus)
 
+        self.model = model
+        self.effort = effort
         self.agents = agents or load_or_detect_agents(
             agents_file=agents_file,
             specific_agent=specific_agent,
+            model=model,
+            effort=effort,
             cwd=Path.cwd(),
         )
 
@@ -207,6 +233,36 @@ class InteractiveSession:
         self.jobs: Dict[str, BackgroundJob] = {}
         self._job_counter: int = 0
         self._active_foreground_runner: Optional[ConductorRunner] = None
+
+    def set_model(self, model: Optional[str], agent_name: Optional[str] = None) -> List[str]:
+        """Update model dynamically for specified agent or all supporting Claude/AI agents."""
+        updated = []
+        targets = [agent_name] if agent_name else list(self.agents.keys())
+        for name in targets:
+            agent = self.agents.get(name)
+            if agent:
+                if hasattr(agent, "set_model"):
+                    agent.set_model(model)
+                    updated.append(name)
+                elif hasattr(agent, "model"):
+                    setattr(agent, "model", model)
+                    updated.append(name)
+        return updated
+
+    def set_effort(self, effort: Optional[str], agent_name: Optional[str] = None) -> List[str]:
+        """Update reasoning effort level dynamically (low, medium, high, xhigh, max)."""
+        updated = []
+        targets = [agent_name] if agent_name else list(self.agents.keys())
+        for name in targets:
+            agent = self.agents.get(name)
+            if agent:
+                if hasattr(agent, "set_effort"):
+                    agent.set_effort(effort)
+                    updated.append(name)
+                elif hasattr(agent, "effort"):
+                    setattr(agent, "effort", effort)
+                    updated.append(name)
+        return updated
 
     def switch_project(self, project_name: str) -> Path:
         """Switch current target project to a new or existing project folder."""
@@ -443,7 +499,18 @@ class InteractiveSession:
         self.project_dir.mkdir(parents=True, exist_ok=True)
         self.blackboard.initialize()
 
-        agent_names = ", ".join(self.agents.keys())
+        agent_desc = []
+        for aname, a in self.agents.items():
+            extra = []
+            if getattr(a, "model", None):
+                extra.append(f"model={a.model}")
+            if getattr(a, "effort", None):
+                extra.append(f"effort={a.effort}")
+            if extra:
+                agent_desc.append(f"{aname} ({', '.join(extra)})")
+            else:
+                agent_desc.append(aname)
+        agent_names = ", ".join(agent_desc)
         print("=" * 64)
         print("🤖 ModueHarness (모두의 하네스) - 대화형 CLI 모드")
         print("=" * 64)
@@ -453,7 +520,7 @@ class InteractiveSession:
         print("-" * 64)
         print("명령어를 입력하면 AI 팀이 프로젝트 디렉터리에 직접 구현합니다.")
         print("💡 팁: 명령 끝에 '&'를 붙이면 백그라운드로 실행되어 논블로킹으로 다른 작업을 계속할 수 있습니다!")
-        print("특수 명령어: /jobs, /cancel, /project <이름>, /projects, /files, /status, /help, exit")
+        print("특수 명령어: /model, /effort, /jobs, /cancel, /project <이름>, /projects, /files, /status, /help, exit")
         print("=" * 64 + "\n")
 
         while True:
@@ -594,6 +661,54 @@ class InteractiveSession:
                 print(f"  • {f}")
             print()
 
+        elif cmd in ["/model", "/m"]:
+            if not arg:
+                print("\n📋 현재 AI 에이전트 모델 설정:")
+                for name, agent in self.agents.items():
+                    m = getattr(agent, "model", None) or "(기본값)"
+                    print(f"  • {name}: {m}")
+                print("\n사용법: /model <모델명> (예: /model sonnet, /model claude-3-7-sonnet-latest)")
+                print("       /model <에이전트명> <모델명> (예: /model developer haiku)\n")
+            else:
+                arg_parts = arg.split(maxsplit=1)
+                if len(arg_parts) == 2 and arg_parts[0] in self.agents:
+                    target_agent, new_model = arg_parts[0], arg_parts[1]
+                    updated = self.set_model(new_model, target_agent)
+                    print(f"✓ '{target_agent}' 에이전트의 모델을 '{new_model}'(으)로 변경했습니다.")
+                else:
+                    new_model = arg
+                    updated = self.set_model(new_model)
+                    if updated:
+                        print(f"✓ AI 에이전트({', '.join(updated)})의 모델을 '{new_model}'(으)로 변경했습니다.")
+                    else:
+                        print("⚠️ 모델을 적용할 수 있는 에이전트를 찾을 수 없습니다.")
+
+        elif cmd in ["/effort", "/e"]:
+            valid_levels = {"low", "medium", "high", "xhigh", "max", "off", "none", "default"}
+            if not arg:
+                print("\n📋 현재 Claude 에이전트 추론 노력(Effort) 설정:")
+                for name, agent in self.agents.items():
+                    eff = getattr(agent, "effort", None) or "(기본값)"
+                    print(f"  • {name}: {eff}")
+                print("\n선택 가능 레벨: low, medium, high, xhigh, max (또는 off/none으로 해제)")
+                print("사용법: /effort <레벨> (예: /effort high, /effort max)")
+                print("       /effort <에이전트명> <레벨> (예: /effort architect max)\n")
+            else:
+                arg_parts = arg.split(maxsplit=1)
+                if len(arg_parts) == 2 and arg_parts[0] in self.agents:
+                    target_agent, level = arg_parts[0], arg_parts[1].lower()
+                    eff_val = None if level in ["off", "none", "default"] else level
+                    updated = self.set_effort(eff_val, target_agent)
+                    print(f"✓ '{target_agent}' 에이전트의 추론 노력(effort)을 '{eff_val or 'default'}'(으)로 변경했습니다.")
+                else:
+                    level = arg.lower()
+                    eff_val = None if level in ["off", "none", "default"] else level
+                    updated = self.set_effort(eff_val)
+                    if updated:
+                        print(f"✓ Claude 에이전트({', '.join(updated)})의 추론 노력(effort)을 '{eff_val or 'default'}'(으)로 변경했습니다.")
+                    else:
+                        print("⚠️ 추론 노력을 적용할 수 있는 Claude 에이전트를 찾을 수 없습니다.")
+
         elif cmd == "/status":
             state = self.blackboard.load_state()
             tasks = self.blackboard.list_tasks()
@@ -603,6 +718,11 @@ class InteractiveSession:
             print(f"\n=== ModueHarness 상태 요약 ===")
             print(f"• 활성 프로젝트: {self.project_name} ({self.project_dir})")
             print(f"• 공용 칠판:     {self.blackboard_dir}")
+            print(f"• 참여 AI 팀:")
+            for aname, a in self.agents.items():
+                m_str = f", model={a.model}" if getattr(a, "model", None) else ""
+                e_str = f", effort={a.effort}" if getattr(a, "effort", None) else ""
+                print(f"    - {aname} ({getattr(a, 'name', a.__class__.__name__)}{m_str}{e_str})")
             print(f"• 세션 ID:       {state.get('session_id', 'N/A')}")
             print(f"• 진행 상태:     {state.get('status', 'unknown')}")
             if running_jobs:
@@ -616,6 +736,8 @@ class InteractiveSession:
             print("\n=== 사용 가능한 명령어 ===")
             print("  자연어 명령 입력        : 동기 방식으로 즉시 실행 (실시간 단계 표시)")
             print("  자연어 명령 &          : 백그라운드 비동기 실행 (프롬프트 즉시 반환)")
+            print("  /model [이름] [모델]    : AI 모델 확인 및 변경 (예: /model sonnet)")
+            print("  /effort [이름] [수준]   : Claude 추론 노력 수준 설정 (low, medium, high, max)")
             print("  /bg <명령어>           : 백그라운드 비동기 실행")
             print("  /jobs                 : 백그라운드 작업 진행 현황 및 목록")
             print("  /cancel [job_id]      : 실행 중인 작업 취소 및 중단")

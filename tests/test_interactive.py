@@ -272,3 +272,57 @@ def test_interactive_session_background_job_and_cancel(tmp_path: Path):
     assert cancelled is True
     assert job2.status == "cancelled"
 
+
+def test_interactive_session_model_and_effort(tmp_path: Path):
+    """Test setting and querying model and effort in interactive session."""
+    from modue_harness.adapters.claude import ClaudeCLIAdapter
+
+    projects_dir = tmp_path / "projects"
+    board_dir = tmp_path / "blackboard"
+
+    claude_arch = ClaudeCLIAdapter(name="architect", model="sonnet", effort="high")
+    claude_dev = ClaudeCLIAdapter(name="developer", model="sonnet", effort="medium")
+
+    session = InteractiveSession(
+        project_name="model_test_app",
+        projects_root=projects_dir,
+        blackboard_dir=board_dir,
+        agents={"architect": claude_arch, "developer": claude_dev},
+        conductor_name="architect",
+    )
+
+    # Verify initial settings
+    assert claude_arch.model == "sonnet"
+    assert claude_arch.effort == "high"
+    assert claude_dev.effort == "medium"
+
+    # Test changing model for all
+    updated = session.set_model("opus")
+    assert "architect" in updated and "developer" in updated
+    assert claude_arch.model == "opus"
+    assert claude_dev.model == "opus"
+
+    # Test changing effort for specific agent
+    updated = session.set_effort("max", agent_name="architect")
+    assert updated == ["architect"]
+    assert claude_arch.effort == "max"
+    assert claude_dev.effort == "medium"
+
+    # Test special command handler for /model and /effort
+    session._handle_special_command("/model haiku")
+    assert claude_arch.model == "haiku"
+    assert claude_dev.model == "haiku"
+
+    session._handle_special_command("/effort low")
+    assert claude_arch.effort == "low"
+    assert claude_dev.effort == "low"
+
+    session._handle_special_command("/model developer sonnet")
+    assert claude_dev.model == "sonnet"
+    assert claude_arch.model == "haiku"
+
+    session._handle_special_command("/effort architect max")
+    assert claude_arch.effort == "max"
+    assert claude_dev.effort == "low"
+
+

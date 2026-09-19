@@ -45,6 +45,7 @@ class WorkflowAgentConfig:
     args: List[str] = field(default_factory=list)
     role: str = "Agent"
     model: Optional[str] = None
+    effort: Optional[str] = None
     system_instruction: Optional[str] = None
 
     @classmethod
@@ -56,6 +57,7 @@ class WorkflowAgentConfig:
             args=data.get("args", []),
             role=data.get("role", "Agent"),
             model=data.get("model"),
+            effort=data.get("effort"),
             system_instruction=data.get("system_instruction"),
         )
 
