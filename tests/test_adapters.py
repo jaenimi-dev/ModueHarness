@@ -160,3 +160,20 @@ def test_claude_adapter_model_and_effort():
     cmd4 = claude.build_command("Hello")
     assert "--effort" not in cmd4
 
+
+def test_format_command_display_full():
+    """Verify format_command_display preserves full command without truncation by default."""
+    claude = ClaudeCLIAdapter()
+    long_prompt = "### System / Role Directive:\nYou are an architect.\n\n### Task Instruction:\nBuild full web app with tests and docs."
+    cmd = claude.build_command(long_prompt)
+
+    full_display = claude.format_command_display(cmd)
+    assert "..." not in full_display
+    assert "### System / Role Directive:" in full_display
+    assert "You are an architect." in full_display
+    assert "Build full web app with tests and docs." in full_display
+
+    # Explicit truncation if max_prompt_len is specified
+    truncated = claude.format_command_display(cmd, max_prompt_len=20)
+    assert "..." in truncated
+

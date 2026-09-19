@@ -51,13 +51,18 @@ class BaseCLIAdapter(ABC):
 
         return cmd
 
-    def format_command_display(self, cmd: List[str], max_prompt_len: Optional[int] = 100) -> str:
+    def format_command_display(self, cmd: List[str], max_prompt_len: Optional[int] = None) -> str:
         """Format a CLI command argument list for display, optionally truncating long prompt argument."""
+        if not max_prompt_len:
+            try:
+                return shlex.join(cmd)
+            except Exception:
+                return " ".join(cmd)
+
         display_parts = []
         for i, part in enumerate(cmd):
             if (
-                max_prompt_len
-                and len(part) > max_prompt_len
+                len(part) > max_prompt_len
                 and ((i > 0 and cmd[i - 1] in ["-p", "--prompt", "-c"]) or "\n" in part)
             ):
                 first_line = part.strip().splitlines()[0] if part.strip().splitlines() else part.strip()
@@ -109,7 +114,7 @@ class BaseCLIAdapter(ABC):
         """Execute a single turn using the wrapped CLI tool."""
         full_prompt = self.prepare_prompt(context)
         cmd = self.build_command(full_prompt, extra_args=extra_args)
-        cmd_display = self.format_command_display(cmd, max_prompt_len=100)
+        cmd_display = self.format_command_display(cmd, max_prompt_len=None)
         try:
             full_cmd_str = shlex.join(cmd)
         except Exception:

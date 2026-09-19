@@ -123,7 +123,7 @@ class ConductorRunner:
         )
         plan_prompt = conductor_adapter.prepare_prompt(plan_context)
         plan_cmd = conductor_adapter.build_command(plan_prompt)
-        plan_cmd_display = conductor_adapter.format_command_display(plan_cmd, max_prompt_len=100)
+        plan_cmd_display = conductor_adapter.format_command_display(plan_cmd, max_prompt_len=None)
         try:
             plan_full_cmd_str = shlex.join(plan_cmd)
         except Exception:
@@ -204,7 +204,7 @@ class ConductorRunner:
             )
             worker_prompt = worker_adapter.prepare_prompt(turn_ctx)
             worker_cmd = worker_adapter.build_command(worker_prompt)
-            worker_cmd_display = worker_adapter.format_command_display(worker_cmd, max_prompt_len=100)
+            worker_cmd_display = worker_adapter.format_command_display(worker_cmd, max_prompt_len=None)
             try:
                 worker_full_cmd_str = shlex.join(worker_cmd)
             except Exception:
@@ -277,7 +277,7 @@ class ConductorRunner:
             )
             synth_prompt = conductor_adapter.prepare_prompt(synth_ctx)
             synth_cmd = conductor_adapter.build_command(synth_prompt)
-            synth_cmd_display = conductor_adapter.format_command_display(synth_cmd, max_prompt_len=100)
+            synth_cmd_display = conductor_adapter.format_command_display(synth_cmd, max_prompt_len=None)
             try:
                 synth_full_cmd_str = shlex.join(synth_cmd)
             except Exception:
