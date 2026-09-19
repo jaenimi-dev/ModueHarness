@@ -190,15 +190,6 @@ def run_app(
         refresh_artifacts()
         refresh_jobs()
 
-    # Prevent Starlette 404 from falling back to NiceGUI's internal run_script
-    try:
-        from starlette.responses import PlainTextResponse
-
-        @app.exception_handler(404)
-        async def _not_found_handler(request, exc):
-            return PlainTextResponse("Not Found", status_code=404)
-    except Exception:
-        pass
 
     # Prepare ui.run kwargs
     run_kwargs = {

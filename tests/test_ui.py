@@ -149,12 +149,34 @@ def test_tui_app_missing_dependency(monkeypatch):
     assert "Textual is not installed" in str(excinfo.value)
 
 
-def test_cli_ui_command_missing_dep(capsys):
+def test_cli_ui_command_missing_dep(monkeypatch, capsys):
     """Test 'modue-harness ui' command prints installation instructions and exits 1."""
+    import builtins
+    real_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name.startswith("nicegui"):
+            raise ImportError("No module named 'nicegui'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", mock_import)
     ret = main(["ui", "-P", "testproj"])
     out, _ = capsys.readouterr()
     assert ret == 1
     assert "NiceGUI is not installed" in out or "pip install 'modue-harness[ui]'" in out
+
+
+def test_cli_ui_command_success(monkeypatch):
+    """Test 'modue-harness ui' calls run_app successfully."""
+    from unittest.mock import MagicMock
+    mock_run = MagicMock()
+    monkeypatch.setattr("modue_harness.ui.web.app.run_app", mock_run)
+
+    ret = main(["ui", "-P", "myproj", "--port", "9001", "--no-browser"])
+    assert ret == 0
+    mock_run.assert_called_once()
+    assert mock_run.call_args[1]["port"] == 9001
+    assert mock_run.call_args[1]["open_browser"] is False
 
 
 def test_cli_tui_command_missing_dep(capsys):
@@ -165,8 +187,18 @@ def test_cli_tui_command_missing_dep(capsys):
     assert "Textual is not installed" in out or "pip install 'modue-harness[ui]'" in out
 
 
-def test_cli_flags_ui_and_tui(capsys):
+def test_cli_flags_ui_and_tui(monkeypatch, capsys):
     """Test '--ui' and '--tui' flags invoke handlers properly."""
+    import builtins
+    real_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name.startswith("nicegui") or name.startswith("textual"):
+            raise ImportError(f"No module named '{name}'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", mock_import)
+
     ret_ui = main(["--ui", "-P", "testproj"])
     out_ui, _ = capsys.readouterr()
     assert ret_ui == 1
