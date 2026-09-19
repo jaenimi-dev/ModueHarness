@@ -211,6 +211,47 @@ python run.py -p "REST API 서버 구현" -P my-api
 
 ---
 
+### 3. 기존 Git / GitHub 저장소 연동 가이드 (`git`, `gh` CLI 활용)
+
+이미 존재하는 외부 Git 또는 GitHub 저장소의 코드를 분석, 리팩토링하거나 새로운 기능을 추가할 때는 **`projects/` 디렉터리 안에 저장소를 클론한 뒤, 그 폴더명을 `-P` 옵션으로 지정**하여 실행합니다.
+
+#### 1) 저장소 클론 (Clone)
+`projects/` 폴더 아래로 대상 저장소를 클론합니다:
+
+```bash
+# 방법 A: 표준 Git 명령어 사용
+git clone https://github.com/my-org/my-service.git projects/my-service
+
+# 방법 B: GitHub CLI (gh) 사용
+gh repo clone my-org/my-service projects/my-service
+```
+
+> 💡 **왜 `projects/<저장소명>`으로 클론해야 하나요?**  
+> ModueHarness는 AI 에이전트(Claude Code, Google Antigravity 등)를 실행할 때 `projects/<저장소명>`을 서브프로세스의 작업 디렉터리(`cwd`)로 지정합니다.  
+> 따라서 저장소가 이 위치에 있으면 AI가 기존 소스코드 파일, 패키지 의존성(`package.json`, `pyproject.toml` 등), Git 버전 관리 내역(`.git`)을 그대로 인식하여 정확하고 안전하게 작업을 진행합니다.
+
+#### 2) ModueHarness 실행 (`-P <저장소명>`)
+클론한 디렉터리 이름을 `-P` 인자로 전달합니다:
+
+```bash
+# 대화형 모드(REPL)로 시작
+python run.py -i -P my-service
+
+# 또는 단일 명령으로 즉시 실행
+python run.py "기존 코드베이스 구조를 파악하고, 누락된 단위 테스트 코드를 pytest로 작성해줘" -P my-service
+```
+
+#### 3) Git 협업 실전 팁
+- **브랜치 생성 및 자동 커밋 지시**:
+  ```text
+  [my-service] > feature/auth 브랜치를 새로 생성하고, JWT 인증 모듈을 구현한 뒤 변경사항을 커밋해줘.
+  ```
+  Claude Code와 Antigravity는 터미널 실행 권한을 가지고 있으므로, 브랜치 분기(`git checkout -b`)부터 커밋(`git commit`)까지 자율적으로 처리합니다.
+- **안전한 원격 푸시**:
+  AI가 작업을 마친 후 터미널에서 사용자가 직접 `git status` 및 `git diff`로 코드 변경 내역을 확인한 뒤 `git push origin <브랜치명>`을 수행하는 것을 권장합니다.
+
+---
+
 ## 4단계 (방법 B - 고급): 설정 폴더(`config/`) 기반 AI 팀 및 워크플로우 구성
 
 고정된 다단계 파이프라인(예: CI/CD 연계, 조건부 재시도 릴레이 등)이 필요한 경우, `config/` 디렉터리에 AI 팀 명세와 작업 명세를 선언적으로 작성할 수 있습니다.

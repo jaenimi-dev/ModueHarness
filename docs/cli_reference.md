@@ -88,11 +88,17 @@ python run.py "알고리즘 최적화" -P algo --agent claude -m sonnet -e high
 
 # 필요 시 타임아웃(예: 600초)을 지정하여 실행 (기본값은 무제한)
 python run.py "대규모 리팩토링" -P refactor -t 600
+
+# 기존 Git 또는 GitHub(gh) 저장소를 클론받아 작업할 때
+# 1) git clone https://github.com/org/my-repo.git projects/my-repo
+#    (또는 gh repo clone org/my-repo projects/my-repo)
+# 2) 저장소 폴더명을 -P 인자로 전달하여 실행
+python run.py "기존 코드베이스 분석 및 버그 수정" -P my-repo
 ```
 
 ### 공통 옵션
 - `-p`, `--prompt`: 실행할 작업 지시사항 (문자열)
-- `-P`, `--project`: 대상 프로젝트 폴더명 (기본값: `default` -> `projects/default/`)
+- `-P`, `--project`: 대상 프로젝트 폴더명 (기본값: `default` -> `projects/default/`). 외부 Git/GitHub 저장소는 `git clone` 또는 `gh repo clone`으로 `projects/<저장소명>`에 클론한 후 그 이름을 전달합니다.
 - `--projects-dir`: 프로젝트 루트 디렉터리 경로 (기본값: `projects`)
 - `--dir`, `-d`: 공용 칠판 디렉터리 경로 (기본값: `blackboard`)
 - `--agents`, `-a`: 사용할 AI 팀 명세 파일 (`config/agents.yaml` 미존재 시 시스템 CLI 도구 자동 감지)

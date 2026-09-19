@@ -21,7 +21,7 @@ pip install -e ".[dev]"
 ### 2. 테스트 검증
 ```bash
 python3 -m pytest -q
-# 62 passed in ~3.5s
+# 65 passed in ~3.5s
 ```
 
 ### 3. CLI 실행 예시 (워크플로우 파일 없이 직접 명령 실행)
@@ -40,6 +40,11 @@ python run.py -i -P my-web-app --agent agy -m gemini-3.8-flash-high -e high
 
 # 단일 명령어로 즉시 프로젝트에 작업 구현
 python run.py "FastAPI 기반 REST API와 테스트 코드를 작성해줘" -P my-api
+
+# 기존 Git / GitHub(gh) 저장소를 클론받아 작업할 때
+git clone https://github.com/username/my-repo.git projects/my-repo
+# (또는 gh repo clone username/my-repo projects/my-repo)
+python run.py -i -P my-repo
 
 # Multi-AI 토론 및 합의 (Debate) 실행 (Claude vs Antigravity)
 python run.py debate --topic "REST vs GraphQL for Mobile Backend" --proposer claude --challenger agy
