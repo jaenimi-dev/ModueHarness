@@ -13,6 +13,7 @@ ADAPTER_REGISTRY: Dict[str, Type[BaseCLIAdapter]] = {
     "claude": ClaudeCLIAdapter,
     "claude-code": ClaudeCLIAdapter,
     "agy": AGYCLIAdapter,
+    "antigravity": AGYCLIAdapter,
     "aider": AiderCLIAdapter,
 }
 

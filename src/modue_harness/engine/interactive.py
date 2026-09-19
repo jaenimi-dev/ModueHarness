@@ -69,10 +69,12 @@ def load_or_detect_agents(
                 kwargs["model"] = model
             if effort:
                 kwargs["effort"] = effort
-        elif specific_agent.lower() == "agy":
+        elif specific_agent.lower() in ["agy", "antigravity"]:
             kwargs = {"command": "agy"}
             if model:
                 kwargs["model"] = model
+            if effort:
+                kwargs["effort"] = effort
         elif specific_agent.lower() == "aider":
             kwargs = {"command": "aider"}
             if model:
@@ -113,16 +115,28 @@ def load_or_detect_agents(
         except Exception:
             pass
 
-    # 3. Auto-detect installed AI CLI tools on system PATH
-    claude_bin = shutil.which("claude")
-    agy_bin = shutil.which("agy")
-    aider_bin = shutil.which("aider")
+    # 3. Auto-detect installed AI CLI tools on system PATH or local installation directories
+    def _find_bin(cmd_name: str) -> Optional[str]:
+        p = shutil.which(cmd_name)
+        if p:
+            return p
+        candidate_local = Path.home() / ".local" / "bin" / cmd_name
+        if candidate_local.is_file() and os.access(candidate_local, os.X_OK):
+            return str(candidate_local)
+        candidate_gemini = Path.home() / ".gemini" / "antigravity-cli" / "bin" / cmd_name
+        if candidate_gemini.is_file() and os.access(candidate_gemini, os.X_OK):
+            return str(candidate_gemini)
+        return None
+
+    claude_bin = _find_bin("claude")
+    agy_bin = _find_bin("agy")
+    aider_bin = _find_bin("aider")
 
     if claude_bin:
         return {
             "architect": ClaudeCLIAdapter(
                 name="architect",
-                command="claude",
+                command=claude_bin,
                 model=model,
                 effort=effort,
                 default_args=["--permission-mode", "auto"],
@@ -130,7 +144,7 @@ def load_or_detect_agents(
             ),
             "developer": ClaudeCLIAdapter(
                 name="developer",
-                command="claude",
+                command=claude_bin,
                 model=model,
                 effort=effort,
                 default_args=["--permission-mode", "auto"],
@@ -138,7 +152,7 @@ def load_or_detect_agents(
             ),
             "reviewer": ClaudeCLIAdapter(
                 name="reviewer",
-                command="claude",
+                command=claude_bin,
                 model=model,
                 effort=effort,
                 default_args=["--permission-mode", "auto"],
@@ -150,13 +164,24 @@ def load_or_detect_agents(
         return {
             "architect": AGYCLIAdapter(
                 name="architect",
-                command="agy",
+                command=agy_bin,
+                model=model,
+                effort=effort,
                 system_instruction="You design modular software architecture and decompose tasks clearly.",
             ),
             "developer": AGYCLIAdapter(
                 name="developer",
-                command="agy",
+                command=agy_bin,
+                model=model,
+                effort=effort,
                 system_instruction="You write clean, tested, production-ready code in the project directory.",
+            ),
+            "reviewer": AGYCLIAdapter(
+                name="reviewer",
+                command=agy_bin,
+                model=model,
+                effort=effort,
+                system_instruction="You verify and review implementation code and write test validations.",
             ),
         }
 
@@ -732,13 +757,13 @@ class InteractiveSession:
         elif cmd in ["/effort", "/e"]:
             valid_levels = {"low", "medium", "high", "xhigh", "max", "off", "none", "default"}
             if not arg:
-                print("\n📋 현재 Claude 에이전트 추론 노력(Effort) 설정:")
+                print("\n📋 현재 AI 에이전트(Claude / Antigravity) 추론 노력(Effort) 설정:")
                 for name, agent in self.agents.items():
                     eff = getattr(agent, "effort", None) or "(기본값)"
                     print(f"  • {name}: {eff}")
-                print("\n선택 가능 레벨: low, medium, high, xhigh, max (또는 off/none으로 해제)")
+                print("\n선택 가능 레벨: low, medium, high (Claude의 경우 xhigh, max 추가 지원, off/none으로 해제)")
                 print("사용법: /effort <레벨> (예: /effort high, /effort max)")
-                print("       /effort <에이전트명> <레벨> (예: /effort architect max)\n")
+                print("       /effort <에이전트명> <레벨> (예: /effort architect high)\n")
             else:
                 arg_parts = arg.split(maxsplit=1)
                 if len(arg_parts) == 2 and arg_parts[0] in self.agents:
@@ -751,9 +776,9 @@ class InteractiveSession:
                     eff_val = None if level in ["off", "none", "default"] else level
                     updated = self.set_effort(eff_val)
                     if updated:
-                        print(f"✓ Claude 에이전트({', '.join(updated)})의 추론 노력(effort)을 '{eff_val or 'default'}'(으)로 변경했습니다.")
+                        print(f"✓ AI 에이전트({', '.join(updated)})의 추론 노력(effort)을 '{eff_val or 'default'}'(으)로 변경했습니다.")
                     else:
-                        print("⚠️ 추론 노력을 적용할 수 있는 Claude 에이전트를 찾을 수 없습니다.")
+                        print("⚠️ 추론 노력을 적용할 수 있는 AI 에이전트를 찾을 수 없습니다.")
 
         elif cmd == "/status":
             state = self.blackboard.load_state()

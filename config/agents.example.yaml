@@ -6,6 +6,9 @@
 version: "0.5.0"
 name: "my-engineering-team"
 
+# -------------------------------------------------------------
+# 예시 1: Claude Code 전담 팀 (기본 예시)
+# -------------------------------------------------------------
 agents:
   # 1. 아키텍트 / 기획자 (Claude Code)
   architect:
@@ -36,3 +39,57 @@ agents:
     effort: "high"                       # 심층 검증을 위한 높은 추론 노력
     role: "Quality & Security Reviewer"
     system_instruction: "You critically review code for edge cases, performance bottlenecks, and security vulnerabilities."
+
+# -------------------------------------------------------------
+# 예시 2: Google Antigravity (AGY) 전담 팀 (필요시 위 agents를 대체)
+# -------------------------------------------------------------
+# agents:
+#   architect:
+#     adapter: "antigravity"             # 또는 "agy"
+#     command: "agy"
+#     args: ["--dangerously-skip-permissions"]
+#     model: "gemini-3.8-flash-high"     # 또는 gemini-3.1-pro-high, claude-sonnet-4-6
+#     effort: "high"                     # low, medium, high
+#     role: "Lead Architect"
+#     system_instruction: "You design modular software architecture."
+#
+#   developer:
+#     adapter: "antigravity"
+#     command: "agy"
+#     args: ["--dangerously-skip-permissions"]
+#     model: "gemini-3.7-flash-high"
+#     effort: "medium"
+#     role: "Software Engineer"
+#     system_instruction: "You write clean, tested code in the project directory."
+#
+#   reviewer:
+#     adapter: "antigravity"
+#     command: "agy"
+#     args: ["--dangerously-skip-permissions"]
+#     model: "gemini-3.8-flash-high"
+#     effort: "high"
+#     role: "Code Reviewer"
+#     system_instruction: "You verify implementation and run tests."
+
+# -------------------------------------------------------------
+# 예시 3: Claude + Antigravity 하이브리드 협업 팀
+# -------------------------------------------------------------
+# agents:
+#   architect:
+#     adapter: "claude"                  # 기획 및 아키텍처: Claude 3.7 Sonnet
+#     command: "claude"
+#     args: ["--permission-mode", "auto"]
+#     model: "sonnet"
+#     effort: "high"
+#   developer:
+#     adapter: "antigravity"             # 고속 코드 구현: Antigravity (Gemini Flash)
+#     command: "agy"
+#     args: ["--dangerously-skip-permissions"]
+#     model: "gemini-3.8-flash-high"
+#     effort: "medium"
+#   reviewer:
+#     adapter: "claude"                  # 최종 보안 및 품질 검토: Claude
+#     command: "claude"
+#     args: ["--permission-mode", "auto"]
+#     model: "sonnet"
+#     effort: "high"

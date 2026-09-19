@@ -30,6 +30,9 @@ def test_adapter_factory():
     agy = create_adapter("agy")
     assert isinstance(agy, AGYCLIAdapter)
 
+    antigravity = create_adapter("antigravity")
+    assert isinstance(antigravity, AGYCLIAdapter)
+
     aider = create_adapter("aider")
     assert isinstance(aider, AiderCLIAdapter)
 
@@ -176,4 +179,35 @@ def test_format_command_display_full():
     # Explicit truncation if max_prompt_len is specified
     truncated = claude.format_command_display(cmd, max_prompt_len=20)
     assert "..." in truncated
+
+
+def test_agy_adapter_features():
+    """Verify AGY (Antigravity) adapter configuration, auto-permissions, model, and effort."""
+    agy = AGYCLIAdapter(model="gemini-3.8-flash-high", effort="high")
+    cmd = agy.build_command("Build test app")
+
+    assert "--dangerously-skip-permissions" in cmd
+    assert "-p" in cmd
+    assert "--model" in cmd
+    assert "gemini-3.8-flash-high" in cmd
+    assert "--effort" in cmd
+    assert "high" in cmd
+
+    # Test dynamic model update
+    agy.set_model("gemini-3.1-pro-high")
+    cmd2 = agy.build_command("Build test app")
+    assert "gemini-3.1-pro-high" in cmd2
+    assert "gemini-3.8-flash-high" not in cmd2
+
+    # Test dynamic effort update
+    agy.set_effort("low")
+    cmd3 = agy.build_command("Build test app")
+    assert "low" in cmd3
+    assert "high" not in cmd3
+
+    # Test clearing effort
+    agy.set_effort(None)
+    cmd4 = agy.build_command("Build test app")
+    assert "--effort" not in cmd4
+
 

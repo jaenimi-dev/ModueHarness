@@ -326,6 +326,38 @@ def test_interactive_session_model_and_effort(tmp_path: Path):
     assert claude_dev.effort == "low"
 
 
+def test_interactive_session_antigravity_support(tmp_path: Path):
+    """Test Antigravity (AGY) agent loading, model/effort configuration, and aliases."""
+    # Test specific agent "antigravity"
+    agents_anti = load_or_detect_agents(specific_agent="antigravity", model="gemini-3.8-flash-high", effort="high")
+    assert "antigravity" in agents_anti
+    anti_agent = agents_anti["antigravity"]
+    assert anti_agent.model == "gemini-3.8-flash-high"
+    assert anti_agent.effort == "high"
+
+    # Test specific agent "agy"
+    agents_agy = load_or_detect_agents(specific_agent="agy", model="gemini-3.1-pro-high", effort="medium")
+    assert "agy" in agents_agy
+    agy_agent = agents_agy["agy"]
+    assert agy_agent.model == "gemini-3.1-pro-high"
+    assert agy_agent.effort == "medium"
+
+    # Test session dynamic model/effort controls for AGY
+    projects_dir = tmp_path / "projects"
+    board_dir = tmp_path / "blackboard"
+    session = InteractiveSession(
+        project_name="agy_proj",
+        projects_root=projects_dir,
+        blackboard_dir=board_dir,
+        agents={"antigravity": anti_agent},
+        conductor_name="antigravity",
+    )
+    session._handle_special_command("/model gemini-3.7-flash-high")
+    assert anti_agent.model == "gemini-3.7-flash-high"
+    session._handle_special_command("/effort low")
+    assert anti_agent.effort == "low"
+
+
 def test_interactive_session_command_display(tmp_path: Path, capsys):
     """Test CLI command display and /cmd history inspection."""
     projects_dir = tmp_path / "projects"
