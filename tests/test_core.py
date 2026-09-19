@@ -1,5 +1,6 @@
 """Tests for core BaseHarness and HarnessConfig."""
 
+from pathlib import Path
 from typing import Any
 import pytest
 from modue_harness.core.config import HarnessConfig
@@ -25,9 +26,25 @@ def test_harness_config_defaults():
     """Verify default configurations."""
     config = HarnessConfig()
     assert config.name == "default-harness"
-    assert config.version == "0.0.0"
+    assert config.version == "0.4.0"
     assert config.debug is False
     assert config.options == {}
+
+
+def test_load_dotenv(tmp_path: Path, monkeypatch):
+    """Verify loading key-value pairs from .env into environment."""
+    from modue_harness.core.config import load_dotenv
+    import os
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("TEST_KEY_ALPHA=hello_world\nTEST_KEY_BETA='quoted_val'\n# Comment line\n", encoding="utf-8")
+
+    monkeypatch.delenv("TEST_KEY_ALPHA", raising=False)
+    monkeypatch.delenv("TEST_KEY_BETA", raising=False)
+
+    load_dotenv(env_file)
+    assert os.environ.get("TEST_KEY_ALPHA") == "hello_world"
+    assert os.environ.get("TEST_KEY_BETA") == "quoted_val"
 
 
 def test_harness_lifecycle():

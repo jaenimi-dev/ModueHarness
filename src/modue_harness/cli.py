@@ -8,6 +8,7 @@ from typing import List, Optional
 from modue_harness import __version__
 from modue_harness.adapters import create_adapter
 from modue_harness.core.blackboard import Blackboard
+from modue_harness.core.config import load_dotenv
 from modue_harness.engine.debate import DebateRunner
 from modue_harness.engine.pipeline import PipelineRunner
 from modue_harness.engine.workflow import WorkflowConfig
@@ -250,6 +251,7 @@ def handle_debate(args: argparse.Namespace) -> int:
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Main CLI entrypoint."""
+    load_dotenv()
     parser = create_parser()
     args = parser.parse_args(argv)
 
