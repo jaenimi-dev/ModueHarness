@@ -174,3 +174,43 @@ def test_cli_flags_ui_and_tui(capsys):
     ret_tui = main(["--tui", "-P", "testproj"])
     out_tui, _ = capsys.readouterr()
     assert ret_tui == 1
+
+
+def test_web_app_runs_with_mock_nicegui_with_root(monkeypatch):
+    """Test run_app passes root when ui.run accepts root."""
+    from unittest.mock import MagicMock
+
+    mock_ui = MagicMock()
+    mock_app = MagicMock()
+
+    called_args = {}
+    def fake_run(root=None, **kwargs):
+        called_args["root"] = root
+        called_args.update(kwargs)
+
+    mock_ui.run = fake_run
+    monkeypatch.setitem(sys.modules, "nicegui", MagicMock(ui=mock_ui, app=mock_app))
+
+    run_app(open_browser=False)
+    assert called_args.get("reload") is False
+    assert called_args.get("show") is False
+    assert callable(called_args.get("root"))
+
+
+def test_web_app_runs_with_mock_nicegui_fallback_page(monkeypatch):
+    """Test run_app falls back to ui.page('/') when ui.run does not accept root."""
+    from unittest.mock import MagicMock
+
+    mock_ui = MagicMock()
+    mock_app = MagicMock()
+
+    called_args = {}
+    def fake_run(**kwargs):
+        called_args.update(kwargs)
+
+    mock_ui.run = fake_run
+    monkeypatch.setitem(sys.modules, "nicegui", MagicMock(ui=mock_ui, app=mock_app))
+
+    run_app(open_browser=False)
+    assert called_args.get("reload") is False
+    mock_ui.page.assert_called_with("/")
