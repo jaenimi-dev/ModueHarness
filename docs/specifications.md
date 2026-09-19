@@ -1,6 +1,12 @@
 # ModueHarness 명세 작성 가이드 (Specifications Guide)
 
-ModueHarness는 설정의 재사용성과 유연성을 극대화하기 위해 **AI 팀 명세(`agents.yaml`)**와 **작업/할 일 명세(`workflow.yaml`)**의 분리 구성을 기본으로 지원합니다.
+ModueHarness는 정적 파이프라인 및 복잡한 배치 자동화를 위해 **AI 팀 명세(`agents.yaml`)**와 **작업/할 일 명세(`workflow.yaml`)**의 분리 구성을 지원합니다.
+
+> 💡 **명세 파일이 항상 필요한가요? (자연어 대화형 모드 vs 워크플로우)**:  
+> - **대화형 CLI 및 직접 명령 모드 (`modue-harness -i` 또는 `modue-harness "<명령어>" -P <프로젝트명>`)**:  
+>   `workflow.yaml` 파일을 **작성할 필요가 전혀 없습니다**. 시스템에 설치된 AI CLI를 자동 감지하여 Conductor(Leader)가 명령을 해석하고 Worker들이 `projects/<프로젝트명>/`에 직접 구현합니다.
+> - **정적 파이프라인 모드 (`modue-harness run -c workflow.yaml`)**:  
+>   CI/CD 연동, 정형화된 다단계 조건부 릴레이, 특정 스텝 재시도 및 승인 체크포인트가 필요한 경우에 아래 가이드에 따라 명세 파일을 작성합니다.
 
 > 📁 **설정 파일 위치 권장사항 (`config/`)**:  
 > 명세 파일들은 프로젝트 내 `config/` 폴더(`config/agents.yaml`, `config/workflow.yaml`)에 관리하는 것을 권장합니다.  
@@ -20,7 +26,7 @@ agents:
   planner:
     adapter: "claude"                  # claude, agy, aider, generic
     command: "claude"                  # 실행할 CLI 명령어
-    args: ["--permission-mode", "auto"] # 추가 실행 인자
+    args: ["--permission-mode", "auto"] # 추가 실행 인자 (프롬프트 멈춤 방지)
     model: "claude-3-7-sonnet-latest"  # 선택적 모델 지정
     role: "System Architect"           # 역할 설명
     system_instruction: "You are the lead architect..."
@@ -88,3 +94,5 @@ workflow:
   - `${artifact:<path>}`: 해당 아티팩트의 텍스트 내용이 지시문에 자동으로 인라인 치환됩니다.
 - **격리 모드 (`isolation: "worktree"`)**:
   - 해당 스텝은 별도의 임시 `git worktree`에서 실행되어 메인 작업 디렉터리를 오염시키지 않습니다.
+- **저장소 분리 원칙**:
+  - 모든 워크플로우 진행 상황, 태스크, 교환 산출물은 `blackboard/`에 저장되며, 개발 코드는 대상 프로젝트 디렉터리에 반영됩니다.

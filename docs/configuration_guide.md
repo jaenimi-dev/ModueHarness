@@ -1,27 +1,33 @@
 # ModueHarness 설정 및 실전 사용 매뉴얼 (Configuration & Setup Guide)
 
-ModueHarness 설치를 마친 후, 실제로 다양한 AI CLI(Claude Code, Google Antigravity, Aider 등)를 연결하여 팀을 구성하고 작업을 실행하기 위한 **단계별 설정 매뉴얼**입니다.
+ModueHarness 설치를 마친 후, 다양한 AI CLI(Claude Code, Google Antigravity, Aider 등)를 연결하여 팀을 구성하고 실제 프로젝트 작업을 자율적으로 실행하기 위한 **단계별 설정 매뉴얼**입니다.
 
 ---
 
 ## 🧭 전체 설정 흐름 (Roadmap)
 
+ModueHarness는 **자연어 대화형 CLI 실행(방법 A)**과 **정적 워크플로우 명세 실행(방법 B)**의 두 가지 방식을 모두 지원합니다.
+
 ```text
-[1단계: AI CLI 도구 준비 및 인증]
+[1단계: AI CLI 도구 준비 및 인증 (Claude, AGY 등)]
        ↓
 [2단계: 환경 변수(.env) 설정 (선택 사항: API 키 직접 사용 시)]
        ↓
-[3단계: AI 팀 명세(agents.yaml) 작성 (필수)]
-       ↓
-[4단계: 작업 명세(workflow.yaml) 작성 (필수)]
-       ↓
-[5단계: 실행 및 블랙보드 산출물 확인]
+       ├─────────────────────────────────────────────┐
+       ▼ [방법 A: 대화형 CLI 직접 실행 (권장, 퀵스타트)]   ▼ [방법 B: 정적 워크플로우 실행]
+[3단계-A: 워크플로우 파일 없이 즉시 실행]             [3단계-B: AI 팀 명세(config/agents.yaml) 작성]
+ - 터미널에서 대화형 모드(REPL) 진입 (-i)              [4단계-B: 작업 명세(config/workflow.yaml) 작성]
+ - 또는 단일 자연어 명령으로 프로젝트에 직접 지시       [5단계-B: modue-harness run 명령 실행]
+       │                                             │
+       └──────────────────────┬──────────────────────┘
+                              ▼
+[최종 단계: 공용 칠판(blackboard/) 정보 교환 및 프로젝트 폴더(projects/) 구현 결과 확인]
 ```
 
-> 💡 **핵심 설정 안내 (YAML vs .env)**:  
-> - **AI 설정 및 작업 명세**: AI CLI 도구 지정, 실행 인자, 모델, 역할, 파이프라인 단계는 `.env`가 아니라 **`agents.yaml`과 `workflow.yaml`이라는 2개의 별도 YAML 파일**에 작성합니다.  
-> - **.env 파일의 역할**: 브라우저 로그인 없이 `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` 같은 비공개 API 키를 직접 주입해야 할 때만 사용합니다.  
-> - **건너뛰기(Skip) 가능 여부**: 1단계에서 `claude` 브라우저 로그인을 마쳤다면 `.env`를 생성할 필요가 없으므로, **2단계를 건너뛰고 곧바로 3단계(agents.yaml)로 이동**하십시오.
+> 💡 **핵심 아키텍처 원칙 (정보 교환 vs 실제 구현)**:  
+> - **공용 칠판 (`blackboard/`)**: AI 에이전트 간 상태(`state.json`), 태스크(`tasks/`), 계획 및 종합 보고서(`artifacts/`), 프로세스 로그(`logs/`)를 교환하는 팀 협업 전용 공간입니다.
+> - **프로젝트 작업 공간 (`projects/<프로젝트명>/`)**: AI 팀이 실제 소스 코드, 패키지 파일, 단위 테스트를 직접 작성하고 수정하는 프로젝트별 격리 작업 폴더입니다.
+> - **건너뛰기(Skip) 가능 여부**: `claude` 브라우저 로그인을 마쳤다면 `.env`를 생성할 필요가 없으며, 워크플로우 파일 없이 곧바로 CLI에서 명령을 내려 작업을 시작할 수 있습니다.
 
 ---
 
@@ -84,7 +90,7 @@ ModueHarness는 사용자의 시스템에 설치된 실제 AI CLI 명령어를 �
 ## 2단계: 환경 변수(`.env`) 설정 (선택 사항)
 
 > ⚡ **잠깐! 이 단계를 건너뛰어도 되나요?**  
-> - **건너뛰기 가능 (Skip)**: 1단계에서 터미널을 통해 `claude` 브라우저 로그인을 완료하셨다면 인증 토큰이 로컬에 보관되므로 **`.env` 파일이 필요 없습니다. 바로 3단계로 넘어가세요.**  
+> - **건너뛰기 가능 (Skip)**: 1단계에서 터미널을 통해 `claude` 브라우저 로그인을 완료하셨다면 인증 토큰이 로컬에 보관되므로 **`.env` 파일이 필요 없습니다. 바로 실행 단계로 넘어가세요.**  
 > - **설정 필요**: Claude Console 선불 API 키(`ANTHROPIC_API_KEY`)를 직접 쓰거나, Aider를 사용하기 위해 `OPENAI_API_KEY`를 등록해야 할 때만 아래 과정을 진행합니다.
 
 ModueHarness는 CLI 실행 시 프로젝트 루트의 `.env` 파일을 자동으로 감지하여 하위 AI CLI 서브프로세스에 환경 변수로 전달합니다.
@@ -109,15 +115,67 @@ GEMINI_API_KEY=AIzaSy...
 
 ---
 
-## 3단계: 설정 폴더(`config/`) 템플릿 복사 및 AI 팀 명세(`agents.yaml`) 작성
+## 3단계 (방법 A - 추천): 워크플로우 파일 없이 CLI로 직접 실행하기
 
-ModueHarness는 사용자가 AI 팀 및 작업 명세를 체계적으로 관리할 수 있도록 **`config/` 전용 설정 폴더**를 제공합니다.
+ModueHarness는 복잡한 YAML 설정 파일을 작성하지 않고도, **CLI에서 직접 자연어로 명령을 내려 프로젝트 개발 작업을 수행**할 수 있습니다. 시스템에 설치된 `claude` 또는 `agy`를 자동으로 감지하여 팀을 구성합니다.
 
-### 🛡️ 설정 파일 보안 (.gitignore 자동 보호)
-- `config/` 디렉터리 내의 **`*.example.yaml` 템플릿 파일만 Git(GitHub)에 공개**됩니다.
-- 사용자가 복사하여 생성한 **실제 설정 파일(`config/agents.yaml`, `config/workflow.yaml` 등)은 `.gitignore`에 의해 자동으로 보호**되어 GitHub에 커밋/유출되지 않습니다.
+### 1. 대화형 CLI 모드 (Interactive REPL)
+터미널에서 대화형 프롬프트를 띄우고 연속적으로 지시를 내립니다:
 
-### 📂 권장 디렉터리 구조
+- **Linux / macOS (Bash)**:
+  ```bash
+  PYTHONPATH=src python3 -m modue_harness.cli -i -P my-web-app
+  ```
+- **Windows PowerShell**:
+  ```powershell
+  $env:PYTHONPATH="src"; python -m modue_harness.cli -i -P my-web-app
+  ```
+
+**대화형 화면 예시:**
+```text
+================================================================
+🤖 ModueHarness (모두의 하네스) - 대화형 CLI 모드
+================================================================
+• 대상 프로젝트 (구현 위치): /path/to/projects/my-web-app
+• 공용 칠판 (AI 정보 교환):  /path/to/blackboard
+• 참여 AI 팀:               architect, developer, reviewer (Leader: architect)
+----------------------------------------------------------------
+명령어를 입력하면 AI 팀이 프로젝트 디렉터리에 직접 구현합니다.
+특수 명령어: /project <이름>, /projects, /files, /status, /help, exit
+================================================================
+
+[my-web-app] > FastAPI 기반 사용자 인증 엔드포인트와 단위 테스트 코드를 작성해줘
+```
+
+**대화형 모드 특수 명령어:**
+- `/project <이름>` (또는 `/p <이름>`): 활성 프로젝트 변경 (폴더 자동 생성)
+- `/projects`: 생성된 프로젝트 목록 조회
+- `/files` (또는 `/ls`): 현재 프로젝트 내 소스코드 파일 목록 확인
+- `/status`: 공용 칠판 및 활성 프로젝트 상태 요약
+- `/help`: 도움말
+- `exit` / `quit` / `q`: 세션 종료
+
+---
+
+### 2. 단일 명령 직접 실행 (One-shot Command)
+대화형 모드에 진입하지 않고 터미널 한 줄로 작업을 지시합니다:
+
+- **Linux / macOS (Bash)**:
+  ```bash
+  PYTHONPATH=src python3 -m modue_harness.cli "계산기 파이썬 모듈과 pytest 테스트를 구현해줘" -P calculator
+  ```
+- **Windows PowerShell**:
+  ```powershell
+  $env:PYTHONPATH="src"; python -m modue_harness.cli "계산기 파이썬 모듈과 pytest 테스트를 구현해줘" -P calculator
+  ```
+
+---
+
+## 4단계 (방법 B - 고급): 설정 폴더(`config/`) 기반 AI 팀 및 워크플로우 구성
+
+고정된 다단계 파이프라인(예: CI/CD 연계, 조건부 재시도 릴레이 등)이 필요한 경우, `config/` 디렉터리에 AI 팀 명세와 작업 명세를 선언적으로 작성할 수 있습니다.
+
+### 📂 디렉터리 구조
 ```text
 ModueHarness/
 ├── config/
@@ -125,34 +183,32 @@ ModueHarness/
 │   ├── workflow.example.yaml   <-- [제공되는 템플릿] GitHub 관리
 │   ├── agents.yaml             <-- [복사해서 사용] .gitignore로 로컬 보호
 │   └── workflow.yaml           <-- [복사해서 사용] .gitignore로 로컬 보호
-├── blackboard/                 <-- 산출물 및 로그가 저장될 공용 공간 (자동 생성)
+├── blackboard/                 <-- [정보 교환] 상태, 태스크 큐, 계획, 로그
+├── projects/                   <-- [실제 구현] 프로젝트별 소스코드 (.gitignore 보호)
+│   ├── my-web-app/
+│   └── calculator/
 └── src/
 ```
 
-### 1. 템플릿 복사로 빠르게 시작하기
-터미널에서 아래 명령어를 실행하여 템플릿을 복사합니다:
+### 1. 템플릿 복사
 ```bash
 cp config/agents.example.yaml config/agents.yaml
 cp config/workflow.example.yaml config/workflow.yaml
 ```
 
-### 2. AI 팀 명세(`config/agents.yaml`) 내용 확인 및 수정
-어떤 AI CLI 도구와 모델, 역할을 가진 팀원들로 구성할지 정의합니다:
-
+### 2. AI 팀 명세(`config/agents.yaml`)
 ```yaml
 version: "0.4.0"
 name: "my-engineering-team"
 
 agents:
-  # 1. 아키텍트 / 기획자 (Claude Code)
   architect:
     adapter: "claude"
     command: "claude"
-    args: ["--permission-mode", "auto"]  # 프롬프트 입력 자동 승인 모드
+    args: ["--permission-mode", "auto"]
     role: "System Architect & Technical Planner"
     system_instruction: "You design clean, modular software architecture specifications."
 
-  # 2. 구현 엔지니어 (Claude Code 또는 AGY)
   developer:
     adapter: "claude"
     command: "claude"
@@ -160,7 +216,6 @@ agents:
     role: "Core Implementation Engineer"
     system_instruction: "You write robust, production-ready code matching the specifications."
 
-  # 3. 코드 리뷰어 (Claude Code)
   reviewer:
     adapter: "claude"
     command: "claude"
@@ -169,46 +224,29 @@ agents:
     system_instruction: "You critically review code for edge cases and security vulnerabilities."
 ```
 
-> 💡 **핵심 팁 (프롬프트 멈춤 방지)**:
-> AI CLI가 "파일을 수정하시겠습니까? (Y/N)" 같은 대화형 확인 프롬프트를 띄우면 자동화 프로세스가 멈출 수 있습니다.
-> - Claude: `args: ["--permission-mode", "auto"]`
-> - Aider: `args: ["--yes-always"]`
-
----
-
-## 4단계: 작업 명세(`config/workflow.yaml`) 작성
-
-실제 수행할 비즈니스 작업, 단계별 입출력 아티팩트 전달, 실행 조건 등을 정의합니다.
-
-### 작성 예시 (`config/workflow.yaml`)
+### 3. 작업 명세(`config/workflow.yaml`)
 ```yaml
 version: "0.4.0"
 name: "feature-delivery-pipeline"
-
-# 같은 config/ 폴더 내의 AI 팀 명세 파일 지정 (상대 경로로 자동 탐색)
 agents_file: "agents.yaml"
 
 workflow:
-  topology: "pipeline"      # pipeline(순차 릴레이), conductor, debate
-  timeout_per_step: 300     # 스텝당 최대 제한 시간(초)
+  topology: "pipeline"
+  timeout_per_step: 300
   steps:
-    # 스텝 1: 아키텍트가 기획서 작성
     - id: "step_plan"
       agent: "architect"
-      instruction: "Write a technical specification in markdown for a token-bucket rate limiter utility in spec.md."
+      instruction: "Write a technical specification for token-bucket rate limiter in spec.md."
       output_artifact: "spec.md"
 
-    # 스텝 2: 개발자가 기획서를 읽고 코드 구현
     - id: "step_code"
       agent: "developer"
-      condition: "artifact_exists:spec.md"        # 선행 산출물 확인
-      input_artifacts: ["spec.md"]               # 기획서 내용 자동 주입
+      condition: "artifact_exists:spec.md"
+      input_artifacts: ["spec.md"]
       instruction: "Read spec.md and implement the rate limiter in ratelimiter.py."
       output_artifact: "ratelimiter.py"
-      retry_count: 1                             # 실패 시 1회 재시도
-      fallback_agent: "architect"                # 재시도 실패 시 아키텍트에 대체 위임
+      retry_count: 1
 
-    # 스텝 3: 리뷰어가 코드 검토
     - id: "step_review"
       agent: "reviewer"
       input_artifacts: ["spec.md", "ratelimiter.py"]
@@ -216,106 +254,33 @@ workflow:
       output_artifact: "review.md"
 ```
 
-> 💡 **경로 인식 규칙**:  
-> `config/workflow.yaml` 내부에서 `agents_file: "agents.yaml"`로 지정하면, ModueHarness는 **`workflow.yaml`이 위치한 `config/` 폴더를 기준으로 `agents.yaml`을 자동 탐색**하므로 별도의 복잡한 경로를 입력할 필요가 없습니다.
+### 4. 워크플로우 실행
+- **Linux / macOS (Bash)**:
+  ```bash
+  PYTHONPATH=src python3 -m modue_harness.cli run -c config/workflow.yaml --report report.md
+  ```
+- **Windows PowerShell**:
+  ```powershell
+  $env:PYTHONPATH="src"; python -m modue_harness.cli run -c config/workflow.yaml --report report.md
+  ```
 
 ---
 
-## 5단계: 실행 및 상태 점검
+## 5단계: 프로젝트 관리 및 공용 칠판 산출물 점검
 
-> 💡 **Windows PowerShell 환경 주의**:  
-> `PYTHONPATH=src ...` 한 줄 문법은 Linux/macOS(Bash) 전용 문법입니다.  
-> 윈도우 PowerShell에서는 `$env:PYTHONPATH="src"` 환경 변수를 사용하거나, `pip install -e .` 설치 후 `python -m modue_harness.cli ...` 명령어로 실행합니다.
+### 1. 프로젝트 목록 조회
+생성된 프로젝트 목록을 확인합니다:
+```bash
+python3 -m modue_harness.cli projects
+```
 
-### 1. 공용 칠판(Blackboard) 초기화 (선택 사항)
-- **Windows PowerShell**:
-  ```powershell
-  $env:PYTHONPATH="src"; python -m modue_harness.cli init
-  # (pip install -e . 를 하셨다면 바로: python -m modue_harness.cli init)
-  ```
-- **Linux / macOS (Bash)**:
-  ```bash
-  PYTHONPATH=src python3 -m modue_harness.cli init
-  ```
+### 2. 공용 칠판 및 세션 상태 점검
+칠판 상태, 활성 프로젝트, 등록된 태스크와 아티팩트를 확인합니다:
+```bash
+python3 -m modue_harness.cli status
+```
 
-### 2. 워크플로우 실행
-- **Windows PowerShell**:
-  ```powershell
-  # config/ 폴더의 워크플로우 실행
-  $env:PYTHONPATH="src"; python -m modue_harness.cli run --config config/workflow.yaml
-
-  # 실행 보고서(Markdown) 자동 생성
-  $env:PYTHONPATH="src"; python -m modue_harness.cli run --config config/workflow.yaml --report report.md
-
-  # 필요 시 다른 AI 팀 명세로 교체하여 실행 (오버라이드)
-  $env:PYTHONPATH="src"; python -m modue_harness.cli run --config config/workflow.yaml --agents config/agents.example.yaml
-  ```
-- **Linux / macOS (Bash)**:
-  ```bash
-  # config/ 폴더의 워크플로우 실행
-  PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml
-
-  # 실행 보고서(Markdown) 자동 생성
-  PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml --report report.md
-
-  # 필요 시 다른 AI 팀 명세로 교체하여 실행 (오버라이드)
-  PYTHONPATH=src python3 -m modue_harness.cli run --config config/workflow.yaml --agents config/agents.example.yaml
-  ```
-
-### 3. 진행 상황 및 산출물 확인
-- **Windows PowerShell**:
-  ```powershell
-  $env:PYTHONPATH="src"; python -m modue_harness.cli status
-  ```
-- **Linux / macOS (Bash)**:
-  ```bash
-  PYTHONPATH=src python3 -m modue_harness.cli status
-  ```
-
-생성된 파일은 프로젝트 내 `blackboard/` 폴더에서 바로 확인하실 수 있습니다:
-- `blackboard/artifacts/`: AI 에이전트들이 생성한 기획서, 코드, 보고서 등
-- `blackboard/logs/`: 각 AI CLI의 상세 원시 실행 로그
-- `blackboard/state.json`: 현재 워크플로우 실행 메트릭
-
----
-
-## 6단계: 트러블슈팅 및 자주 묻는 질문 (FAQ)
-
-### Q1. AI CLI 프로세스가 아무 출력 없이 멈춰 있어요.
-- **원인**: AI CLI가 사용자 승인(Y/N) 입력을 대기하고 있을 가능성이 높습니다.
-- **해결책**:
-  - Claude: `agents.yaml`의 `args`에 `["--permission-mode", "auto"]` 추가
-  - Aider: `args`에 `["--yes-always"]` 추가
-  - `workflow.yaml` 스텝에 `stall_timeout: 60`을 설정하여 무응답 시 자동 감지 및 중단 유도
-
-### Q2. `Command not found: 'claude'` (종료 코드 127) 오류가 납니다.
-- **원인**: 해당 CLI 명령어가 시스템 `PATH`에 등록되어 있지 않습니다.
-- **해결책**:
-  - 터미널에서 `which claude`를 실행하여 경로 확인 (예: `/usr/local/bin/claude`)
-  - `agents.yaml`에서 절대 경로 지정:
-    ```yaml
-    command: "/usr/local/bin/claude"
-    ```
-
-### Q3. AI 에이전트가 기존 코드를 함부로 덮어쓸까 봐 불안합니다.
-- **해결책 (Git Worktree 격리 모드 사용)**:
-  `workflow.yaml` 스텝에 `isolation: "worktree"`를 지정하면, 임시 Git 브랜치 워크트리에서 코드를 수정한 뒤 검증하므로 메인 작업 트리가 안전하게 보호됩니다.
-
-### Q4. API 비용이나 무한 루프가 걱정됩니다.
-- **해결책**: ModueHarness의 `ProcessSupervisor`가 동일한 에러나 텍스트가 20회 이상 반복 출력되면 무한 루프로 판단하고 프로세스를 강제 종료(`SIGKILL`)합니다. 또한 `timeout_per_step`을 통해 최대 실행 시간을 제어할 수 있습니다.
-
-### Q5. Windows PowerShell에서 `PYTHONPATH=src : 'PYTHONPATH=src' 용어가 cmdlet... 으로 인식되지 않습니다` 오류가 납니다.
-- **원인**: `PYTHONPATH=src python3 ...` 문법은 Linux/macOS(Bash) 전용 인라인 환경 변수 문법입니다. Windows PowerShell은 이를 하나의 실행 명령어 이름으로 오인하여 오류가 발생합니다. 또한 Windows에서는 `python3` 대신 `python`이 기본 실행 파일명입니다.
-- **해결책 (아래 2가지 중 택일)**:
-  - **방법 A (PowerShell 세미콜론 문법, 즉시 해결)**:
-    ```powershell
-    $env:PYTHONPATH="src"; python -m modue_harness.cli init
-    $env:PYTHONPATH="src"; python -m modue_harness.cli run --config config/workflow.yaml
-    ```
-  - **방법 B (패키지 개발 모드 설치 후 깔끔하게 실행, 가장 추천)**:
-    터미널에서 1회 설치를 해두면 `PYTHONPATH`를 아예 입력하지 않고 어디서든 깔끔하게 실행할 수 있습니다:
-    ```powershell
-    pip install -e .
-    python -m modue_harness.cli init
-    python -m modue_harness.cli run --config config/workflow.yaml
-    ```
+### 3. 산출물 및 구현 코드 확인
+- **실제 소스 코드 및 구현 파일**: `projects/<프로젝트명>/` 에서 확인
+- **AI 간 계획 및 종합 보고서**: `blackboard/artifacts/plan.md`, `blackboard/artifacts/synthesis_report.md` 에서 확인
+- **실행 원시 로그**: `blackboard/logs/` 에서 확인
