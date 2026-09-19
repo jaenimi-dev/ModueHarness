@@ -27,31 +27,72 @@ Google Deepmind의 에이전틱 AI 코딩 CLI 도구인 **Google Antigravity (`a
 
 ---
 
-## 2. 설치 및 바이너리 확인
+## 2. 공식 설치 방법 (OS별)
 
-### 설치 경로
-Antigravity는 일반적으로 사용자 홈 디렉터리에 설치됩니다:
-* `~/.local/bin/agy`
-* `~/.gemini/antigravity-cli/bin/`
+공식 웹페이지([Getting Started - CLI](https://antigravity.google/docs/getting-started?tab=cli#tab-panel-83))에 안내된 OS별 공식 Fast-Path 설치 명령어입니다:
 
-ModueHarness는 시스템 `PATH`뿐만 아니라 위 로컬 설치 경로(`~/.local/bin/agy` 등)를 **자동 탐색**하여 인식하므로, 별도의 복잡한 PATH 설정 없이도 바로 실행할 수 있습니다.
+### 1) macOS / Linux
+터미널을 열고 다음 스크립트를 실행합니다:
+```bash
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+```
+* **기본 설치 위치**: `~/.local/bin/agy`
+* **PATH 등록 확인**: 설치 후 터미널에서 `agy` 명령어가 실행되지 않으면 `~/.bashrc` 또는 `~/.zshrc`에 다음 줄을 추가합니다:
+  ```bash
+  export PATH="$HOME/.local/bin:$PATH"
+  ```
 
-### 설치 및 버전 확인
+### 2) Windows (PowerShell)
+PowerShell을 실행하고 다음 명령어를 실행합니다:
+```powershell
+irm https://antigravity.google/cli/install.ps1 | iex
+```
+* **기본 설치 위치**: `C:\Users\<username>\AppData\Local\agy\bin` (또는 `%LOCALAPPDATA%\agy\bin`)
+* **PATH 자동 등록**: 설치 스크립트가 사용자 환경 변수 `Path`에 해당 디렉터리를 자동 등록합니다. 설치 후 새 터미널을 열어 적용합니다.
+
+### 3) Windows (CMD / 명령 프롬프트)
+기본 명령 프롬프트(CMD)를 사용할 경우:
+```batch
+curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd
+```
+
+### 4) 설치 및 버전 확인
 ```bash
 agy --version
-# 또는 전체 경로로 확인
-~/.local/bin/agy --version
+# 정상 출력 예: agy version 0.x.x
 ```
 
 ---
 
-## 3. 인증 (Authentication)
+## 3. 인증 (Authentication) 및 초기 설정
 
-Antigravity CLI를 처음 실행할 때 Google 계정 인증을 진행합니다:
+### 1) 기본 대화형 계정 로그인 (권장)
+터미널에서 `agy`를 실행합니다:
 ```bash
 agy
 ```
-화면에 나타나는 브라우저 링크 및 OAuth 인증 절차를 완료하면 자격 증명이 로컬에 안전하게 저장됩니다. 인증 완료 후 `/exit` 또는 `Ctrl+D`를 눌러 세션을 종료하면, 이후 ModueHarness가 백그라운드에서 자동으로 Antigravity를 호출합니다.
+1. **첫 실행 환경 설정**: 테마(Color Scheme: Dark/Solarized 등)와 렌더링 모드(Alt-Screen / Inline), 작업 디렉터리 신뢰(Workspace Trust)를 순서대로 선택합니다.
+2. **브라우저 인증**: 기본 브라우저가 열리면 승인된 Google 계정으로 로그인을 완료합니다. 인증 토큰은 로컬 OS 키체인(Keychain / Secret Service / Credential Manager)에 안전하게 저장됩니다.
+3. 인증이 완료되면 `/exit` 또는 `Ctrl+D`를 눌러 세션을 종료합니다. 이후 ModueHarness가 백그라운드에서 자동으로 인증된 세션을 활용합니다.
+
+### 2) 원격 SSH 환경 인증
+원격 서버에 SSH로 접속하여 `agy`를 실행하면 브라우저를 직접 열 수 없으므로, 터미널에 고유 인증 URL이 표시됩니다:
+1. 터미널에 출력된 URL을 복사하여 로컬 PC 브라우저에 붙여넣고 로그인합니다.
+2. 브라우저에 표시된 인증 코드를 복사하여 원격 터미널 프롬프트에 입력합니다.
+
+### 3) Gemini API 키 사용 (CI/CD 및 헤드리스 환경)
+브라우저 로그인 없이 Google AI Studio에서 발급받은 Gemini API 키로 실행할 수도 있습니다:
+1. `~/.gemini/antigravity-cli/settings.json` 생성 또는 수정:
+   ```json
+   {
+     "modelProvider": "gemini"
+   }
+   ```
+2. 환경 변수 설정:
+   ```bash
+   export GEMINI_API_KEY="your-api-key"
+   ```
+   (Windows PowerShell: `$env:GEMINI_API_KEY="your-api-key"`)
 
 ---
 
