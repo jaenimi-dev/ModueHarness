@@ -32,6 +32,6 @@ class HarnessConfig:
     """Base configuration for a harness instance."""
 
     name: str = "default-harness"
-    version: str = "0.5.0"
+    version: str = "0.6.0"
     debug: bool = False
     options: Dict[str, Any] = field(default_factory=dict)

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-20
+
+### Added
+- **Google Antigravity (`agy` / `antigravity`) CLI Adapter**:
+  - Full support for Google Antigravity CLI as an autonomous engineering agent (`AGYCLIAdapter`).
+  - Auto-enables `--dangerously-skip-permissions` to eliminate interactive blocking prompts during autonomous runs.
+  - Supports model selection (`gemini-3.8-flash-high`, `gemini-3.1-pro-high`, etc.) and reasoning effort levels (`low`, `medium`, `high`).
+  - OS-aware binary discovery on Linux/macOS and Windows (`%LOCALAPPDATA%\agy\bin\agy.exe`).
+  - Comprehensive documentation guide in `docs/antigravity_guide.md`.
+- **Dynamic AI Model & Reasoning Effort Controls**:
+  - REPL slash commands: `/model [agent] [model]` and `/effort [agent] [level]`.
+  - CLI execution flags: `-m, --model` and `-e, --effort`.
+  - Claude and Antigravity multi-agent team hybrid configurations.
+- **Unabbreviated CLI Command Output & Inspection**:
+  - Real-time transparent terminal output of full CLI commands (`💻 CLI 실행: ...`) without prompt truncation.
+  - `/cmd` (and `/last-cmd`) REPL command to inspect complete execution histories across phases.
+- **Detailed Failure Reason Diagnostics**:
+  - Automatic extraction of subprocess stderr/stdout (up to 5 lines) on non-zero exit codes.
+  - Real-time streaming, final summary reports, and `/jobs` output displaying `❌ [실패 상세 원인]` and `❌ 오류 상세: ...`.
+- **Configurable Session Timeout**:
+  - Removed arbitrary 300s hardcoded execution timeout (unlimited by default for long/deep reasoning tasks).
+  - Added `/timeout [seconds|off]` REPL command and `-t, --timeout` CLI option.
+
 ## [0.5.0] - 2026-09-20
 
 ### Added

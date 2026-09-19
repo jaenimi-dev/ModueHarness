@@ -168,7 +168,7 @@ python run.py "FastAPI 기반 REST API 엔드포인트와 pytest 테스트 작�
 팀원 전체를 Antigravity로 구성하거나 역할을 분담할 수 있습니다:
 
 ```yaml
-version: "0.5.0"
+version: "0.6.0"
 name: "antigravity-engineering-team"
 
 agents:
@@ -210,7 +210,7 @@ Claude Code와 Antigravity의 장점을 조합한 **드림팀**을 손쉽게 구
 * **품질 검증(Reviewer)**: Claude 3.7 Sonnet (엄격한 엣지케이스 및 보안 리뷰)
 
 ```yaml
-version: "0.5.0"
+version: "0.6.0"
 name: "hybrid-ai-team"
 
 agents:

@@ -1,6 +1,6 @@
 # ModueHarness (모두의 하네스)
 
-[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](pyproject.toml)
 [![Tests](https://img.shields.io/badge/tests-65%20passed-brightgreen.svg)](tests/)

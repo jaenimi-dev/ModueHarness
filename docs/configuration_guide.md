@@ -240,7 +240,7 @@ cp config/workflow.example.yaml config/workflow.yaml
 Claude Code, Google Antigravity, Aider 등 팀원별로 어댑터와 모델, 추론 노력을 자유롭게 지정할 수 있습니다:
 
 ```yaml
-version: "0.5.0"
+version: "0.6.0"
 name: "my-engineering-team"
 
 agents:
@@ -277,7 +277,7 @@ agents:
 
 ### 3. 작업 명세(`config/workflow.yaml`)
 ```yaml
-version: "0.5.0"
+version: "0.6.0"
 name: "feature-delivery-pipeline"
 agents_file: "agents.yaml"
 

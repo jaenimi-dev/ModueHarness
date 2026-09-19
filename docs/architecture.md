@@ -166,3 +166,4 @@ flowchart LR
 | **Phase 3** | `0.3.0` | Git Worktree 격리, Supervisor 안전 감시(타임아웃/루프 방지), 조건부/재시도 엔진 | ✅ 완료 |
 | **Phase 4** | `0.4.0` | 동적 분업(Leader-Worker), 토론/합의 모델, 플러그인 확장 체계, 보고서 생성기 | ✅ 완료 |
 | **Phase 5** | `0.5.0` | 대화형 CLI(REPL) 및 단일 명령 직접 실행, blackboard와 projects 폴더의 이원화 격리 | ✅ 완료 |
+| **Phase 6** | `0.6.0` | Google Antigravity 연동 확장, 모델/추론노력 제어, 투명한 CLI/실패 원인 진단, 무제한 세션 타임아웃 | ✅ 완료 |

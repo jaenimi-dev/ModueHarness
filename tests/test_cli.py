@@ -12,7 +12,7 @@ def test_cli_version_flag(capsys):
         main(["--version"])
     assert exc_info.value.code == 0
     captured = capsys.readouterr()
-    assert "0.5.0" in captured.out
+    assert "0.6.0" in captured.out
 
 
 def test_cli_default_run(capsys):
@@ -20,7 +20,7 @@ def test_cli_default_run(capsys):
     exit_code = main([])
     assert exit_code == 0
     captured = capsys.readouterr()
-    assert "ModueHarness v0.5.0" in captured.out
+    assert "ModueHarness v0.6.0" in captured.out
 
 
 def test_cli_init_and_status(tmp_path: Path, capsys):

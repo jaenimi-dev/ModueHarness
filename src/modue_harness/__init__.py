@@ -1,6 +1,6 @@
-"""ModueHarness - Multi-AI CLI Collaboration Harness Framework."""
+"""ModueHarness: Multi-AI CLI Collaboration Harness."""
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 from modue_harness.adapters import (
     AGYCLIAdapter,

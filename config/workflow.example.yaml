@@ -3,7 +3,7 @@
 # 명령어 예: cp config/workflow.example.yaml config/workflow.yaml
 # (참고: config/workflow.yaml 파일은 .gitignore에 의해 깃허브에 커밋되지 않고 안전하게 보관됩니다)
 
-version: "0.5.0"
+version: "0.6.0"
 name: "feature-delivery-pipeline"
 
 # 같은 config/ 폴더 내의 AI 팀 명세 파일(agents.yaml) 참조

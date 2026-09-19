@@ -1,5 +1,5 @@
 # Task and Workflow Specification (workflow.yaml)
-version: "0.5.0"
+version: "0.6.0"
 name: "data-pipeline-feature"
 
 # Reference to external AI team specification file
