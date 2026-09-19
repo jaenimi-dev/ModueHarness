@@ -39,7 +39,7 @@ ModueHarness는 사용자의 시스템에 설치된 실제 AI CLI 명령어를 �
     > (또는 GUI 환경 변수 `Path`에 `%USERPROFILE%\.local\bin` 추가)
   - 대안: `npm install -g @anthropic-ai/claude-code` 또는 `brew install --cask claude-code`
 - **인증 (아래 2가지 중 택일)**:
-  - **방법 A (브라우저 로그인, 권장)**: 터미널에서 `claude`를 실행하여 브라우저 OAuth 인증 완료 (Pro, Max, Team 계정)
+  - **방법 A (브라우저 로그인, 권장)**: 터미널에서 `claude`를 실행하여 브라우저 OAuth 인증 완료 (Pro, Max, Team 계정). 로그인 완료 후 터미널에 나타나는 안내에서 **`No, exit`를 선택하거나 `/exit`로 종료**해도 인증 토큰이 로컬에 안전하게 저장됩니다.
   - **방법 B (API 키)**: `.env` 파일 또는 쉘 환경에 `ANTHROPIC_API_KEY` 설정 (Console API)
 - **비인터랙티브(헤드리스) 동작 검증**:
   ModueHarness가 자동으로 쿼리를 실행하도록 하려면 `-p` 플래그가 지원되어야 합니다:
