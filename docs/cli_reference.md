@@ -41,8 +41,10 @@ python run.py -i -P my-web-app
 
 ### 대화형 세션 내 특수 명령어
 - `자연어 명령 &` (또는 `/bg <명령어>`): 백그라운드 비동기 작업 실행 (프롬프트 즉시 반환)
-- `/model [에이전트명] [모델명]`: AI 모델 확인 및 실시간 변경 (예: `/model sonnet`)
-- `/effort [에이전트명] [수준]`: Claude 추론 노력(Effort) 설정 (low, medium, high, max, off)
+- `/model [에이전트명] [모델명]`: AI 모델 확인 및 실시간 변경 (예: `/model sonnet`, `/model agy gemini-3.8-flash-high`)
+- `/effort [에이전트명] [수준]`: AI 추론 노력(Reasoning Effort/Thinking) 설정
+  - Claude: `low`, `medium`, `high`, `max`, `off`
+  - Antigravity: `low`, `medium`, `high`
 - `/cmd` (또는 `/last-cmd`): 최근 실행된 실제 AI CLI 명령어 전체 확인
 - `/jobs`: 백그라운드 작업 목록, 현재 진행 단계(Stage), 실패 시 상세 사유 조회
 - `/cancel [job_id]` (또는 `/stop`): 실행 중인 작업 즉시 취소 및 중단
@@ -75,6 +77,12 @@ python run.py "간단한 사칙연산 계산기 모듈과 테스트 코드를 �
 
 # -p 플래그 사용 예시
 python run.py -p "FastAPI 기반 회원가입 API 구현" -P user-service
+
+# Antigravity CLI로 모델 및 추론 노력 지정 실행
+python run.py "REST API 엔드포인트 구현" -P my-api --agent agy -m gemini-3.8-flash-high -e high
+
+# Claude Code로 Sonnet 모델 및 최대 추론 노력 지정 실행
+python run.py "알고리즘 최적화" -P algo --agent claude -m sonnet -e high
 ```
 
 ### 공통 옵션
@@ -83,7 +91,9 @@ python run.py -p "FastAPI 기반 회원가입 API 구현" -P user-service
 - `--projects-dir`: 프로젝트 루트 디렉터리 경로 (기본값: `projects`)
 - `--dir`, `-d`: 공용 칠판 디렉터리 경로 (기본값: `blackboard`)
 - `--agents`, `-a`: 사용할 AI 팀 명세 파일 (`config/agents.yaml` 미존재 시 시스템 CLI 도구 자동 감지)
-- `--agent`: 특정 단일 AI 에이전트 어댑터 지정 (예: `claude`, `agy`, `aider`, `generic`)
+- `--agent`: 특정 단일 AI 에이전트 어댑터 지정 (예: `claude`, `agy` 또는 `antigravity`, `aider`, `generic`)
+- `-m`, `--model`: 사용할 AI 모델명 지정 (Claude: `sonnet`, `opus`, `haiku` 등 / Antigravity: `gemini-3.8-flash-high`, `gemini-3.5-pro` 등)
+- `-e`, `--effort`: AI 추론 노력(Reasoning Effort) 수준 지정 (Claude: `low`, `medium`, `high`, `max` / Antigravity: `low`, `medium`, `high`)
 
 ---
 

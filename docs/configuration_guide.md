@@ -60,15 +60,17 @@ ModueHarness는 사용자의 시스템에 설치된 실제 AI CLI 명령어를 �
 - 💡 **상세 매뉴얼**: 공식 빠른 시작 가이드 및 프롬프팅 모범 사례, `CLAUDE.md` 연계는 **[docs/claude_guide.md](claude_guide.md)**를 참조하십시오.
 
 ### 2. Google Antigravity (`agy`)
+- **공식 원라인 설치**:
+  - macOS / Linux: `curl -fsSL https://antigravity.google/cli/install.sh | bash`
+  - Windows PowerShell: `irm https://antigravity.google/cli/install.ps1 | iex`
+  - Windows CMD: `curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd`
 - **인증**:
-  터미널에서 Google 계정 로그인 또는 Gemini API 환경 변수 설정
+  터미널에서 `agy` 실행 후 브라우저 Google 계정 로그인 또는 `GEMINI_API_KEY` 환경 변수 설정
+- **비인터랙티브 동작 검증**:
   ```bash
-  agy auth status  # 또는 agy auth login
+  agy -p "Say OK" --dangerously-skip-permissions
   ```
-- **동작 검증**:
-  ```bash
-  agy "echo OK"
-  ```
+- 💡 **상세 매뉴얼**: OS별 설치 및 상세 설정, 하이브리드 팀 구성은 **[docs/antigravity_guide.md](antigravity_guide.md)**를 참조하십시오.
 
 ### 3. Aider (`aider`)
 - **설치**:
@@ -163,7 +165,7 @@ $env:PYTHONPATH="src"; python -m modue_harness.cli -i -P my-web-app
 • 참여 AI 팀:               architect, developer, reviewer (Leader: architect)
 ----------------------------------------------------------------
 명령어를 입력하면 AI 팀이 프로젝트 디렉터리에 직접 구현합니다.
-특수 명령어: /project <이름>, /projects, /files, /status, /help, exit
+특수 명령어: /model, /effort, /cmd, /jobs, /cancel, /project <이름>, /projects, /files, /status, /help, exit
 ================================================================
 
 [my-web-app] > FastAPI 기반 사용자 인증 엔드포인트와 단위 테스트 코드를 작성해줘
@@ -171,7 +173,10 @@ $env:PYTHONPATH="src"; python -m modue_harness.cli -i -P my-web-app
 
 **대화형 모드 특수 명령어 및 실행 팁:**
 - `자연어 명령 &` (또는 `/bg <명령어>`): **백그라운드 비동기 실행** (명령을 백그라운드로 보내고 프롬프트가 즉시 반환되어 다른 작업을 계속 입력할 수 있습니다!)
-- `/jobs`: 백그라운드 작업 목록, 현재 진행 단계(Stage), 경과 시간 실시간 조회
+- `/model [에이전트명] [모델명]`: AI 모델 확인 및 실시간 변경 (예: `/model sonnet`, `/model gemini-3.8-flash-high`)
+- `/effort [에이전트명] [레벨]`: 추론 노력(Effort) 깊이 변경 (low, medium, high, max, off)
+- `/cmd` (또는 `/last-cmd`): 최근 실행된 실제 AI CLI 전체 명령어 목록 확인
+- `/jobs`: 백그라운드 작업 목록, 현재 진행 단계(Stage), 경과 시간, 실패 시 상세 사유 실시간 조회
 - `/cancel [job_id]` (또는 `/stop`): 실행 중인 작업 즉시 취소
 - `/project <이름>` (또는 `/p <이름>`): 활성 프로젝트 변경 (폴더 자동 생성)
 - `/projects`: 생성된 프로젝트 목록 조회
@@ -179,6 +184,10 @@ $env:PYTHONPATH="src"; python -m modue_harness.cli -i -P my-web-app
 - `/status`: 공용 칠판, 활성 프로젝트 및 백그라운드 작업 현황 요약
 - `/help`: 도움말
 - `exit` / `quit` / `q`: 세션 종료
+
+**투명한 실행 및 실패 원인 안내:**
+- **실제 실행 CLI 표시**: `💻 CLI 실행: ...`을 통해 에이전트에게 전달되는 전체 명령어를 축약 없이 터미널에 투명하게 출력합니다.
+- **실패 원인 상세 리포트**: 에이전트 작업이나 서브태스크가 실패할 경우 `❌ [실패 상세 원인]` 및 `❌ 오류 상세: <stderr 에러 메시지>`를 즉시 화면에 명시하여 원인을 손쉽게 파악할 수 있습니다.
 
 ---
 
@@ -188,6 +197,9 @@ $env:PYTHONPATH="src"; python -m modue_harness.cli -i -P my-web-app
 ```bash
 # [가장 간편] 루트 실행 파일 사용 (Windows / Mac / Linux 공통)
 python run.py "계산기 파이썬 모듈과 pytest 테스트를 구현해줘" -P calculator
+
+# [Antigravity 지정 실행]
+python run.py "계산기 모듈 구현" -P calculator --agent agy -m gemini-3.8-flash-high -e high
 
 # [전용 CLI] pip install -e . 설치 후 사용
 modue-harness "계산기 파이썬 모듈과 pytest 테스트를 구현해줘" -P calculator
@@ -224,29 +236,40 @@ cp config/workflow.example.yaml config/workflow.yaml
 ```
 
 ### 2. AI 팀 명세(`config/agents.yaml`)
+Claude Code, Google Antigravity, Aider 등 팀원별로 어댑터와 모델, 추론 노력을 자유롭게 지정할 수 있습니다:
+
 ```yaml
 version: "0.5.0"
 name: "my-engineering-team"
 
 agents:
+  # 1. 아키텍트 (Claude Code - 심층 추론)
   architect:
     adapter: "claude"
     command: "claude"
     args: ["--permission-mode", "auto"]
+    model: "claude-3-7-sonnet-latest"
+    effort: "high"
     role: "System Architect & Technical Planner"
     system_instruction: "You design clean, modular software architecture specifications."
 
+  # 2. 소프트웨어 개발자 (Google Antigravity - 초고속 구현)
   developer:
-    adapter: "claude"
-    command: "claude"
-    args: ["--permission-mode", "auto"]
+    adapter: "antigravity"
+    command: "agy"
+    args: ["--dangerously-skip-permissions"]
+    model: "gemini-3.8-flash-high"
+    effort: "medium"
     role: "Core Implementation Engineer"
     system_instruction: "You write robust, production-ready code matching the specifications."
 
+  # 3. 품질 & 보안 리뷰어 (Claude Code)
   reviewer:
     adapter: "claude"
     command: "claude"
     args: ["--permission-mode", "auto"]
+    model: "claude-3-7-sonnet-latest"
+    effort: "high"
     role: "Quality and Security Reviewer"
     system_instruction: "You critically review code for edge cases and security vulnerabilities."
 ```

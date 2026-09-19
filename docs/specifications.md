@@ -24,22 +24,28 @@ name: "modue-engineering-team"
 
 agents:
   planner:
-    adapter: "claude"                  # claude, agy, aider, generic
+    adapter: "claude"                  # claude, antigravity (agy), aider, generic
     command: "claude"                  # 실행할 CLI 명령어
     args: ["--permission-mode", "auto"] # 추가 실행 인자 (프롬프트 멈춤 방지)
-    model: "claude-3-7-sonnet-latest"  # 선택적 모델 지정
+    model: "claude-3-7-sonnet-latest"  # 선택적 모델 지정 (sonnet, opus, haiku 등)
+    effort: "high"                     # 추론 노력 (low, medium, high, max)
     role: "System Architect"           # 역할 설명
     system_instruction: "You are the lead architect..."
 
   coder:
-    adapter: "agy"
+    adapter: "antigravity"             # 또는 agy
     command: "agy"
+    args: ["--dangerously-skip-permissions"]
+    model: "gemini-3.8-flash-high"
+    effort: "medium"
     role: "Software Engineer"
 
   reviewer:
-    adapter: "aider"
-    command: "aider"
-    args: ["--yes-always"]
+    adapter: "claude"
+    command: "claude"
+    args: ["--permission-mode", "auto"]
+    model: "claude-3-7-sonnet-latest"
+    effort: "high"
     role: "Quality Reviewer"
 ```
 
