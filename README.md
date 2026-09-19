@@ -51,6 +51,8 @@ PYTHONPATH=src python3 -m modue_harness.cli debate --topic "REST vs GraphQL for 
 
 - 📖 **[설정 및 실전 사용 매뉴얼 (Configuration & Setup Guide)](docs/configuration_guide.md)**  
   설치 후 실제 AI CLI(Claude, AGY, Aider) 연결, `.env` 환경 변수 설정, 팀 구성 및 트러블슈팅 단계별 가이드
+- 🤖 **[Claude Code 연동 및 퀵스타트 가이드 (Claude Code Guide)](docs/claude_guide.md)**  
+  Anthropic 공식 퀵스타트 기반 설치, 인증, 권한 모드(`auto`), `CLAUDE.md` 및 ModueHarness 연동 가이드
 - 🏛️ **[시스템 아키텍처 및 상세 기능 (Architecture & Features)](docs/architecture.md)**  
   전체 아키텍처 다이어그램, 3대 협업 토폴로지, 어댑터 계층, 블랙보드, 안전 감시자 및 로드맵
 - 📝 **[명세 파일 작성 가이드 (Specifications Guide)](docs/specifications.md)**  

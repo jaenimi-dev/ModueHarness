@@ -25,18 +25,25 @@ ModueHarness 설치를 마친 후, 실제로 다양한 AI CLI(Claude Code, Googl
 ModueHarness는 사용자의 시스템에 설치된 실제 AI CLI 명령어를 서브프로세스로 구동합니다. 사용하고자 하는 도구가 설치되어 있고 인증되었는지 확인합니다.
 
 ### 1. Anthropic Claude Code (`claude`)
-- **설치**:
-  ```bash
-  npm install -g @anthropic-ai/claude-code
-  ```
+- **공식 권장 설치 (자동 업데이트 지원)**:
+  - macOS, Linux, WSL:
+    ```bash
+    curl -fsSL https://claude.ai/install.sh | bash
+    ```
+  - Windows PowerShell:
+    ```powershell
+    irm https://claude.ai/install.ps1 | iex
+    ```
+  - 대안: `npm install -g @anthropic-ai/claude-code` 또는 `brew install --cask claude-code`
 - **인증 (아래 2가지 중 택일)**:
-  - **방법 A (브라우저 로그인)**: 터미널에서 `claude`를 실행하여 브라우저 OAuth 인증 완료
-  - **방법 B (API 키)**: `.env` 파일 또는 쉘 환경에 `ANTHROPIC_API_KEY` 설정
+  - **방법 A (브라우저 로그인, 권장)**: 터미널에서 `claude`를 실행하여 브라우저 OAuth 인증 완료 (Pro, Max, Team 계정)
+  - **방법 B (API 키)**: `.env` 파일 또는 쉘 환경에 `ANTHROPIC_API_KEY` 설정 (Console API)
 - **비인터랙티브(헤드리스) 동작 검증**:
-  ModueHarness가 자동으로 질문에 답변하도록 하려면 `-p` 플래그가 지원되어야 합니다:
+  ModueHarness가 자동으로 쿼리를 실행하도록 하려면 `-p` 플래그가 지원되어야 합니다:
   ```bash
   claude -p "Respond only with PONG"
   ```
+- 💡 **상세 매뉴얼**: 공식 빠른 시작 가이드 및 프롬프팅 모범 사례, `CLAUDE.md` 연계는 **[docs/claude_guide.md](claude_guide.md)**를 참조하십시오.
 
 ### 2. Google Antigravity (`agy`)
 - **인증**:
