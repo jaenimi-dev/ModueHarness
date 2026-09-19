@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import re
+import shlex
 import time
 from typing import Any, Callable, Dict, List, Optional
 
@@ -107,13 +108,26 @@ class ConductorRunner:
             return {"status": "cancelled", "success": False, "goal": self.goal, "subtasks": []}
 
         # Phase 1: Planning / Task Decomposition
-        self._notify("planning_start", {"conductor": self.conductor_name, "goal": self.goal})
         plan_context = TurnContext(
             step_id="conductor_planning",
             instruction=decomposition_prompt,
             blackboard_dir=self.blackboard.root_dir,
             workspace_dir=self.workspace_dir,
         )
+        plan_prompt = conductor_adapter.prepare_prompt(plan_context)
+        plan_cmd = conductor_adapter.build_command(plan_prompt)
+        plan_cmd_display = conductor_adapter.format_command_display(plan_cmd, max_prompt_len=100)
+        try:
+            plan_full_cmd_str = shlex.join(plan_cmd)
+        except Exception:
+            plan_full_cmd_str = " ".join(plan_cmd)
+
+        self._notify("planning_start", {
+            "conductor": self.conductor_name,
+            "goal": self.goal,
+            "command": plan_cmd_display,
+            "full_command_str": plan_full_cmd_str,
+        })
 
         plan_result = conductor_adapter.execute(plan_context)
         if not plan_result.is_success:
@@ -170,49 +184,69 @@ class ConductorRunner:
             )
             self.blackboard.create_task(task)
 
-            self._notify("task_start", {
-                "task_id": task_id,
-                "agent": assigned,
-                "instruction": instruction,
-                "index": idx + 1,
-                "total": total_subtasks,
-            })
-
             turn_ctx = TurnContext(
                 step_id=task_id,
                 instruction=instruction,
                 blackboard_dir=self.blackboard.root_dir,
                 workspace_dir=self.workspace_dir,
             )
+            worker_prompt = worker_adapter.prepare_prompt(turn_ctx)
+            worker_cmd = worker_adapter.build_command(worker_prompt)
+            worker_cmd_display = worker_adapter.format_command_display(worker_cmd, max_prompt_len=100)
+            try:
+                worker_full_cmd_str = shlex.join(worker_cmd)
+            except Exception:
+                worker_full_cmd_str = " ".join(worker_cmd)
+
+            self._notify("task_start", {
+                "task_id": task_id,
+                "agent": assigned,
+                "instruction": instruction,
+                "index": idx + 1,
+                "total": total_subtasks,
+                "command": worker_cmd_display,
+                "full_command_str": worker_full_cmd_str,
+            })
 
             res = worker_adapter.execute(turn_ctx)
+            task_record = {
+                "task_id": task_id,
+                "agent": assigned,
+                "is_success": res.is_success,
+                "command": worker_cmd_display,
+                "full_command_str": worker_full_cmd_str,
+                "duration_sec": res.duration_sec,
+            }
             if res.is_success:
                 if output_art and res.stdout:
                     self.blackboard.write_artifact(output_art, res.stdout.strip(), author_agent=assigned)
                 self.blackboard.update_task_status(task_id, TaskStatus.COMPLETED)
-                worker_results.append({"task_id": task_id, "agent": assigned, "is_success": True})
+                worker_results.append(task_record)
                 self._notify("task_end", {
                     "task_id": task_id,
                     "agent": assigned,
                     "is_success": True,
                     "duration_sec": res.duration_sec,
+                    "command": worker_cmd_display,
+                    "full_command_str": worker_full_cmd_str,
                 })
             else:
                 self.blackboard.update_task_status(task_id, TaskStatus.FAILED, {"error": res.error_message})
-                worker_results.append({"task_id": task_id, "agent": assigned, "is_success": False})
+                worker_results.append(task_record)
                 self._notify("task_end", {
                     "task_id": task_id,
                     "agent": assigned,
                     "is_success": False,
                     "duration_sec": res.duration_sec,
                     "error": res.error_message,
+                    "command": worker_cmd_display,
+                    "full_command_str": worker_full_cmd_str,
                 })
                 overall_success = False
                 break
 
         # Phase 3: Conductor Synthesis / Review
         if not self._is_cancelled and overall_success:
-            self._notify("synthesis_start", {"conductor": self.conductor_name})
             synthesis_prompt = (
                 f"You are the Conductor AI.\n"
                 f"All worker subtasks have concluded.\n"
@@ -227,10 +261,28 @@ class ConductorRunner:
                 blackboard_dir=self.blackboard.root_dir,
                 workspace_dir=self.workspace_dir,
             )
+            synth_prompt = conductor_adapter.prepare_prompt(synth_ctx)
+            synth_cmd = conductor_adapter.build_command(synth_prompt)
+            synth_cmd_display = conductor_adapter.format_command_display(synth_cmd, max_prompt_len=100)
+            try:
+                synth_full_cmd_str = shlex.join(synth_cmd)
+            except Exception:
+                synth_full_cmd_str = " ".join(synth_cmd)
+
+            self._notify("synthesis_start", {
+                "conductor": self.conductor_name,
+                "command": synth_cmd_display,
+                "full_command_str": synth_full_cmd_str,
+            })
             synth_res = conductor_adapter.execute(synth_ctx)
             if synth_res.is_success:
                 self.blackboard.write_artifact("synthesis_report.md", synth_res.stdout.strip(), author_agent=self.conductor_name)
-            self._notify("synthesis_end", {"conductor": self.conductor_name, "is_success": synth_res.is_success})
+            self._notify("synthesis_end", {
+                "conductor": self.conductor_name,
+                "is_success": synth_res.is_success,
+                "command": synth_cmd_display,
+                "full_command_str": synth_full_cmd_str,
+            })
 
         total_duration = time.time() - start_time
         if self._is_cancelled:

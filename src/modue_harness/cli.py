@@ -389,7 +389,8 @@ def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
             print(f"\n[실행된 서브태스크 ({len(summary['subtasks'])})]")
             for st in summary["subtasks"]:
                 mark = "✓" if st.get("is_success") else "✗"
-                print(f"  [{mark}] {st.get('task_id')} ({st.get('agent')})")
+                cmd_line = f"\n      💻 CLI: {st.get('command')}" if st.get("command") else ""
+                print(f"  [{mark}] {st.get('task_id')} ({st.get('agent')}){cmd_line}")
 
         if summary.get("project_files"):
             print(f"\n[프로젝트 내 생성/수정된 파일 ({len(summary['project_files'])})]")

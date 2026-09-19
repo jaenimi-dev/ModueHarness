@@ -326,3 +326,45 @@ def test_interactive_session_model_and_effort(tmp_path: Path):
     assert claude_dev.effort == "low"
 
 
+def test_interactive_session_command_display(tmp_path: Path, capsys):
+    """Test CLI command display and /cmd history inspection."""
+    projects_dir = tmp_path / "projects"
+    board_dir = tmp_path / "blackboard"
+
+    # Mock agent returning valid json tasks
+    tasks_json = json.dumps([
+        {
+            "id": "task_sub_1",
+            "assigned_agent": "worker",
+            "instruction": "Do work",
+        }
+    ])
+    worker = GenericCLIAdapter(
+        name="worker",
+        command=sys.executable,
+        default_args=["-c", f"import sys; content = sys.stdin.read(); print('{tasks_json}' if 'decompose' in content else 'WORK_DONE')"],
+    )
+
+    session = InteractiveSession(
+        project_name="cmd_display_app",
+        projects_root=projects_dir,
+        blackboard_dir=board_dir,
+        agents={"conductor": worker, "worker": worker},
+        conductor_name="conductor",
+    )
+
+    summary = session.execute_command("Test display command", live_progress=True)
+    captured = capsys.readouterr()
+
+    # Verify that CLI execution line was printed to the screen
+    assert "💻 CLI 실행:" in captured.out
+    assert len(session.last_commands) >= 2
+
+    # Test /cmd slash command
+    session._handle_special_command("/cmd")
+    captured_cmd = capsys.readouterr()
+    assert "최근 실행된 실제 AI CLI 명령어 목록" in captured_cmd.out
+    assert sys.executable in captured_cmd.out
+
+
+

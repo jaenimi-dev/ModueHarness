@@ -233,6 +233,7 @@ class InteractiveSession:
         self.jobs: Dict[str, BackgroundJob] = {}
         self._job_counter: int = 0
         self._active_foreground_runner: Optional[ConductorRunner] = None
+        self.last_commands: List[Dict[str, Any]] = []
 
     def set_model(self, model: Optional[str], agent_name: Optional[str] = None) -> List[str]:
         """Update model dynamically for specified agent or all supporting Claude/AI agents."""
@@ -328,11 +329,21 @@ class InteractiveSession:
             "last_command_at": datetime.datetime.now().isoformat(),
         })
 
+        self.last_commands = []
+
         def _console_progress(event: str, data: Dict[str, Any]) -> None:
             if not live_progress:
                 return
             if event == "planning_start":
                 print(f"  [1/3] 🧠 Conductor({data.get('conductor')}) 작업 목표 분석 및 계획 수립 중...")
+                if data.get("command"):
+                    print(f"        💻 CLI 실행: {data.get('command')}")
+                if data.get("full_command_str") or data.get("command"):
+                    self.last_commands.append({
+                        "phase": "기획 (Planning)",
+                        "agent": data.get("conductor"),
+                        "command": data.get("full_command_str") or data.get("command"),
+                    })
             elif event == "planning_end":
                 if data.get("is_success"):
                     tasks = data.get("tasks", [])
@@ -348,12 +359,28 @@ class InteractiveSession:
                 desc = (data.get("instruction") or "")[:60]
                 print(f"  [2/3] 🛠️ [{idx}/{tot}] {data.get('agent')} 실행 중 ({data.get('task_id')})...")
                 print(f"        지시: {desc}")
+                if data.get("command"):
+                    print(f"        💻 CLI 실행: {data.get('command')}")
+                if data.get("full_command_str") or data.get("command"):
+                    self.last_commands.append({
+                        "phase": f"태스크 [{idx}/{tot}] {data.get('task_id')}",
+                        "agent": data.get("agent"),
+                        "command": data.get("full_command_str") or data.get("command"),
+                    })
             elif event == "task_end":
                 mark = "✓" if data.get("is_success") else "✗"
                 dur = data.get("duration_sec", 0.0)
                 print(f"  {mark} [{data.get('task_id')}] 실행 완료 ({dur:.1f}s)")
             elif event == "synthesis_start":
                 print(f"  [3/3] 📝 Conductor({data.get('conductor')}) 최종 검토 및 종합 보고서 작성 중...")
+                if data.get("command"):
+                    print(f"        💻 CLI 실행: {data.get('command')}")
+                if data.get("full_command_str") or data.get("command"):
+                    self.last_commands.append({
+                        "phase": "종합 검토 (Synthesis)",
+                        "agent": data.get("conductor"),
+                        "command": data.get("full_command_str") or data.get("command"),
+                    })
             elif event == "synthesis_end":
                 print(f"  ✓ 최종 종합 보고서 저장: blackboard/artifacts/synthesis_report.md")
 
@@ -569,7 +596,8 @@ class InteractiveSession:
                     print(f"\n[실행된 서브태스크: {len(summary['subtasks'])}개]")
                     for st in summary["subtasks"]:
                         mark = "✓" if st.get("is_success") else "✗"
-                        print(f"  [{mark}] {st.get('task_id')} ({st.get('agent')})")
+                        cmd_line = f"\n      💻 CLI: {st.get('command')}" if st.get("command") else ""
+                        print(f"  [{mark}] {st.get('task_id')} ({st.get('agent')}){cmd_line}")
 
                 if summary.get("project_files"):
                     print(f"\n[프로젝트 파일 ({self.project_dir.name})]")
@@ -732,12 +760,23 @@ class InteractiveSession:
             print(f"• 등록된 태스크: {len(tasks)}개")
             print(f"• 칠판 아티팩트: {len(artifacts)}개\n")
 
+        elif cmd in ["/cmd", "/command", "/last-cmd"]:
+            if not self.last_commands:
+                print("\n📋 직전에 실행된 CLI 명령어가 없습니다.\n")
+            else:
+                print(f"\n📋 최근 실행된 실제 AI CLI 명령어 목록 ({len(self.last_commands)}개):")
+                for i, item in enumerate(self.last_commands, 1):
+                    print(f"\n  [{i}] {item.get('phase')} - 에이전트: {item.get('agent')}")
+                    print(f"      {item.get('command')}")
+                print()
+
         elif cmd in ["/help", "/?"]:
             print("\n=== 사용 가능한 명령어 ===")
-            print("  자연어 명령 입력        : 동기 방식으로 즉시 실행 (실시간 단계 표시)")
+            print("  자연어 명령 입력        : 동기 방식으로 즉시 실행 (실시간 단계 및 CLI 명령 표시)")
             print("  자연어 명령 &          : 백그라운드 비동기 실행 (프롬프트 즉시 반환)")
             print("  /model [이름] [모델]    : AI 모델 확인 및 변경 (예: /model sonnet)")
             print("  /effort [이름] [수준]   : Claude 추론 노력 수준 설정 (low, medium, high, max)")
+            print("  /cmd (또는 /last-cmd)   : 직전 실행된 실제 AI CLI 명령어 전체 보기")
             print("  /bg <명령어>           : 백그라운드 비동기 실행")
             print("  /jobs                 : 백그라운드 작업 진행 현황 및 목록")
             print("  /cancel [job_id]      : 실행 중인 작업 취소 및 중단")

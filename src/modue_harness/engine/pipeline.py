@@ -295,4 +295,6 @@ class PipelineRunner:
             "exit_code": turn_result.exit_code,
             "duration_sec": turn_result.duration_sec,
             "error_message": turn_result.error_message,
+            "command": turn_result.metadata.get("command_display"),
+            "full_command": turn_result.metadata.get("full_command_str"),
         }

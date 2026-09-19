@@ -3,6 +3,7 @@
 from abc import ABC
 import os
 import re
+import shlex
 import subprocess
 import time
 from typing import Any, Dict, Generator, List, Optional
@@ -50,6 +51,28 @@ class BaseCLIAdapter(ABC):
 
         return cmd
 
+    def format_command_display(self, cmd: List[str], max_prompt_len: Optional[int] = 100) -> str:
+        """Format a CLI command argument list for display, optionally truncating long prompt argument."""
+        display_parts = []
+        for i, part in enumerate(cmd):
+            if (
+                max_prompt_len
+                and len(part) > max_prompt_len
+                and ((i > 0 and cmd[i - 1] in ["-p", "--prompt", "-c"]) or "\n" in part)
+            ):
+                first_line = part.strip().splitlines()[0] if part.strip().splitlines() else part.strip()
+                if len(first_line) > max_prompt_len:
+                    preview = first_line[:max_prompt_len] + "..."
+                else:
+                    preview = first_line + ("..." if len(part.strip().splitlines()) > 1 else "")
+                display_parts.append(preview)
+            else:
+                display_parts.append(part)
+        try:
+            return shlex.join(display_parts)
+        except Exception:
+            return " ".join(display_parts)
+
     def prepare_prompt(self, context: TurnContext) -> str:
         """Compose the full prompt incorporating instructions and input artifacts."""
         prompt_parts = []
@@ -86,6 +109,16 @@ class BaseCLIAdapter(ABC):
         """Execute a single turn using the wrapped CLI tool."""
         full_prompt = self.prepare_prompt(context)
         cmd = self.build_command(full_prompt, extra_args=extra_args)
+        cmd_display = self.format_command_display(cmd, max_prompt_len=100)
+        try:
+            full_cmd_str = shlex.join(cmd)
+        except Exception:
+            full_cmd_str = " ".join(cmd)
+        cmd_metadata = {
+            "command": cmd,
+            "command_display": cmd_display,
+            "full_command_str": full_cmd_str,
+        }
 
         env = os.environ.copy()
         if context.env:
@@ -122,6 +155,7 @@ class BaseCLIAdapter(ABC):
                 exit_code=process.returncode,
                 duration_sec=duration,
                 error_message=error_msg,
+                metadata=cmd_metadata,
             )
 
         except FileNotFoundError:
@@ -131,6 +165,7 @@ class BaseCLIAdapter(ABC):
                 exit_code=127,
                 duration_sec=duration,
                 error_message=f"Command not found: '{self.command}'",
+                metadata=cmd_metadata,
             )
         except subprocess.TimeoutExpired as e:
             duration = time.time() - start_time
@@ -141,6 +176,7 @@ class BaseCLIAdapter(ABC):
                 stdout=strip_ansi(e.stdout or "") if isinstance(e.stdout, str) else "",
                 stderr=strip_ansi(e.stderr or "") if isinstance(e.stderr, str) else "",
                 error_message=f"Execution timed out after {timeout} seconds",
+                metadata=cmd_metadata,
             )
         except Exception as e:
             duration = time.time() - start_time
@@ -149,6 +185,7 @@ class BaseCLIAdapter(ABC):
                 exit_code=1,
                 duration_sec=duration,
                 error_message=f"Execution failed with exception: {str(e)}",
+                metadata=cmd_metadata,
             )
 
     def execute_stream(
