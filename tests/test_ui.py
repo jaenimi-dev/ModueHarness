@@ -258,3 +258,42 @@ def test_web_app_runs_with_mock_nicegui_fallback_page(monkeypatch):
     run_app(open_browser=False)
     assert called_args.get("reload") is False
     mock_ui.page.assert_called_with("/")
+
+
+def test_ui_controller_agent_crud_and_conductor(tmp_path: Path):
+    """Test dynamic agent CRUD operations and setting conductor in UIController."""
+    ctrl = UIController(
+        project_name="demo",
+        projects_root=tmp_path / "projects",
+        blackboard_dir=tmp_path / "blackboard",
+    )
+
+    # 1. Add agent
+    res = ctrl.add_agent("qa_tester", adapter_type="claude", model="sonnet", effort="high")
+    assert res["success"] is True
+    agents = ctrl.get_agents_info()
+    qa = next((a for a in agents if a["name"] == "qa_tester"), None)
+    assert qa is not None
+    assert qa["adapter"] == "claude"
+    assert qa["model"] == "sonnet"
+    assert qa["effort"] == "high"
+
+    # 2. Update agent (switch adapter to agy and set leader)
+    updated = ctrl.update_agent("qa_tester", adapter_type="agy", model="gemini-3.8-flash-high", is_conductor=True)
+    assert updated is True
+    agents_after = ctrl.get_agents_info()
+    qa_after = next(a for a in agents_after if a["name"] == "qa_tester")
+    assert qa_after["adapter"] == "agy"
+    assert qa_after["model"] == "gemini-3.8-flash-high"
+    assert qa_after["is_leader"] is True
+
+    # 3. Set conductor explicitly
+    first_agent = agents_after[0]["name"]
+    ctrl.set_conductor(first_agent)
+    agents_leader = ctrl.get_agents_info()
+    assert any(a["name"] == first_agent and a["is_leader"] for a in agents_leader)
+
+    # 4. Remove agent
+    assert ctrl.remove_agent("qa_tester") is True
+    agents_rem = ctrl.get_agents_info()
+    assert not any(a["name"] == "qa_tester" for a in agents_rem)

@@ -63,12 +63,23 @@ class UIController:
         """Return information about configured AI agents."""
         info = []
         for name, agent in self.session.agents.items():
+            adapter_type = "generic"
+            cls_name = agent.__class__.__name__.lower()
+            if "claude" in cls_name:
+                adapter_type = "claude"
+            elif "agy" in cls_name or "antigravity" in cls_name:
+                adapter_type = "agy"
+            elif "aider" in cls_name:
+                adapter_type = "aider"
+
             info.append({
                 "name": name,
-                "adapter": getattr(agent, "name", agent.__class__.__name__),
+                "adapter": adapter_type,
+                "adapter_cls": agent.__class__.__name__,
                 "model": getattr(agent, "model", None),
                 "effort": getattr(agent, "effort", None),
                 "command": getattr(agent, "command", "N/A"),
+                "system_instruction": getattr(agent, "system_instruction", ""),
                 "is_leader": name == self.session.conductor_name,
             })
         return info
@@ -84,6 +95,53 @@ class UIController:
     def set_timeout(self, timeout: Optional[float]) -> Optional[float]:
         """Update session execution timeout in seconds (None for unlimited)."""
         return self.session.set_timeout(timeout)
+
+    def set_conductor(self, agent_name: str) -> bool:
+        """Set an existing agent as the team leader/conductor."""
+        return self.session.set_conductor(agent_name)
+
+    def add_agent(
+        self,
+        name: str,
+        adapter_type: str = "claude",
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
+        is_conductor: bool = False,
+        system_instruction: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Add a new agent or replace an existing one."""
+        self.session.add_agent(
+            name=name,
+            adapter_type=adapter_type,
+            model=model,
+            effort=effort,
+            is_conductor=is_conductor,
+            system_instruction=system_instruction,
+        )
+        return {"name": name, "success": True}
+
+    def remove_agent(self, name: str) -> bool:
+        """Remove an agent from the active session."""
+        return self.session.remove_agent(name)
+
+    def update_agent(
+        self,
+        name: str,
+        adapter_type: Optional[str] = None,
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
+        is_conductor: Optional[bool] = None,
+        system_instruction: Optional[str] = None,
+    ) -> bool:
+        """Update an agent's configuration."""
+        return self.session.update_agent(
+            name=name,
+            adapter_type=adapter_type,
+            model=model,
+            effort=effort,
+            is_conductor=is_conductor,
+            system_instruction=system_instruction,
+        )
 
     def get_status(self) -> Dict[str, Any]:
         """Return current status summary of session and blackboard."""

@@ -297,6 +297,98 @@ class InteractiveSession:
         self.timeout = timeout
         return self.timeout
 
+    def set_conductor(self, agent_name: str) -> bool:
+        """Set an existing agent as the team leader/conductor."""
+        if agent_name in self.agents:
+            self.conductor_name = agent_name
+            return True
+        return False
+
+    def add_agent(
+        self,
+        name: str,
+        adapter_type: str = "claude",
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
+        is_conductor: bool = False,
+        system_instruction: Optional[str] = None,
+    ) -> BaseCLIAdapter:
+        """Dynamically add or replace an agent in the active session."""
+        kwargs: Dict[str, Any] = {"name": name}
+        if model:
+            kwargs["model"] = model
+        if effort:
+            kwargs["effort"] = effort
+        if system_instruction:
+            kwargs["system_instruction"] = system_instruction
+
+        adapter = create_adapter(adapter_type, **kwargs)
+        self.agents[name] = adapter
+        if is_conductor:
+            self.conductor_name = name
+        return adapter
+
+    def remove_agent(self, name: str) -> bool:
+        """Remove an agent from the session (keeps at least one)."""
+        if len(self.agents) <= 1:
+            return False
+        if name in self.agents:
+            del self.agents[name]
+            if self.conductor_name == name:
+                self.conductor_name = next(iter(self.agents.keys()))
+            return True
+        return False
+
+    def update_agent(
+        self,
+        name: str,
+        adapter_type: Optional[str] = None,
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
+        is_conductor: Optional[bool] = None,
+        system_instruction: Optional[str] = None,
+    ) -> bool:
+        """Update an existing agent's configuration or recreate with a new adapter type."""
+        agent = self.agents.get(name)
+        if not agent:
+            return False
+
+        current_adapter = "generic"
+        cls_name = agent.__class__.__name__.lower()
+        if "claude" in cls_name:
+            current_adapter = "claude"
+        elif "agy" in cls_name or "antigravity" in cls_name:
+            current_adapter = "agy"
+        elif "aider" in cls_name:
+            current_adapter = "aider"
+
+        target_adapter = (adapter_type or current_adapter).lower()
+        if target_adapter != current_adapter:
+            kwargs: Dict[str, Any] = {
+                "name": name,
+                "model": model if model is not None else getattr(agent, "model", None),
+                "effort": effort if effort is not None else getattr(agent, "effort", None),
+                "system_instruction": system_instruction if system_instruction is not None else getattr(agent, "system_instruction", None),
+            }
+            self.agents[name] = create_adapter(target_adapter, **kwargs)
+        else:
+            if model is not None:
+                if hasattr(agent, "set_model"):
+                    agent.set_model(model)
+                elif hasattr(agent, "model"):
+                    setattr(agent, "model", model)
+            if effort is not None:
+                if hasattr(agent, "set_effort"):
+                    agent.set_effort(effort)
+                elif hasattr(agent, "effort"):
+                    setattr(agent, "effort", effort)
+            if system_instruction is not None and hasattr(agent, "system_instruction"):
+                setattr(agent, "system_instruction", system_instruction)
+
+        if is_conductor:
+            self.conductor_name = name
+        return True
+
     def switch_project(self, project_name: str) -> Path:
         """Switch current target project to a new or existing project folder."""
         clean_name = project_name.strip()

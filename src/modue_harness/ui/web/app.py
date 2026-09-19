@@ -2,7 +2,7 @@
 
 import asyncio
 import inspect
-from typing import Optional
+from typing import Any, Dict, Optional
 from modue_harness.ui.controller import UIController
 
 
@@ -58,42 +58,237 @@ def run_app(
                 # Dark mode switch
                 ui.button(icon="dark_mode", on_click=lambda: dark.toggle()).props("flat round text-color=white")
 
-        # 2. Main 3-Column Layout
+        # 2. Modals for AI Team Management
+        current_edit_target = {"name": ""}
+
+        # 2-A: Edit Agent Dialog
+        edit_dialog = ui.dialog()
+        with edit_dialog, ui.card().classes("w-96 p-4 bg-slate-900 border border-slate-700 text-white gap-2"):
+            ui.label("⚙️ Configure AI Agent").classes("text-base font-bold text-blue-400")
+            edit_name_label = ui.label("").classes("text-xs font-mono text-slate-400 mb-1")
+
+            edit_adapter = ui.select(
+                options=["claude", "agy", "aider", "generic"],
+                label="Adapter Type",
+            ).classes("w-full bg-slate-800 text-white rounded")
+
+            edit_model = ui.input(
+                label="Model Name",
+                placeholder="e.g. sonnet, gemini-3.8-flash-high",
+            ).classes("w-full")
+
+            with ui.row().classes("gap-1 items-center"):
+                ui.label("Presets:").classes("text-[11px] text-slate-400")
+                ui.button("sonnet", on_click=lambda: edit_model.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
+                ui.button("opus", on_click=lambda: edit_model.set_value("opus")).props("dense outline size=xs text-color=slate-300")
+                ui.button("flash-high", on_click=lambda: edit_model.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")
+                ui.button("pro", on_click=lambda: edit_model.set_value("gemini-3.5-pro")).props("dense outline size=xs text-color=slate-300")
+
+            edit_effort = ui.select(
+                options=["default", "low", "medium", "high", "max", "off"],
+                value="default",
+                label="Reasoning Effort",
+            ).classes("w-full bg-slate-800 text-white rounded")
+
+            edit_leader_cb = ui.checkbox("Set as Team Leader (Conductor)").classes("text-xs text-slate-300")
+
+            edit_instruction = ui.textarea(
+                label="Custom Role / System Instruction (optional)",
+                placeholder="e.g. You write clean, tested code matching specifications.",
+            ).classes("w-full h-20 text-xs")
+
+            def save_agent_edit():
+                target_name = current_edit_target["name"]
+                eff = None if edit_effort.value == "default" else edit_effort.value
+                mod = edit_model.value.strip() or None
+                ins = edit_instruction.value.strip() or None
+                ctrl.update_agent(
+                    name=target_name,
+                    adapter_type=edit_adapter.value,
+                    model=mod,
+                    effort=eff,
+                    is_conductor=edit_leader_cb.value,
+                    system_instruction=ins,
+                )
+                ui.notify(f"Updated agent '{target_name}'", type="positive")
+                edit_dialog.close()
+                refresh_agents()
+
+            with ui.row().classes("w-full justify-end gap-2 mt-2"):
+                ui.button("Cancel", on_click=edit_dialog.close).props("flat text-color=slate-400")
+                ui.button("Save", color="primary", on_click=save_agent_edit)
+
+        def open_edit_dialog(agent_info: Dict[str, Any]):
+            current_edit_target["name"] = agent_info["name"]
+            edit_name_label.set_text(f"Agent: {agent_info['name']}")
+            edit_adapter.set_value(agent_info["adapter"])
+            edit_model.set_value(agent_info.get("model") or "")
+            edit_effort.set_value(agent_info.get("effort") or "default")
+            edit_leader_cb.set_value(agent_info["is_leader"])
+            edit_instruction.set_value(agent_info.get("system_instruction") or "")
+            edit_dialog.open()
+
+        # 2-B: Add Agent Dialog
+        add_dialog = ui.dialog()
+        with add_dialog, ui.card().classes("w-96 p-4 bg-slate-900 border border-slate-700 text-white gap-2"):
+            ui.label("➕ Add AI Team Member").classes("text-base font-bold text-green-400")
+            add_name = ui.input(
+                label="Agent Name",
+                placeholder="e.g. tester, reviewer, architect",
+            ).classes("w-full")
+
+            add_adapter = ui.select(
+                options=["claude", "agy", "aider", "generic"],
+                value="claude",
+                label="Adapter Type",
+            ).classes("w-full bg-slate-800 text-white rounded")
+
+            add_model = ui.input(
+                label="Model (optional)",
+                placeholder="e.g. sonnet, gemini-3.8-flash-high",
+            ).classes("w-full")
+
+            with ui.row().classes("gap-1 items-center"):
+                ui.label("Presets:").classes("text-[11px] text-slate-400")
+                ui.button("sonnet", on_click=lambda: add_model.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
+                ui.button("flash-high", on_click=lambda: add_model.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")
+
+            add_effort = ui.select(
+                options=["default", "low", "medium", "high", "max", "off"],
+                value="default",
+                label="Reasoning Effort",
+            ).classes("w-full bg-slate-800 text-white rounded")
+
+            add_leader_cb = ui.checkbox("Set as Team Leader (Conductor)").classes("text-xs text-slate-300")
+
+            add_instruction = ui.textarea(
+                label="Role / System Instruction (optional)",
+                placeholder="e.g. You write unit tests and inspect code quality.",
+            ).classes("w-full h-20 text-xs")
+
+            def submit_new_agent():
+                name = add_name.value.strip()
+                if not name:
+                    ui.notify("Please enter an agent name.", type="warning")
+                    return
+                eff = None if add_effort.value == "default" else add_effort.value
+                mod = add_model.value.strip() or None
+                ins = add_instruction.value.strip() or None
+                ctrl.add_agent(
+                    name=name,
+                    adapter_type=add_adapter.value,
+                    model=mod,
+                    effort=eff,
+                    is_conductor=add_leader_cb.value,
+                    system_instruction=ins,
+                )
+                ui.notify(f"Added agent '{name}' ({add_adapter.value})", type="positive")
+                add_name.set_value("")
+                add_model.set_value("")
+                add_instruction.set_value("")
+                add_leader_cb.set_value(False)
+                add_dialog.close()
+                refresh_agents()
+
+            with ui.row().classes("w-full justify-end gap-2 mt-2"):
+                ui.button("Cancel", on_click=add_dialog.close).props("flat text-color=slate-400")
+                ui.button("Add Agent", color="positive", on_click=submit_new_agent)
+
+        def on_make_leader(name: str):
+            if ctrl.set_conductor(name):
+                ui.notify(f"'{name}' is now the Team Leader (Conductor)", type="positive")
+                refresh_agents()
+
+        def on_delete_agent(name: str):
+            if ctrl.remove_agent(name):
+                ui.notify(f"Removed agent '{name}'", type="info")
+                refresh_agents()
+            else:
+                ui.notify("Cannot remove the last remaining agent.", type="warning")
+
+        # 3. Main 3-Column Layout
         with ui.row().classes("w-full h-[calc(100vh-60px)] p-3 gap-3 no-wrap"):
             # Left Pane: Command Dispatcher & Agent Settings
-            with ui.card().classes("w-1/4 h-full flex flex-col justify-between p-4 bg-slate-800 border border-slate-700"):
+            with ui.card().classes("w-1/4 h-full flex flex-col justify-between p-4 bg-slate-800 border border-slate-700 overflow-y-auto"):
                 with ui.column().classes("w-full gap-3"):
                     ui.label("🎯 Task Dispatcher").classes("text-base font-semibold text-blue-300")
                     prompt_input = ui.textarea(
                         label="Natural Language Instruction",
                         placeholder="Enter what you want the AI team to implement...",
-                    ).classes("w-full h-32")
+                    ).classes("w-full h-28")
 
                     with ui.row().classes("w-full gap-2 justify-between"):
                         run_btn = ui.button("Execute", icon="play_arrow", color="primary").classes("flex-1")
                         async_btn = ui.button("Background (&)", icon="schedule", color="secondary").classes("flex-1")
                         cancel_btn = ui.button(icon="stop", color="red").props("outline")
 
-                    ui.separator().classes("my-2")
-                    ui.label("⚙️ AI Team & Config").classes("text-sm font-semibold text-slate-300")
+                    ui.separator().classes("my-1")
 
-                    # Agents list
-                    agents_container = ui.column().classes("w-full gap-1")
+                    # AI Team Header
+                    with ui.row().classes("items-center justify-between w-full"):
+                        ui.label("⚙️ AI Team & Config").classes("text-sm font-semibold text-slate-300")
+                        ui.button("+ Add AI", on_click=add_dialog.open).props("dense outline size=xs text-color=blue-400")
+
+                    # Agents list container
+                    agents_container = ui.column().classes("w-full gap-1.5")
 
                     def refresh_agents():
                         agents_container.clear()
+                        agents = ctrl.get_agents_info()
                         with agents_container:
-                            for a in ctrl.get_agents_info():
-                                with ui.row().classes("items-center justify-between w-full text-xs text-slate-300 p-1 bg-slate-900 rounded"):
-                                    ui.label(f"• {a['name']} ({a['adapter']})").classes("font-mono")
-                                    m = a.get("model") or "default"
-                                    ui.label(f"{m}").classes("text-slate-400")
+                            for a in agents:
+                                with ui.card().classes("w-full p-2 bg-slate-900 border border-slate-700 rounded gap-1"):
+                                    with ui.row().classes("items-center justify-between w-full no-wrap"):
+                                        with ui.row().classes("items-center gap-1.5"):
+                                            if a["is_leader"]:
+                                                ui.badge("LEADER", color="amber-700").classes("text-[10px] font-bold")
+                                            ui.label(a["name"]).classes("text-xs font-bold text-white font-mono")
+
+                                        with ui.row().classes("items-center gap-0.5"):
+                                            if not a["is_leader"]:
+                                                ui.button(icon="star_border", on_click=lambda name=a["name"]: on_make_leader(name))\
+                                                    .props("flat dense round size=xs text-color=amber-400")\
+                                                    .tooltip("Set as Leader (Conductor)")
+
+                                            ui.button(icon="edit", on_click=lambda agent=a: open_edit_dialog(agent))\
+                                                .props("flat dense round size=xs text-color=blue-400")\
+                                                .tooltip("Configure Agent")
+
+                                            if len(agents) > 1:
+                                                ui.button(icon="delete", on_click=lambda name=a["name"]: on_delete_agent(name))\
+                                                    .props("flat dense round size=xs text-color=red-400")\
+                                                    .tooltip("Remove Agent")
+
+                                    with ui.row().classes("items-center justify-between w-full text-[11px] text-slate-400"):
+                                        adapter_color = {
+                                            "claude": "purple-600",
+                                            "agy": "blue-600",
+                                            "aider": "teal-600",
+                                        }.get(a["adapter"], "slate-600")
+                                        ui.badge(a["adapter"], color=adapter_color).classes("text-[10px]")
+
+                                        m_text = a.get("model") or "default"
+                                        e_text = f"/{a.get('effort')}" if a.get("effort") else ""
+                                        ui.label(f"{m_text}{e_text}").classes("text-slate-400 font-mono truncate max-w-[120px]")
 
                     refresh_agents()
 
-                with ui.column().classes("w-full gap-2 mt-auto"):
-                    ui.label("⏱️ Timeout:").classes("text-xs text-slate-400")
-                    t_label = ui.label("Unlimited" if ctrl.timeout is None else f"{ctrl.timeout}s").classes("text-xs font-mono text-green-400")
+                # Timeout control
+                with ui.column().classes("w-full gap-1 mt-auto pt-2 border-t border-slate-700"):
+                    with ui.row().classes("items-center justify-between w-full"):
+                        ui.label("⏱️ Turn Timeout:").classes("text-xs text-slate-400 font-semibold")
+                        t_label = ui.label("Unlimited" if ctrl.timeout is None else f"{ctrl.timeout}s").classes("text-xs font-mono text-green-400 font-bold")
+
+                    with ui.row().classes("gap-1 w-full justify-between"):
+                        def set_to(val):
+                            ctrl.set_timeout(val)
+                            t_label.set_text("Unlimited" if val is None else f"{val}s")
+                            ui.notify(f"Timeout: {'Unlimited' if val is None else f'{val}s'}", type="info")
+
+                        ui.button("Off", on_click=lambda: set_to(None)).props("dense outline size=xs text-color=slate-300").classes("flex-1")
+                        ui.button("120s", on_click=lambda: set_to(120.0)).props("dense outline size=xs text-color=slate-300").classes("flex-1")
+                        ui.button("300s", on_click=lambda: set_to(300.0)).props("dense outline size=xs text-color=slate-300").classes("flex-1")
+                        ui.button("600s", on_click=lambda: set_to(600.0)).props("dense outline size=xs text-color=slate-300").classes("flex-1")
 
             # Center Pane: Real-time Live Stream & Stage
             with ui.card().classes("w-1/2 h-full flex flex-col p-4 bg-slate-800 border border-slate-700"):
@@ -189,7 +384,6 @@ def run_app(
         refresh_file_list()
         refresh_artifacts()
         refresh_jobs()
-
 
     # Prepare ui.run kwargs
     run_kwargs = {
