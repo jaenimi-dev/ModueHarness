@@ -18,7 +18,7 @@ from modue_harness.engine.pipeline import PipelineRunner
 from modue_harness.engine.workflow import WorkflowConfig
 from modue_harness.plugins.reporter import MarkdownReportPlugin
 
-KNOWN_SUBCOMMANDS = {"init", "status", "projects", "run", "debate"}
+KNOWN_SUBCOMMANDS = {"init", "status", "projects", "run", "debate", "ui", "tui"}
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -98,6 +98,28 @@ def create_parser() -> argparse.ArgumentParser:
         "-i", "--interactive",
         action="store_true",
         help="Start interactive CLI REPL session",
+    )
+    parser.add_argument(
+        "--ui",
+        action="store_true",
+        help="Launch NiceGUI Web dashboard in browser",
+    )
+    parser.add_argument(
+        "--tui",
+        action="store_true",
+        help="Launch Textual Terminal UI dashboard",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Host address for Web UI (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port for Web UI (default: 8080)",
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
@@ -207,6 +229,125 @@ def create_parser() -> argparse.ArgumentParser:
         help="Path to blackboard directory (default: blackboard)",
     )
 
+    # Command: ui
+    ui_parser = subparsers.add_parser("ui", help="Launch NiceGUI Web dashboard in browser")
+    ui_parser.add_argument(
+        "-P", "--project",
+        type=str,
+        default="default",
+        help="Initial target project name (default: 'default')",
+    )
+    ui_parser.add_argument(
+        "--projects-dir",
+        type=str,
+        default="projects",
+        help="Path to projects directory (default: projects)",
+    )
+    ui_parser.add_argument(
+        "--dir", "-d",
+        type=str,
+        default="blackboard",
+        help="Path to blackboard directory (default: blackboard)",
+    )
+    ui_parser.add_argument(
+        "--agents", "-a",
+        type=str,
+        default=None,
+        help="Path to AI team specification file",
+    )
+    ui_parser.add_argument(
+        "--agent",
+        type=str,
+        default=None,
+        help="Override with a specific single AI agent adapter",
+    )
+    ui_parser.add_argument(
+        "--model", "-m",
+        type=str,
+        default=None,
+        help="Model to use for Claude/AI agents",
+    )
+    ui_parser.add_argument(
+        "--effort", "-e",
+        type=str,
+        default=None,
+        help="Reasoning/thinking effort level",
+    )
+    ui_parser.add_argument(
+        "-t", "--timeout",
+        type=float,
+        default=None,
+        help="Execution timeout in seconds per AI CLI turn",
+    )
+    ui_parser.add_argument(
+        "--host",
+        type=str,
+        default="127.0.0.1",
+        help="Host to bind Web UI server (default: 127.0.0.1)",
+    )
+    ui_parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port for Web UI server (default: 8080)",
+    )
+    ui_parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not open browser automatically",
+    )
+
+    # Command: tui
+    tui_parser = subparsers.add_parser("tui", help="Launch Textual Terminal UI dashboard")
+    tui_parser.add_argument(
+        "-P", "--project",
+        type=str,
+        default="default",
+        help="Initial target project name (default: 'default')",
+    )
+    tui_parser.add_argument(
+        "--projects-dir",
+        type=str,
+        default="projects",
+        help="Path to projects directory (default: projects)",
+    )
+    tui_parser.add_argument(
+        "--dir", "-d",
+        type=str,
+        default="blackboard",
+        help="Path to blackboard directory (default: blackboard)",
+    )
+    tui_parser.add_argument(
+        "--agents", "-a",
+        type=str,
+        default=None,
+        help="Path to AI team specification file",
+    )
+    tui_parser.add_argument(
+        "--agent",
+        type=str,
+        default=None,
+        help="Override with a specific single AI agent adapter",
+    )
+    tui_parser.add_argument(
+        "--model", "-m",
+        type=str,
+        default=None,
+        help="Model to use for Claude/AI agents",
+    )
+    tui_parser.add_argument(
+        "--effort", "-e",
+        type=str,
+        default=None,
+        help="Reasoning/thinking effort level",
+    )
+    tui_parser.add_argument(
+        "-t", "--timeout",
+        type=float,
+        default=None,
+        help="Execution timeout in seconds per AI CLI turn",
+    )
+
     return parser
 
 
@@ -242,6 +383,8 @@ def parse_cli_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
             "-e", "--effort",
             "-t", "--timeout",
             "-p", "--prompt",
+            "--host",
+            "--port",
         }
 
         while i < len(raw_args):
@@ -354,8 +497,81 @@ def handle_projects(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_ui(args: argparse.Namespace) -> int:
+    """Handle 'ui' command or '--ui' flag: Launch NiceGUI web dashboard."""
+    try:
+        from modue_harness.ui.controller import UIController
+        from modue_harness.ui.web.app import run_app
+    except ImportError as e:
+        print(f"❌ Error loading UI module: {e}")
+        print("Tip: Install UI dependencies using: pip install 'modue-harness[ui]' or pip install nicegui")
+        return 1
+
+    ctrl = UIController(
+        project_name=getattr(args, "project", "default") or "default",
+        projects_root=Path(getattr(args, "projects_dir", "projects")).resolve(),
+        blackboard_dir=Path(getattr(args, "dir", "blackboard")).resolve(),
+        agents_file=Path(args.agents).resolve() if getattr(args, "agents", None) else None,
+        specific_agent=getattr(args, "agent", None),
+        model=getattr(args, "model", None),
+        effort=getattr(args, "effort", None),
+        timeout=getattr(args, "timeout", None),
+    )
+    host = getattr(args, "host", "127.0.0.1")
+    port = getattr(args, "port", 8080)
+    open_browser = not getattr(args, "no_browser", False)
+
+    print(f"🌐 Starting ModueHarness Web UI at http://{host}:{port} ...")
+    try:
+        run_app(controller=ctrl, host=host, port=port, open_browser=open_browser)
+        return 0
+    except ImportError as e:
+        print(f"❌ {e}")
+        return 1
+    except Exception as e:
+        print(f"❌ Failed to run Web UI: {e}")
+        return 1
+
+
+def handle_tui(args: argparse.Namespace) -> int:
+    """Handle 'tui' command or '--tui' flag: Launch Textual terminal dashboard."""
+    try:
+        from modue_harness.ui.controller import UIController
+        from modue_harness.ui.tui.app import run_tui_app
+    except ImportError as e:
+        print(f"❌ Error loading TUI module: {e}")
+        print("Tip: Install UI dependencies using: pip install 'modue-harness[ui]' or pip install textual")
+        return 1
+
+    ctrl = UIController(
+        project_name=getattr(args, "project", "default") or "default",
+        projects_root=Path(getattr(args, "projects_dir", "projects")).resolve(),
+        blackboard_dir=Path(getattr(args, "dir", "blackboard")).resolve(),
+        agents_file=Path(args.agents).resolve() if getattr(args, "agents", None) else None,
+        specific_agent=getattr(args, "agent", None),
+        model=getattr(args, "model", None),
+        effort=getattr(args, "effort", None),
+        timeout=getattr(args, "timeout", None),
+    )
+
+    try:
+        run_tui_app(controller=ctrl)
+        return 0
+    except ImportError as e:
+        print(f"❌ {e}")
+        return 1
+    except Exception as e:
+        print(f"❌ Failed to run TUI: {e}")
+        return 1
+
+
 def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
     """Handle direct CLI command execution or interactive REPL session."""
+    if getattr(args, "ui", False):
+        return handle_ui(args)
+    if getattr(args, "tui", False):
+        return handle_tui(args)
+
     project_name = getattr(args, "project", "default") or "default"
     projects_dir = Path(getattr(args, "projects_dir", "projects")).resolve()
     board_dir = Path(getattr(args, "dir", "blackboard")).resolve()
@@ -423,6 +639,8 @@ def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
     print("\n사용법:")
     print("  modue-harness \"<작업 명령>\" [-P <프로젝트명>]   # 프로젝트에 코드 직접 구현")
     print("  modue-harness -i                                # 대화형 CLI 프롬프트 실행")
+    print("  modue-harness --ui / modue-harness ui           # 웹 대시보드 실행 (NiceGUI)")
+    print("  modue-harness --tui / modue-harness tui         # 터미널 대시보드 실행 (Textual)")
     print("  modue-harness projects                          # 생성된 프로젝트 목록")
     print("  modue-harness status                            # 상태 및 태스크 현황")
     print("  modue-harness --help                            # 전체 옵션 도움말")
@@ -520,6 +738,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         return handle_status(args)
     elif args.command == "projects":
         return handle_projects(args)
+    elif args.command == "ui":
+        return handle_ui(args)
+    elif args.command == "tui":
+        return handle_tui(args)
     elif args.command == "run":
         return handle_run(args)
     elif args.command == "debate":
