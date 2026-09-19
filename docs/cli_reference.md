@@ -45,13 +45,15 @@ python run.py -i -P my-web-app
 - `/effort [에이전트명] [수준]`: AI 추론 노력(Reasoning Effort/Thinking) 설정
   - Claude: `low`, `medium`, `high`, `max`, `off`
   - Antigravity: `low`, `medium`, `high`
+- `/timeout [초|off]`: AI 실행 타임아웃 설정 또는 해제 (기본값: 해제됨 / 무제한 대기)
+  - `/timeout 600` (600초 설정), `/timeout off` (무제한 해제)
 - `/cmd` (또는 `/last-cmd`): 최근 실행된 실제 AI CLI 명령어 전체 확인
 - `/jobs`: 백그라운드 작업 목록, 현재 진행 단계(Stage), 실패 시 상세 사유 조회
 - `/cancel [job_id]` (또는 `/stop`): 실행 중인 작업 즉시 취소 및 중단
 - `/project <이름>` (또는 `/p <이름>`): 활성 프로젝트 전환 (해당 폴더 자동 생성)
 - `/projects`: 기존 생성된 프로젝트 목록 조회
 - `/files` (또는 `/ls`): 현재 프로젝트 내 생성/수정된 파일 목록 조회
-- `/status`: 공용 칠판, 활성 프로젝트 및 백그라운드 작업 상태 조회
+- `/status`: 공용 칠판, 활성 프로젝트, 세션 타임아웃 및 백그라운드 작업 상태 조회
 - `/help`: 사용 가능한 명령어 안내
 - `exit` / `quit` / `q`: 세션 종료
 
@@ -83,6 +85,9 @@ python run.py "REST API 엔드포인트 구현" -P my-api --agent agy -m gemini-
 
 # Claude Code로 Sonnet 모델 및 최대 추론 노력 지정 실행
 python run.py "알고리즘 최적화" -P algo --agent claude -m sonnet -e high
+
+# 필요 시 타임아웃(예: 600초)을 지정하여 실행 (기본값은 무제한)
+python run.py "대규모 리팩토링" -P refactor -t 600
 ```
 
 ### 공통 옵션
@@ -94,6 +99,7 @@ python run.py "알고리즘 최적화" -P algo --agent claude -m sonnet -e high
 - `--agent`: 특정 단일 AI 에이전트 어댑터 지정 (예: `claude`, `agy` 또는 `antigravity`, `aider`, `generic`)
 - `-m`, `--model`: 사용할 AI 모델명 지정 (Claude: `sonnet`, `opus`, `haiku` 등 / Antigravity: `gemini-3.8-flash-high`, `gemini-3.5-pro` 등)
 - `-e`, `--effort`: AI 추론 노력(Reasoning Effort) 수준 지정 (Claude: `low`, `medium`, `high`, `max` / Antigravity: `low`, `medium`, `high`)
+- `-t`, `--timeout`: AI 실행 1턴당 타임아웃(초) 지정 (기본값: `None` / 무제한 대기)
 
 ---
 

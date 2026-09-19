@@ -226,6 +226,7 @@ class InteractiveSession:
         model: Optional[str] = None,
         effort: Optional[str] = None,
         event_bus: Optional[EventBus] = None,
+        timeout: Optional[float] = None,
     ) -> None:
         self.projects_root = (projects_root or (Path.cwd() / "projects")).resolve()
         self.project_name = project_name
@@ -237,6 +238,7 @@ class InteractiveSession:
 
         self.model = model
         self.effort = effort
+        self.timeout = timeout
         self.agents = agents or load_or_detect_agents(
             agents_file=agents_file,
             specific_agent=specific_agent,
@@ -289,6 +291,11 @@ class InteractiveSession:
                     setattr(agent, "effort", effort)
                     updated.append(name)
         return updated
+
+    def set_timeout(self, timeout: Optional[float]) -> Optional[float]:
+        """Update session execution timeout in seconds (None for unlimited)."""
+        self.timeout = timeout
+        return self.timeout
 
     def switch_project(self, project_name: str) -> Path:
         """Switch current target project to a new or existing project folder."""
@@ -427,6 +434,7 @@ class InteractiveSession:
             workspace_dir=self.project_dir,
             event_bus=self.event_bus,
             progress_callback=_console_progress,
+            timeout=self.timeout,
         )
         self._active_foreground_runner = runner
 
@@ -496,6 +504,7 @@ class InteractiveSession:
                 workspace_dir=self.project_dir,
                 event_bus=self.event_bus,
                 progress_callback=_bg_progress,
+                timeout=self.timeout,
             )
             job.runner = runner
 
@@ -780,15 +789,40 @@ class InteractiveSession:
                     else:
                         print("⚠️ 추론 노력을 적용할 수 있는 AI 에이전트를 찾을 수 없습니다.")
 
+        elif cmd in ["/timeout", "/t"]:
+            if not arg:
+                if self.timeout is None:
+                    print("\n⏱️ 현재 AI 실행 타임아웃: 해제됨 (무제한 대기)")
+                else:
+                    print(f"\n⏱️ 현재 AI 실행 타임아웃: {self.timeout}초")
+                print("사용법: /timeout <초> (예: /timeout 600)")
+                print("       /timeout off (또는 none, 0: 타임아웃 해제/무제한 대기)\n")
+            elif arg.lower() in ["off", "none", "0", "disable", "unlimited"]:
+                self.set_timeout(None)
+                print("✓ 세션 타임아웃이 해제되었습니다 (무제한 대기).")
+            else:
+                try:
+                    t_val = float(arg)
+                    if t_val <= 0:
+                        self.set_timeout(None)
+                        print("✓ 세션 타임아웃이 해제되었습니다 (무제한 대기).")
+                    else:
+                        self.set_timeout(t_val)
+                        print(f"✓ 세션 타임아웃이 {t_val}초로 설정되었습니다.")
+                except ValueError:
+                    print("❌ 올바른 숫자를 입력하세요. 예: /timeout 600 또는 /timeout off")
+
         elif cmd == "/status":
             state = self.blackboard.load_state()
             tasks = self.blackboard.list_tasks()
             artifacts = self.blackboard.list_artifacts()
             running_jobs = [j for j in self.jobs.values() if j.status == "running"]
+            timeout_str = f"{self.timeout}초" if self.timeout is not None else "해제됨 (무제한)"
 
             print(f"\n=== ModueHarness 상태 요약 ===")
             print(f"• 활성 프로젝트: {self.project_name} ({self.project_dir})")
             print(f"• 공용 칠판:     {self.blackboard_dir}")
+            print(f"• 세션 타임아웃: {timeout_str}")
             print(f"• 참여 AI 팀:")
             for aname, a in self.agents.items():
                 m_str = f", model={a.model}" if getattr(a, "model", None) else ""
@@ -819,6 +853,7 @@ class InteractiveSession:
             print("  자연어 명령 &          : 백그라운드 비동기 실행 (프롬프트 즉시 반환)")
             print("  /model [이름] [모델]    : AI 모델 확인 및 변경 (예: /model sonnet)")
             print("  /effort [이름] [수준]   : Claude 추론 노력 수준 설정 (low, medium, high, max)")
+            print("  /timeout [초|off]      : AI 실행 타임아웃 설정 또는 해제 (기본: 해제/무제한)")
             print("  /cmd (또는 /last-cmd)   : 직전 실행된 실제 AI CLI 명령어 전체 보기")
             print("  /bg <명령어>           : 백그라운드 비동기 실행")
             print("  /jobs                 : 백그라운드 작업 진행 현황 및 목록")

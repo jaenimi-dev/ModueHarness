@@ -107,7 +107,7 @@ class BaseCLIAdapter(ABC):
     def execute(
         self,
         context: TurnContext,
-        timeout: Optional[float] = 300.0,
+        timeout: Optional[float] = None,
         extra_args: Optional[List[str]] = None,
         custom_env: Optional[Dict[str, str]] = None,
     ) -> TurnResult:

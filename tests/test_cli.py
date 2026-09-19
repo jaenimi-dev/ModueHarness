@@ -113,3 +113,14 @@ def test_cli_debate_command(tmp_path: Path, capsys):
     assert "Starting Multi-AI Debate" in captured.out
     assert "Debate concluded successfully" in captured.out
     assert (board_dir / "artifacts" / "consensus.md").exists()
+
+
+def test_cli_timeout_option():
+    """Verify --timeout flag is parsed in cli arguments."""
+    from modue_harness.cli import parse_cli_args
+    args = parse_cli_args(["--timeout", "120.5"])
+    assert args.timeout == 120.5
+
+    args_default = parse_cli_args([])
+    assert args_default.timeout is None
+

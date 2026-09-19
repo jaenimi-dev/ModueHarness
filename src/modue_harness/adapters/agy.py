@@ -19,15 +19,22 @@ def resolve_agy_binary(command: str = "agy") -> str:
     if which_p:
         return which_p
 
-    # 3. Check known local installation directories
+    # 3. Check known local installation directories (Linux, macOS, Windows)
     candidate_paths = [
         Path.home() / ".local" / "bin" / "agy",
         Path.home() / ".gemini" / "antigravity-cli" / "bin" / "agy",
         Path("/usr/local/bin/agy"),
         Path("/usr/bin/agy"),
     ]
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        candidate_paths.append(Path(local_app_data) / "agy" / "bin" / "agy.exe")
+        candidate_paths.append(Path(local_app_data) / "agy" / "bin" / "agy")
+    candidate_paths.append(Path.home() / "AppData" / "Local" / "agy" / "bin" / "agy.exe")
+    candidate_paths.append(Path.home() / "AppData" / "Local" / "agy" / "bin" / "agy")
+
     for p in candidate_paths:
-        if p.is_file() and os.access(p, os.X_OK):
+        if p.is_file():
             return str(p)
 
     return command

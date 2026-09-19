@@ -27,6 +27,7 @@ class ConductorRunner:
         event_bus: Optional[EventBus] = None,
         max_subtasks: int = 10,
         progress_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        timeout: Optional[float] = None,
     ) -> None:
         self.goal = goal
         self.conductor_name = conductor_agent_name
@@ -37,6 +38,7 @@ class ConductorRunner:
         self.blackboard.event_bus = self.event_bus
         self.max_subtasks = max_subtasks
         self.progress_callback = progress_callback
+        self.timeout = timeout
         self._is_cancelled: bool = False
 
     def cancel(self) -> None:
@@ -136,7 +138,7 @@ class ConductorRunner:
             "full_command_str": plan_full_cmd_str,
         })
 
-        plan_result = conductor_adapter.execute(plan_context)
+        plan_result = conductor_adapter.execute(plan_context, timeout=self.timeout)
         if not plan_result.is_success:
             self._notify("planning_end", {"conductor": self.conductor_name, "is_success": False, "error": plan_result.error_message})
             return {
@@ -220,7 +222,7 @@ class ConductorRunner:
                 "full_command_str": worker_full_cmd_str,
             })
 
-            res = worker_adapter.execute(turn_ctx)
+            res = worker_adapter.execute(turn_ctx, timeout=self.timeout)
             task_record = {
                 "task_id": task_id,
                 "agent": assigned,
@@ -288,7 +290,7 @@ class ConductorRunner:
                 "command": synth_cmd_display,
                 "full_command_str": synth_full_cmd_str,
             })
-            synth_res = conductor_adapter.execute(synth_ctx)
+            synth_res = conductor_adapter.execute(synth_ctx, timeout=self.timeout)
             if synth_res.is_success:
                 self.blackboard.write_artifact("synthesis_report.md", synth_res.stdout.strip(), author_agent=self.conductor_name)
             else:

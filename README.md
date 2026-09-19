@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/tests-62%20passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-65%20passed-brightgreen.svg)](tests/)
 
 **ModueHarness**는 Claude Code, Google Antigravity(AGY), Aider 등 다양한 AI CLI 도구들을 하나의 유기적인 팀으로 엮어 소프트웨어 엔지니어링 작업을 자율적·협업적으로 해결하는 Multi-AI CLI 하네스(Harness) 프레임워크입니다.
 

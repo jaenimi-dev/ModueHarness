@@ -512,5 +512,38 @@ def test_jobs_slash_command_displays_failure_reason(tmp_path: Path, capsys):
     assert "❌ 실패 사유: ConnectionTimeout: network timeout after 30s" in captured.out
 
 
+def test_interactive_timeout_management(tmp_path: Path, capsys):
+    """Verify session timeout viewing, setting, and disabling."""
+    session = InteractiveSession(
+        project_name="timeout_proj",
+        projects_root=tmp_path / "projects",
+        blackboard_dir=tmp_path / "blackboard",
+    )
+    # Default is unlimited (None)
+    assert session.timeout is None
+
+    # Query timeout
+    session._handle_special_command("/timeout")
+    out = capsys.readouterr().out
+    assert "해제됨 (무제한 대기)" in out
+
+    # Set timeout to 600
+    session._handle_special_command("/timeout 600")
+    out = capsys.readouterr().out
+    assert session.timeout == 600.0
+    assert "600.0초로 설정되었습니다" in out
+
+    # Check status display
+    session._handle_special_command("/status")
+    out = capsys.readouterr().out
+    assert "세션 타임아웃: 600.0초" in out
+
+    # Disable timeout
+    session._handle_special_command("/timeout off")
+    out = capsys.readouterr().out
+    assert session.timeout is None
+    assert "세션 타임아웃이 해제되었습니다" in out
+
+
 
 

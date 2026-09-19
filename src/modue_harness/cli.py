@@ -89,6 +89,12 @@ def create_parser() -> argparse.ArgumentParser:
         help="Reasoning/thinking effort level for Claude (choices: low, medium, high, xhigh, max)",
     )
     parser.add_argument(
+        "-t", "--timeout",
+        type=float,
+        default=None,
+        help="Execution timeout in seconds per AI CLI turn (default: None / unlimited)",
+    )
+    parser.add_argument(
         "-i", "--interactive",
         action="store_true",
         help="Start interactive CLI REPL session",
@@ -234,6 +240,7 @@ def parse_cli_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
             "--agent",
             "-m", "--model",
             "-e", "--effort",
+            "-t", "--timeout",
             "-p", "--prompt",
         }
 
@@ -363,6 +370,7 @@ def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
         specific_agent=specific_agent,
         model=getattr(args, "model", None),
         effort=getattr(args, "effort", None),
+        timeout=getattr(args, "timeout", None),
     )
 
     # 1. User requested interactive session explicitly or running in a TTY terminal without args

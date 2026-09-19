@@ -165,7 +165,7 @@ $env:PYTHONPATH="src"; python -m modue_harness.cli -i -P my-web-app
 • 참여 AI 팀:               architect, developer, reviewer (Leader: architect)
 ----------------------------------------------------------------
 명령어를 입력하면 AI 팀이 프로젝트 디렉터리에 직접 구현합니다.
-특수 명령어: /model, /effort, /cmd, /jobs, /cancel, /project <이름>, /projects, /files, /status, /help, exit
+특수 명령어: /model, /effort, /timeout, /cmd, /jobs, /cancel, /project <이름>, /projects, /files, /status, /help, exit
 ================================================================
 
 [my-web-app] > FastAPI 기반 사용자 인증 엔드포인트와 단위 테스트 코드를 작성해줘
@@ -175,6 +175,7 @@ $env:PYTHONPATH="src"; python -m modue_harness.cli -i -P my-web-app
 - `자연어 명령 &` (또는 `/bg <명령어>`): **백그라운드 비동기 실행** (명령을 백그라운드로 보내고 프롬프트가 즉시 반환되어 다른 작업을 계속 입력할 수 있습니다!)
 - `/model [에이전트명] [모델명]`: AI 모델 확인 및 실시간 변경 (예: `/model sonnet`, `/model gemini-3.8-flash-high`)
 - `/effort [에이전트명] [레벨]`: 추론 노력(Effort) 깊이 변경 (low, medium, high, max, off)
+- `/timeout [초|off]`: AI 실행 타임아웃 설정 또는 해제 (기본값: 해제됨 / 무제한 대기)
 - `/cmd` (또는 `/last-cmd`): 최근 실행된 실제 AI CLI 전체 명령어 목록 확인
 - `/jobs`: 백그라운드 작업 목록, 현재 진행 단계(Stage), 경과 시간, 실패 시 상세 사유 실시간 조회
 - `/cancel [job_id]` (또는 `/stop`): 실행 중인 작업 즉시 취소

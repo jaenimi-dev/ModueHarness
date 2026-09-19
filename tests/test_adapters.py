@@ -211,3 +211,21 @@ def test_agy_adapter_features():
     assert "--effort" not in cmd4
 
 
+def test_resolve_agy_binary_windows(monkeypatch, tmp_path: Path):
+    """Verify resolve_agy_binary discovers Windows %LOCALAPPDATA%\\agy\\bin\\agy.exe."""
+    from modue_harness.adapters.agy import resolve_agy_binary
+    fake_localappdata = tmp_path / "AppData" / "Local"
+    fake_bin = fake_localappdata / "agy" / "bin"
+    fake_bin.mkdir(parents=True)
+    fake_exe = fake_bin / "agy.exe"
+    fake_exe.touch()
+
+    monkeypatch.setenv("LOCALAPPDATA", str(fake_localappdata))
+    monkeypatch.setattr("shutil.which", lambda x: None)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "fake_home")
+
+    resolved = resolve_agy_binary("agy")
+    assert resolved == str(fake_exe)
+
+
+
