@@ -291,7 +291,17 @@ PYTHONPATH=src python3 -m modue_harness.cli run \
     irm https://claude.ai/install.ps1 | iex
     ```
 
-### Q4. Claude의 컨텍스트 윈도우가 넘치거나 토큰 비용이 걱정됩니다.
+### Q4. Windows에서 설치 후 `C:\Users\<사용자>\.local\bin is not in your PATH` 알림이 뜹니다.
+- **원인**: Claude Code 설치 파일(`claude.exe`)은 정상 다운로드되었으나, 윈도우 환경 변수 `Path`에 해당 디렉터리가 등록되지 않아 터미널이 `claude` 명령을 찾지 못하는 상태입니다.
+- **해결책 (PowerShell에서 1줄로 영구 등록)**:
+  PowerShell 창을 열고 아래 명령어를 실행한 뒤, 터미널을 다시 시작(Restart)합니다:
+  ```powershell
+  $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+  [Environment]::SetEnvironmentVariable("Path", "$userPath;$HOME\.local\bin", "User")
+  ```
+  *(현재 열려 있는 세션에 즉시 반영하려면 `$env:Path += ";$HOME\.local\bin"` 입력 후 `claude --version` 확인)*
+
+### Q5. Claude의 컨텍스트 윈도우가 넘치거나 토큰 비용이 걱정됩니다.
 - **해결책**:
   - ModueHarness의 `input_artifacts` 기능을 사용하여 이전 단계의 모든 출력이 아닌 **필요한 아티팩트만 선별하여 전달**하십시오.
   - 대화형 세션에서는 주기적으로 `/clear`를 실행하거나 파이프라인 방식(독립 프로세스)으로 각 스텝의 컨텍스트를 깔끔하게 유지합니다.
