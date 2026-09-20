@@ -30,12 +30,32 @@ GLOBAL_VIEWPORT_CSS = """
     .q-page {
         min-height: 0 !important;
         height: 100% !important;
+        max-height: calc(100vh - 52px) !important;
         overflow: hidden !important;
         padding: 0 !important;
     }
     .nicegui-log, .nicegui-scroll-area, .q-scrollarea {
         height: 100% !important;
         width: 100% !important;
+    }
+    /* Custom styled scrollbar for stream container */
+    .stream-scroll-container {
+        scrollbar-width: thin;
+        scrollbar-color: #334155 #020617;
+    }
+    .stream-scroll-container::-webkit-scrollbar {
+        width: 8px;
+    }
+    .stream-scroll-container::-webkit-scrollbar-track {
+        background: #020617;
+        border-radius: 4px;
+    }
+    .stream-scroll-container::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 4px;
+    }
+    .stream-scroll-container::-webkit-scrollbar-thumb:hover {
+        background: #475569;
     }
 </style>
 """
@@ -91,7 +111,9 @@ def run_app(
         header_container = ui.header().classes(
             "h-[52px] items-center justify-between bg-slate-900 text-white px-4 py-1 border-b border-slate-700"
         )
-        main_container = ui.row().classes("w-full h-full p-2.5 gap-2.5 no-wrap box-border overflow-hidden")
+        main_container = ui.row().classes(
+            "w-full min-h-0 p-2.5 gap-2.5 no-wrap box-border overflow-hidden"
+        ).style("height: calc(100vh - 52px); max-height: calc(100vh - 52px); min-height: 0;")
         dialogs_container = ui.column().classes("hidden")
 
         try:
@@ -407,8 +429,8 @@ def run_app(
             with main_container:
                 # Left Pane: Command Dispatcher & Agent Settings
                 with ui.card().classes(
-                    "w-1/4 h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
-                ):
+                    "w-1/4 h-full min-h-0 max-h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
+                ).style("height: 100%; max-height: 100%; min-height: 0;"):
                     # Task Dispatcher Card (Compact, fixed height)
                     with ui.card().classes("w-full p-2.5 bg-slate-900 border border-slate-700 rounded gap-1.5 flex-shrink-0"):
                         ui.label(i18n("task_dispatcher")).classes("text-sm font-bold text-blue-300")
@@ -508,18 +530,34 @@ def run_app(
 
                 # Center Pane: Real-time Live Stream & Stage
                 with ui.card().classes(
-                    "w-1/2 h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
-                ):
+                    "w-1/2 h-full min-h-0 max-h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
+                ).style("height: 100%; max-height: 100%; min-height: 0;"):
                     with ui.row().classes("w-full items-center justify-between border-b border-slate-700 pb-2 flex-shrink-0"):
                         with ui.row().classes("items-center gap-2"):
                             ui.icon("terminal", size="sm").classes("text-green-400")
                             ui.label(i18n("realtime_stream")).classes("text-base font-semibold text-green-400")
 
                         with ui.row().classes("items-center gap-2"):
+                            def scroll_stream_to_bottom():
+                                try:
+                                    ui.run_javascript(f"const el = getElement({log_scroll.id}); if (el) el.scrollTop = el.scrollHeight;")
+                                except Exception:
+                                    pass
+                                try:
+                                    log_scroll.run_method("scrollTo", {"top": 999999, "behavior": "smooth"})
+                                except Exception:
+                                    pass
+
                             def clear_stream_logs():
                                 state["logs"] = []
                                 log_scroll.clear()
                                 ui.notify(i18n("notify_stream_cleared"), type="info")
+
+                            ui.button(
+                                icon="arrow_downward",
+                                on_click=scroll_stream_to_bottom,
+                            ).props("dense outline size=xs text-color=slate-400 hover:text-blue-400")\
+                             .tooltip(i18n("tooltip_scroll_bottom"))
 
                             ui.button(
                                 icon="delete_sweep",
@@ -529,10 +567,10 @@ def run_app(
 
                             status_badge = ui.badge(i18n(state["status_text_key"]), color=state["status_color"]).classes("text-xs")
 
-                    # Native scrollable container: 100% visible, never collapsed by Quasar
+                    # Native scrollable container: fixed to viewport, smooth scrolling
                     log_scroll = ui.column().classes(
-                        "w-full flex-1 min-h-0 overflow-y-auto bg-slate-950 text-slate-200 p-3 rounded my-1.5 font-mono text-xs border border-slate-900 gap-0.5 select-text"
-                    )
+                        "w-full flex-1 min-h-0 overflow-y-auto stream-scroll-container bg-slate-950 text-slate-200 p-3 rounded my-1.5 font-mono text-xs border border-slate-900 gap-0.5 select-text"
+                    ).style("flex: 1 1 0%; min-height: 0; max-height: 100%; height: 100%; overflow-y: auto;")
 
                     def render_line_label(line: str):
                         if not line.strip():
@@ -564,6 +602,10 @@ def run_app(
                             with log_scroll:
                                 for line in str(text).splitlines():
                                     render_line_label(line)
+                            try:
+                                ui.run_javascript(f"const el = getElement({log_scroll.id}); if (el) el.scrollTop = el.scrollHeight;")
+                            except Exception:
+                                pass
                             try:
                                 log_scroll.run_method("scrollTo", {"top": 999999, "behavior": "smooth"})
                             except Exception:
@@ -727,8 +769,8 @@ def run_app(
 
                 # Right Pane: Blackboard Tasks, Artifacts & Project Files
                 with ui.card().classes(
-                    "w-1/4 h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
-                ):
+                    "w-1/4 h-full min-h-0 max-h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
+                ).style("height: 100%; max-height: 100%; min-height: 0;"):
                     with ui.row().classes("w-full items-center justify-between border-b border-slate-700 pb-1 flex-shrink-0"):
                         with ui.tabs().classes("text-xs flex-1") as tabs:
                             tab_tasks = ui.tab(i18n("tab_tasks"))
