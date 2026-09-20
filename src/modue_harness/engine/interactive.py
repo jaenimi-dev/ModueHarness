@@ -216,7 +216,7 @@ class InteractiveSession:
 
     def __init__(
         self,
-        project_name: str = "default",
+        project_name: Optional[str] = None,
         projects_root: Optional[Path] = None,
         blackboard_dir: Optional[Path] = None,
         agents: Optional[Dict[str, BaseCLIAdapter]] = None,
@@ -229,16 +229,27 @@ class InteractiveSession:
         timeout: Optional[float] = None,
     ) -> None:
         self.projects_root = (projects_root or (Path.cwd() / "projects")).resolve()
-        self.project_name = project_name
-        self.project_dir = self.projects_root / self.project_name
-
         raw_board_dir = (blackboard_dir or (Path.cwd() / "blackboard")).resolve()
-        if raw_board_dir.name == self.project_name:
-            self.blackboard_root = raw_board_dir.parent
-            self.blackboard_dir = raw_board_dir
+        self.blackboard_root = raw_board_dir if raw_board_dir.name != project_name else raw_board_dir.parent
+
+        if project_name:
+            self.project_name = project_name.strip()
         else:
-            self.blackboard_root = raw_board_dir
+            existing = self.list_projects()
+            non_default = [p for p in existing if p != "default"]
+            if non_default:
+                self.project_name = non_default[0]
+            elif existing:
+                self.project_name = existing[0]
+            else:
+                self.project_name = None
+
+        if self.project_name:
+            self.project_dir = self.projects_root / self.project_name
             self.blackboard_dir = self.blackboard_root / self.project_name
+        else:
+            self.project_dir = None
+            self.blackboard_dir = None
 
         self.event_bus = event_bus or EventBus()
         self.blackboard = Blackboard(
@@ -529,7 +540,7 @@ class InteractiveSession:
 
     def list_project_files(self) -> List[str]:
         """List all implementation files inside the active project folder."""
-        if not self.project_dir.exists():
+        if not self.project_dir or not self.project_dir.exists():
             return []
         files = []
         try:
@@ -555,6 +566,16 @@ class InteractiveSession:
         command = command.strip()
         if not command:
             return {"success": False, "error": "Empty command"}
+
+        if not self.project_name:
+            existing = self.list_projects()
+            non_default = [p for p in existing if p != "default"]
+            if non_default:
+                self.switch_project(non_default[0])
+            elif existing:
+                self.switch_project(existing[0])
+            else:
+                self.switch_project("project_1")
 
         # Ensure project and blackboard directories exist
         self.project_dir.mkdir(parents=True, exist_ok=True)
@@ -675,6 +696,16 @@ class InteractiveSession:
     def execute_command_async(self, command: str) -> BackgroundJob:
         """Submit a command to run asynchronously in a background thread."""
         command = command.strip()
+        if not self.project_name:
+            existing = self.list_projects()
+            non_default = [p for p in existing if p != "default"]
+            if non_default:
+                self.switch_project(non_default[0])
+            elif existing:
+                self.switch_project(existing[0])
+            else:
+                self.switch_project("project_1")
+
         self._job_counter += 1
         job_id = f"job_{self._job_counter}"
 
@@ -776,6 +807,24 @@ class InteractiveSession:
 
     def start_repl(self) -> None:
         """Start an interactive CLI REPL session with live status feedback and background jobs."""
+        if not self.project_name:
+            existing = self.list_projects()
+            non_default = [p for p in existing if p != "default"]
+            if non_default:
+                self.switch_project(non_default[0])
+            elif existing:
+                self.switch_project(existing[0])
+            else:
+                print("현재 생성된 프로젝트가 없습니다.")
+                try:
+                    p_name = input("작업을 진행할 새 프로젝트 이름을 입력하세요: ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    p_name = ""
+                if p_name:
+                    self.switch_project(p_name)
+                else:
+                    self.switch_project("project_1")
+
         self.project_dir.mkdir(parents=True, exist_ok=True)
         self.blackboard.initialize()
 

@@ -67,7 +67,7 @@ def test_ui_controller_artifacts_and_tasks(tmp_path: Path):
     projects_dir = tmp_path / "projects"
     board_dir = tmp_path / "blackboard"
 
-    board = Blackboard(root_dir=board_dir)
+    board = Blackboard(root_dir=board_dir, project="demo")
     board.initialize()
     board.write_artifact("notes.md", "# Test Notes\nContent here.")
 
@@ -475,7 +475,7 @@ def test_corrupt_artifact_metadata_and_windows_paths(tmp_path: Path):
     assert resolved == board.artifacts_dir / "subdir" / "test.txt"
 
     # 5. Controller get_artifacts with corrupt and BOM metadata should not crash
-    ctrl = UIController(blackboard_dir=board_dir, projects_root=tmp_path / "projects")
+    ctrl = UIController(project_name="default", blackboard_dir=board_dir, projects_root=tmp_path / "projects")
     artifacts = ctrl.get_artifacts()
     # bom.md was tagged with project='default' so it is in matched artifacts for default project
     assert any(a["name"] == "bom.md" for a in artifacts)
@@ -645,5 +645,47 @@ def test_project_isolated_blackboards(tmp_path: Path):
     assert "project_beta" in all_projects
 
 
+def test_no_default_project_created_automatically(tmp_path: Path):
+    """Verify that launching session or UIController without arguments does not create a 'default' folder."""
+    from modue_harness.engine.interactive import InteractiveSession
 
+    proj_root = tmp_path / "projects"
+    board_root = tmp_path / "blackboard"
 
+    # Session initialized with None project_name
+    session = InteractiveSession(
+        project_name=None,
+        projects_root=proj_root,
+        blackboard_dir=board_root,
+    )
+    assert session.project_name is None
+    assert session.project_dir is None
+    assert session.blackboard_dir is None
+
+    # Should not create default folders on disk
+    assert not (proj_root / "default").exists()
+    assert not (board_root / "default").exists()
+
+    # Controller initialized with None project_name
+    ctrl = UIController(
+        project_name=None,
+        projects_root=proj_root,
+        blackboard_dir=board_root,
+    )
+    assert ctrl.project_name is None
+    assert ctrl.get_projects() == []
+    assert ctrl.get_artifacts() == []
+    assert ctrl.get_tasks() == []
+    assert ctrl.get_project_files() == []
+
+    # Status summary should be safe and healthy
+    status = ctrl.get_status()
+    assert status["project_name"] == "None"
+
+    # Switching to a newly named project creates project dynamically without touching 'default'
+    ctrl.switch_project("my_web_app")
+    assert ctrl.project_name == "my_web_app"
+    assert (proj_root / "my_web_app").exists()
+    assert (board_root / "my_web_app").exists()
+    assert not (proj_root / "default").exists()
+    assert not (board_root / "default").exists()

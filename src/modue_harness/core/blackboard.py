@@ -265,7 +265,20 @@ class Blackboard:
             if self.root_dir != self.base_root_dir:
                 base_art = self.base_root_dir / "artifacts" / clean_path
                 if base_art.exists():
-                    return base_art
+                    meta_file = base_art.with_name(f".{base_art.name}.meta.json")
+                    if meta_file.exists():
+                        try:
+                            with open(meta_file, "r", encoding="utf-8-sig") as f:
+                                m = json.load(f)
+                            proj_meta = (
+                                m.get("custom", {}).get("project")
+                                if isinstance(m.get("custom"), dict)
+                                else m.get("project")
+                            )
+                            if proj_meta == self.project:
+                                return base_art
+                        except Exception:
+                            pass
             return direct
         for sub_dir in self._get_subproject_dirs():
             sub_art = sub_dir / "artifacts" / clean_path
@@ -342,8 +355,22 @@ class Blackboard:
             return True
         if self.project:
             if self.root_dir != self.base_root_dir:
-                if (self.base_root_dir / "artifacts" / clean_path).exists():
-                    return True
+                base_art = self.base_root_dir / "artifacts" / clean_path
+                if base_art.exists():
+                    meta_file = base_art.with_name(f".{base_art.name}.meta.json")
+                    if meta_file.exists():
+                        try:
+                            with open(meta_file, "r", encoding="utf-8-sig") as f:
+                                m = json.load(f)
+                            proj_meta = (
+                                m.get("custom", {}).get("project")
+                                if isinstance(m.get("custom"), dict)
+                                else m.get("project")
+                            )
+                            if proj_meta == self.project:
+                                return True
+                        except Exception:
+                            pass
         else:
             for sub_dir in self._get_subproject_dirs():
                 if (sub_dir / "artifacts" / clean_path).exists():
@@ -377,11 +404,10 @@ class Blackboard:
                                         if isinstance(m.get("custom"), dict)
                                         else m.get("project")
                                     )
-                                    if proj_meta and proj_meta != self.project:
-                                        continue
+                                    if proj_meta == self.project:
+                                        artifacts.add(rel)
                                 except Exception:
                                     pass
-                            artifacts.add(rel)
                 except Exception:
                     pass
         elif not self.project:

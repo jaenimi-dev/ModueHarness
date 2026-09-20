@@ -17,6 +17,16 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "switch_project_notify": "프로젝트가 변경되었습니다: {name}",
         "language": "언어",
         "theme_toggle": "다크 모드 전환",
+        "btn_new_project": "+ 새 프로젝트",
+        "tooltip_new_project": "새 프로젝트 생성",
+        "dialog_new_project_title": "📁 새 프로젝트 생성",
+        "project_name_label": "프로젝트 이름",
+        "project_name_placeholder": "예: my_web_app, calculator",
+        "btn_create_project": "생성",
+        "no_projects_yet": "(프로젝트 없음)",
+        "notify_project_created": "새 프로젝트 '{name}'이(가) 생성되었습니다.",
+        "notify_select_project_first": "먼저 새 프로젝트를 생성하거나 선택해주세요.",
+        "notify_invalid_project_name": "올바른 프로젝트 이름을 입력해주세요 (특수문자 제외).",
 
         # Left Pane - Task Dispatcher
         "task_dispatcher": "🎯 작업 지시",
@@ -100,6 +110,16 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "switch_project_notify": "Switched to project: {name}",
         "language": "Language",
         "theme_toggle": "Toggle dark mode",
+        "btn_new_project": "+ New Project",
+        "tooltip_new_project": "Create a new project",
+        "dialog_new_project_title": "📁 Create New Project",
+        "project_name_label": "Project Name",
+        "project_name_placeholder": "e.g. my_web_app, calculator",
+        "btn_create_project": "Create",
+        "no_projects_yet": "(No projects)",
+        "notify_project_created": "New project '{name}' created.",
+        "notify_select_project_first": "Please create or select a project first.",
+        "notify_invalid_project_name": "Please enter a valid project name (no special characters).",
 
         # Left Pane - Task Dispatcher
         "task_dispatcher": "🎯 Task Dispatcher",

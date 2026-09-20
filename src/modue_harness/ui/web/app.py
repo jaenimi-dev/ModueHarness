@@ -92,9 +92,10 @@ def run_app(
 
         # Forward declarations of handlers / variables
         prompt_input = None
+        new_project_dialog = None
 
         def _render_dashboard_impl() -> None:
-            nonlocal prompt_input
+            nonlocal prompt_input, new_project_dialog
             # Clear containers
             header_container.clear()
             main_container.clear()
@@ -107,34 +108,50 @@ def run_app(
                     ui.label(i18n("app_title")).classes("text-lg font-bold tracking-tight")
                     ui.badge("v0.7.0", color="blue-600").classes("text-xs")
 
-                with ui.row().classes("items-center gap-4"):
+                with ui.row().classes("items-center gap-2 sm:gap-3"):
                     projects = ctrl.get_projects()
                     current_p = ctrl.project_name
-                    if current_p not in projects:
+                    if current_p and current_p not in projects:
                         projects.append(current_p)
 
                     ui.label(i18n("project")).classes("text-sm text-slate-400")
-                    project_select = ui.select(
-                        options=projects,
-                        value=current_p,
-                    ).classes("w-44 bg-slate-800 text-white rounded text-xs")
-                    bb_badge = ui.badge(f"blackboard/{current_p}", color="slate-700").classes("text-[10px] font-mono text-slate-400 hidden sm:inline-flex")
+                    if projects:
+                        project_select = ui.select(
+                            options=projects,
+                            value=current_p or projects[0],
+                        ).classes("w-36 sm:w-44 bg-slate-800 text-white rounded text-xs")
 
-                    def on_project_change(e):
-                        if e.value:
-                            ctrl.switch_project(e.value)
-                            bb_badge.set_text(f"blackboard/{e.value}")
-                            ui.notify(i18n("switch_project_notify", name=e.value), type="info")
-                            refresh_file_list()
-                            refresh_artifacts()
+                        def on_project_change(e):
+                            if e.value and e.value in projects:
+                                ctrl.switch_project(e.value)
+                                bb_badge.set_text(f"blackboard/{e.value}")
+                                ui.notify(i18n("switch_project_notify", name=e.value), type="info")
+                                refresh_file_list()
+                                refresh_artifacts()
 
-                    project_select.on_value_change(on_project_change)
+                        project_select.on_value_change(on_project_change)
+                    else:
+                        project_select = ui.select(
+                            options=[i18n("no_projects_yet")],
+                            value=i18n("no_projects_yet"),
+                        ).props("disable").classes("w-36 sm:w-44 bg-slate-800 text-slate-400 rounded text-xs")
+
+                    # + New Project button
+                    ui.button(
+                        i18n("btn_new_project"),
+                        on_click=lambda: new_project_dialog.open() if new_project_dialog else None,
+                    ).props("dense outline size=xs text-color=blue-300")\
+                     .tooltip(i18n("tooltip_new_project"))\
+                     .classes("text-xs border-blue-500/50 hover:bg-blue-900/30")
+
+                    bb_text = f"blackboard/{current_p}" if current_p else "blackboard"
+                    bb_badge = ui.badge(bb_text, color="slate-700").classes("text-[10px] font-mono text-slate-400 hidden sm:inline-flex")
 
                     # Language Selector
                     lang_select = ui.select(
                         options=SUPPORTED_LANGUAGES,
                         value=i18n.lang,
-                    ).props("dense outlined").classes("w-32 bg-slate-800 text-white rounded text-xs")
+                    ).props("dense outlined").classes("w-28 sm:w-32 bg-slate-800 text-white rounded text-xs")
 
                     def on_lang_change(e):
                         if e.value and e.value != i18n.lang:
@@ -151,10 +168,34 @@ def run_app(
                         .props("flat round text-color=white")\
                         .tooltip(i18n("theme_toggle"))
 
-            # 2. Modals for AI Team Management (inside dialogs_container)
+            # 2. Modals (inside dialogs_container)
             current_edit_target = {"name": ""}
 
             with dialogs_container:
+                # 2-0: New Project Dialog
+                new_project_dialog = ui.dialog()
+                with new_project_dialog, ui.card().classes("w-96 p-4 bg-slate-900 border border-slate-700 text-white gap-2"):
+                    ui.label(i18n("dialog_new_project_title")).classes("text-base font-bold text-blue-400")
+                    new_proj_input = ui.input(
+                        label=i18n("project_name_label"),
+                        placeholder=i18n("project_name_placeholder"),
+                    ).classes("w-full")
+
+                    def create_project_submit():
+                        name = new_proj_input.value.strip()
+                        if not name or any(c in r'\/:*?"<>|' for c in name):
+                            ui.notify(i18n("notify_invalid_project_name"), type="warning")
+                            return
+                        ctrl.switch_project(name)
+                        new_proj_input.set_value("")
+                        new_project_dialog.close()
+                        ui.notify(i18n("notify_project_created", name=name), type="positive")
+                        render_dashboard()
+
+                    with ui.row().classes("w-full justify-end gap-2 mt-2"):
+                        ui.button(i18n("btn_cancel"), on_click=new_project_dialog.close).props("flat text-color=slate-400")
+                        ui.button(i18n("btn_create_project"), color="primary", on_click=create_project_submit)
+
                 # 2-A: Edit Agent Dialog
                 edit_dialog = ui.dialog()
                 with edit_dialog, ui.card().classes("w-96 p-4 bg-slate-900 border border-slate-700 text-white gap-2"):
@@ -438,6 +479,12 @@ def run_app(
                         cmd = prompt_input.value.strip() if prompt_input else ""
                         if not cmd:
                             ui.notify(i18n("notify_enter_instruction"), type="warning")
+                            return
+
+                        if not ctrl.project_name:
+                            ui.notify(i18n("notify_select_project_first"), type="warning")
+                            if new_project_dialog:
+                                new_project_dialog.open()
                             return
 
                         if is_async:

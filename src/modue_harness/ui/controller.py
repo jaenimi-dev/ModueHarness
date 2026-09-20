@@ -15,7 +15,7 @@ class UIController:
 
     def __init__(
         self,
-        project_name: str = "default",
+        project_name: Optional[str] = None,
         projects_root: Optional[Path] = None,
         blackboard_dir: Optional[Path] = None,
         agents_file: Optional[Path] = None,
@@ -38,15 +38,15 @@ class UIController:
         )
 
     @property
-    def project_name(self) -> str:
+    def project_name(self) -> Optional[str]:
         return self.session.project_name
 
     @property
-    def project_dir(self) -> Path:
+    def project_dir(self) -> Optional[Path]:
         return self.session.project_dir
 
     @property
-    def blackboard_dir(self) -> Path:
+    def blackboard_dir(self) -> Optional[Path]:
         return self.session.blackboard_dir
 
     @property
@@ -154,9 +154,9 @@ class UIController:
         state = self.session.blackboard.load_state() if self.session.blackboard.is_initialized() else {}
         running_jobs = [j for j in self.session.jobs.values() if j.status == "running"]
         return {
-            "project_name": self.session.project_name,
-            "project_dir": str(self.session.project_dir),
-            "blackboard_dir": str(self.session.blackboard_dir),
+            "project_name": self.session.project_name or "None",
+            "project_dir": str(self.session.project_dir) if self.session.project_dir else "None",
+            "blackboard_dir": str(self.session.blackboard_dir) if self.session.blackboard_dir else "None",
             "timeout": self.session.timeout,
             "session_id": state.get("session_id", "N/A"),
             "status": state.get("status", "idle"),
@@ -183,6 +183,8 @@ class UIController:
 
     def get_artifacts(self) -> List[Dict[str, Any]]:
         """List artifacts available for the current project on blackboard or project directory."""
+        if not self.session.project_name:
+            return []
         try:
             matched = []
             if self.session.blackboard.is_initialized():
@@ -218,24 +220,25 @@ class UIController:
                         continue
 
             # Also inspect project_dir / "artifacts"
-            try:
-                proj_art_dir = self.session.project_dir / "artifacts"
-                if proj_art_dir.is_dir():
-                    for p in sorted(proj_art_dir.rglob("*")):
-                        try:
-                            if p.is_file() and not p.name.startswith("."):
-                                rel = p.relative_to(proj_art_dir).as_posix()
-                                if not any(r["name"] == rel for r in matched):
-                                    matched.append({
-                                        "name": rel,
-                                        "size_bytes": p.stat().st_size,
-                                        "modified_at": p.stat().st_mtime,
-                                        "path": str(p),
-                                    })
-                        except Exception:
-                            continue
-            except Exception:
-                pass
+            if self.session.project_dir:
+                try:
+                    proj_art_dir = self.session.project_dir / "artifacts"
+                    if proj_art_dir.is_dir():
+                        for p in sorted(proj_art_dir.rglob("*")):
+                            try:
+                                if p.is_file() and not p.name.startswith("."):
+                                    rel = p.relative_to(proj_art_dir).as_posix()
+                                    if not any(r["name"] == rel for r in matched):
+                                        matched.append({
+                                            "name": rel,
+                                            "size_bytes": p.stat().st_size,
+                                            "modified_at": p.stat().st_mtime,
+                                            "path": str(p),
+                                        })
+                            except Exception:
+                                continue
+                except Exception:
+                    pass
 
             return matched
         except Exception:
@@ -243,11 +246,14 @@ class UIController:
 
     def get_artifact_content(self, name: str) -> str:
         """Read artifact content as string for the current project."""
+        if not self.session.project_name:
+            return ""
         try:
             # 1. Project-local artifacts
-            proj_art = self.session.project_dir / "artifacts" / name
-            if proj_art.is_file():
-                return proj_art.read_text(encoding="utf-8-sig", errors="replace")
+            if self.session.project_dir:
+                proj_art = self.session.project_dir / "artifacts" / name
+                if proj_art.is_file():
+                    return proj_art.read_text(encoding="utf-8-sig", errors="replace")
         except Exception:
             pass
         # 2. Blackboard
@@ -259,7 +265,7 @@ class UIController:
 
     def get_tasks(self) -> List[Dict[str, Any]]:
         """List task objects from the blackboard."""
-        if not self.session.blackboard.is_initialized():
+        if not self.session.project_name or not self.session.blackboard.is_initialized():
             return []
         tasks = []
         for t in self.session.blackboard.list_tasks():
@@ -275,6 +281,8 @@ class UIController:
 
     def get_project_files(self) -> List[str]:
         """List implementation files inside current project directory."""
+        if not self.session.project_dir:
+            return []
         try:
             return self.session.list_project_files()
         except Exception:
@@ -282,6 +290,8 @@ class UIController:
 
     def get_project_file_content(self, rel_path: str) -> str:
         """Read content of a file within the current project directory."""
+        if not self.session.project_dir:
+            return ""
         try:
             proj_dir = self.session.project_dir.resolve()
             target = (proj_dir / rel_path).resolve()

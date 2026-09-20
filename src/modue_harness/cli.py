@@ -49,8 +49,8 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-P", "--project",
         type=str,
-        default="default",
-        help="Target project name (saved in projects/<project_name>, default: 'default')",
+        default=None,
+        help="Target project name (saved in projects/<project_name>, default: None / auto-detect)",
     )
     parser.add_argument(
         "--projects-dir",
@@ -253,8 +253,8 @@ def create_parser() -> argparse.ArgumentParser:
     ui_parser.add_argument(
         "-P", "--project",
         type=str,
-        default="default",
-        help="Initial target project name (default: 'default')",
+        default=None,
+        help="Initial target project name (default: None / auto-detect)",
     )
     ui_parser.add_argument(
         "--projects-dir",
@@ -272,7 +272,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--agents", "-a",
         type=str,
         default=None,
-        help="Path to AI team specification file",
+        help="Path to AI team specification file (default: config/agents.yaml or auto-detect)",
     )
     ui_parser.add_argument(
         "--agent",
@@ -290,7 +290,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--effort", "-e",
         type=str,
         default=None,
-        help="Reasoning/thinking effort level",
+        help="Reasoning/thinking effort level for Claude (choices: low, medium, high, xhigh, max)",
     )
     ui_parser.add_argument(
         "-t", "--timeout",
@@ -302,18 +302,18 @@ def create_parser() -> argparse.ArgumentParser:
         "--host",
         type=str,
         default="127.0.0.1",
-        help="Host to bind Web UI server (default: 127.0.0.1)",
+        help="Host address for Web UI (default: 127.0.0.1)",
     )
     ui_parser.add_argument(
         "--port",
         type=int,
         default=8080,
-        help="Port for Web UI server (default: 8080)",
+        help="Port for Web UI (default: 8080)",
     )
     ui_parser.add_argument(
         "--no-browser",
         action="store_true",
-        help="Do not open browser automatically",
+        help="Do not automatically open web browser on startup",
     )
     ui_parser.add_argument(
         "--lang", "-L",
@@ -328,8 +328,8 @@ def create_parser() -> argparse.ArgumentParser:
     tui_parser.add_argument(
         "-P", "--project",
         type=str,
-        default="default",
-        help="Initial target project name (default: 'default')",
+        default=None,
+        help="Initial target project name (default: None / auto-detect)",
     )
     tui_parser.add_argument(
         "--projects-dir",
@@ -558,7 +558,7 @@ def handle_ui(args: argparse.Namespace) -> int:
 
     lang = getattr(args, "lang", "ko") or "ko"
     ctrl = UIController(
-        project_name=getattr(args, "project", "default") or "default",
+        project_name=getattr(args, "project", None),
         projects_root=Path(getattr(args, "projects_dir", "projects")).resolve(),
         blackboard_dir=Path(getattr(args, "dir", "blackboard")).resolve(),
         agents_file=Path(args.agents).resolve() if getattr(args, "agents", None) else None,
@@ -598,7 +598,7 @@ def handle_tui(args: argparse.Namespace) -> int:
         return 1
 
     ctrl = UIController(
-        project_name=getattr(args, "project", "default") or "default",
+        project_name=getattr(args, "project", None),
         projects_root=Path(getattr(args, "projects_dir", "projects")).resolve(),
         blackboard_dir=Path(getattr(args, "dir", "blackboard")).resolve(),
         agents_file=Path(args.agents).resolve() if getattr(args, "agents", None) else None,
@@ -630,7 +630,7 @@ def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
     if getattr(args, "tui", False):
         return handle_tui(args)
 
-    project_name = getattr(args, "project", "default") or "default"
+    project_name = getattr(args, "project", None)
     projects_dir = Path(getattr(args, "projects_dir", "projects")).resolve()
     board_dir = Path(getattr(args, "dir", "blackboard")).resolve()
     agents_file = Path(args.agents).resolve() if getattr(args, "agents", None) else None
@@ -655,9 +655,10 @@ def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
     # 2. User supplied a prompt/command
     if getattr(args, "prompt", None):
         prompt = args.prompt.strip()
-        print(f"🚀 [ModueHarness] 작업 실행 (프로젝트: '{project_name}')")
-        print(f"   구현 디렉터리: {session.project_dir}")
-        print(f"   공용 칠판:     {session.blackboard_dir}")
+        active_p = session.project_name or "project_1"
+        print(f"🚀 [ModueHarness] 작업 실행 (프로젝트: '{active_p}')")
+        print(f"   구현 디렉터리: {session.project_dir or (projects_dir / active_p)}")
+        print(f"   공용 칠판:     {session.blackboard_dir or (board_dir / active_p)}")
         print(f"   작업 명령:     {prompt}\n")
 
         summary = session.execute_command(prompt)
