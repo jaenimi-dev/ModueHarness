@@ -121,6 +121,13 @@ def create_parser() -> argparse.ArgumentParser:
         default=8080,
         help="Port for Web UI (default: 8080)",
     )
+    parser.add_argument(
+        "--lang", "-L",
+        type=str,
+        choices=["ko", "en"],
+        default="ko",
+        help="Display language ('ko' or 'en', default: 'ko')",
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
@@ -296,6 +303,13 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Do not open browser automatically",
     )
+    ui_parser.add_argument(
+        "--lang", "-L",
+        type=str,
+        choices=["ko", "en"],
+        default="ko",
+        help="Web UI display language ('ko' or 'en', default: 'ko')",
+    )
 
     # Command: tui
     tui_parser = subparsers.add_parser("tui", help="Launch Textual Terminal UI dashboard")
@@ -347,6 +361,13 @@ def create_parser() -> argparse.ArgumentParser:
         default=None,
         help="Execution timeout in seconds per AI CLI turn",
     )
+    tui_parser.add_argument(
+        "--lang", "-L",
+        type=str,
+        choices=["ko", "en"],
+        default="ko",
+        help="TUI display language ('ko' or 'en', default: 'ko')",
+    )
 
     return parser
 
@@ -385,6 +406,7 @@ def parse_cli_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
             "-p", "--prompt",
             "--host",
             "--port",
+            "-L", "--lang",
         }
 
         while i < len(raw_args):
@@ -507,6 +529,7 @@ def handle_ui(args: argparse.Namespace) -> int:
         print("Tip: Install UI dependencies using: pip install 'modue-harness[ui]' or pip install nicegui")
         return 1
 
+    lang = getattr(args, "lang", "ko") or "ko"
     ctrl = UIController(
         project_name=getattr(args, "project", "default") or "default",
         projects_root=Path(getattr(args, "projects_dir", "projects")).resolve(),
@@ -516,6 +539,7 @@ def handle_ui(args: argparse.Namespace) -> int:
         model=getattr(args, "model", None),
         effort=getattr(args, "effort", None),
         timeout=getattr(args, "timeout", None),
+        lang=lang,
     )
     host = getattr(args, "host", "127.0.0.1")
     port = getattr(args, "port", 8080)
@@ -523,7 +547,7 @@ def handle_ui(args: argparse.Namespace) -> int:
 
     print(f"🌐 Starting ModueHarness Web UI at http://{host}:{port} ...")
     try:
-        run_app(controller=ctrl, host=host, port=port, open_browser=open_browser)
+        run_app(controller=ctrl, host=host, port=port, open_browser=open_browser, lang=lang)
         return 0
     except KeyboardInterrupt:
         print("\n👋 ModueHarness Web UI 서버가 정상 종료되었습니다.")
@@ -555,6 +579,7 @@ def handle_tui(args: argparse.Namespace) -> int:
         model=getattr(args, "model", None),
         effort=getattr(args, "effort", None),
         timeout=getattr(args, "timeout", None),
+        lang=getattr(args, "lang", "ko") or "ko",
     )
 
     try:

@@ -297,3 +297,74 @@ def test_ui_controller_agent_crud_and_conductor(tmp_path: Path):
     assert ctrl.remove_agent("qa_tester") is True
     agents_rem = ctrl.get_agents_info()
     assert not any(a["name"] == "qa_tester" for a in agents_rem)
+
+
+def test_i18n_module_translations():
+    """Test i18n translations consistency and formatting."""
+    from modue_harness.ui.i18n import I18n, SUPPORTED_LANGUAGES, TRANSLATIONS, get_text
+
+    assert "ko" in SUPPORTED_LANGUAGES
+    assert "en" in SUPPORTED_LANGUAGES
+
+    # Ensure all English keys exist in Korean
+    en_keys = set(TRANSLATIONS["en"].keys())
+    ko_keys = set(TRANSLATIONS["ko"].keys())
+    assert en_keys == ko_keys
+
+    # Check basic translation and formatting
+    ko_text = get_text("notify_agent_removed", lang="ko", name="bot1")
+    assert "bot1" in ko_text
+    assert "삭제되었습니다" in ko_text
+
+    en_text = get_text("notify_agent_removed", lang="en", name="bot1")
+    assert "bot1" in en_text
+    assert "Removed agent" in en_text
+
+    # Check fallback for unknown key
+    assert get_text("non_existent_key", lang="ko") == "non_existent_key"
+
+    # Check I18n class
+    i18n = I18n(lang="ko")
+    assert i18n.lang == "ko"
+    assert "대시보드" in i18n("app_title")
+    i18n.lang = "en"
+    assert i18n.lang == "en"
+    assert "Dashboard" in i18n("app_title")
+
+
+def test_ui_controller_language_setting(tmp_path: Path):
+    """Test UIController language initialization."""
+    ctrl_ko = UIController(
+        project_name="demo",
+        projects_root=tmp_path / "projects",
+        blackboard_dir=tmp_path / "blackboard",
+        lang="ko",
+    )
+    assert ctrl_ko.lang == "ko"
+
+    ctrl_en = UIController(
+        project_name="demo",
+        projects_root=tmp_path / "projects",
+        blackboard_dir=tmp_path / "blackboard",
+        lang="en",
+    )
+    assert ctrl_en.lang == "en"
+
+
+def test_cli_ui_command_language_flags(monkeypatch):
+    """Test 'modue-harness ui --lang en' passes language to run_app."""
+    from unittest.mock import MagicMock
+    mock_run = MagicMock()
+    monkeypatch.setattr("modue_harness.ui.web.app.run_app", mock_run)
+
+    ret = main(["ui", "-P", "myproj", "--lang", "en"])
+    assert ret == 0
+    mock_run.assert_called_once()
+    assert mock_run.call_args[1]["lang"] == "en"
+
+    mock_run.reset_mock()
+    ret_ko = main(["ui", "-P", "myproj", "-L", "ko"])
+    assert ret_ko == 0
+    mock_run.assert_called_once()
+    assert mock_run.call_args[1]["lang"] == "ko"
+

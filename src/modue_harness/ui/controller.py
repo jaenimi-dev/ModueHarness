@@ -23,7 +23,9 @@ class UIController:
         model: Optional[str] = None,
         effort: Optional[str] = None,
         timeout: Optional[float] = None,
+        lang: str = "ko",
     ) -> None:
+        self.lang = lang
         self.session = InteractiveSession(
             project_name=project_name,
             projects_root=projects_root,
