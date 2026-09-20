@@ -888,6 +888,7 @@ def run_app(
                             tab_artifacts = ui.tab(i18n("tab_artifacts")).props("no-caps dense").classes("px-1.5 text-xs min-h-[32px]")
                             tab_files = ui.tab(i18n("tab_files")).props("no-caps dense").classes("px-1.5 text-xs min-h-[32px]")
                             tab_jobs = ui.tab(i18n("tab_jobs")).props("no-caps dense").classes("px-1.5 text-xs min-h-[32px]")
+                            tab_usage = ui.tab(i18n("tab_usage")).props("no-caps dense").classes("px-1.5 text-xs min-h-[32px]")
                         ui.button(icon="refresh", on_click=lambda: on_refresh_all_click())\
                             .props("flat dense round size=sm text-color=slate-300 hover:text-white")\
                             .tooltip(i18n("tooltip_refresh_all"))
@@ -1250,6 +1251,90 @@ def run_app(
                                 refresh_jobs()
                                 ui.notify(i18n("notify_jobs_refreshed"), type="info")
 
+                        # Tab 4: AI Usage & Quota / Limits
+                        with ui.tab_panel(tab_usage).classes("p-0 h-full flex flex-col gap-2 overflow-hidden"):
+                            with ui.row().classes("w-full items-center justify-between flex-shrink-0"):
+                                usage_title_label = ui.label(i18n("usage_overview")).classes("text-xs font-semibold text-slate-300")
+                                ui.button(icon="refresh", on_click=lambda: on_refresh_usage_click())\
+                                    .props("dense outline size=sm text-color=blue-300")\
+                                    .tooltip(i18n("tooltip_refresh_usage"))\
+                                    .classes("border-blue-500/40 hover:bg-blue-900/30")
+
+                            usage_container = ui.column().classes("w-full flex-1 min-h-0 overflow-y-auto gap-2.5 pr-0.5")
+
+                            def refresh_usage():
+                                try:
+                                    usage_container.clear()
+                                    summary = ctrl.get_usage_summary()
+
+                                    def _render_usage():
+                                        with usage_container:
+                                            if not summary:
+                                                ui.label(i18n("no_usage_yet")).classes("text-xs text-slate-400 italic p-3 text-center")
+                                            else:
+                                                for u in summary:
+                                                    agent_name = u.get("agent", "unknown")
+                                                    status = u.get("status", "normal")
+                                                    status_label = u.get("status_label", "정상")
+                                                    resets_at = u.get("resets_at")
+                                                    f_h = u.get("five_hour", {})
+                                                    wk = u.get("weekly", {})
+
+                                                    badge_class = "bg-green-900/40 text-green-300 border-green-500/30"
+                                                    if status == "rate_limited":
+                                                        badge_class = "bg-red-900/50 text-red-300 border-red-500/40"
+                                                    elif status == "warning":
+                                                        badge_class = "bg-yellow-900/40 text-yellow-300 border-yellow-500/30"
+
+                                                    with ui.card().classes("w-full p-2.5 bg-slate-900/70 border border-slate-700/60 rounded gap-1.5 flex flex-col"):
+                                                        with ui.row().classes("w-full items-center justify-between"):
+                                                            with ui.row().classes("items-center gap-1.5"):
+                                                                ui.icon("smart_toy", size="xs").classes("text-blue-400")
+                                                                ui.label(agent_name).classes("font-semibold text-xs text-white")
+                                                            with ui.row().classes("items-center gap-1"):
+                                                                if resets_at:
+                                                                    ui.label(f"리셋: {resets_at}").classes("text-[10px] px-1 py-0.5 rounded bg-slate-800 text-slate-300 font-mono")
+                                                                ui.label(status_label).classes(f"text-[10px] px-1.5 py-0.5 rounded border {badge_class} font-bold")
+
+                                                        # 5-hour limit bar
+                                                        f_ratio = f_h.get("usage_ratio", 0.0)
+                                                        f_tokens = f_h.get("total_tokens", 0)
+                                                        f_limit = f_h.get("limit_tokens", 0)
+                                                        f_pct = f_h.get("percent_str", "0%")
+                                                        with ui.column().classes("w-full gap-0.5 mt-1"):
+                                                            with ui.row().classes("w-full justify-between text-[11px] text-slate-300"):
+                                                                ui.label("⏱️ 5시간 윈도우").classes("font-medium")
+                                                                ui.label(f"{f_tokens:,} / {f_limit:,} ({f_pct})").classes("font-mono text-slate-400 text-[10px]")
+                                                            ui.linear_progress(value=f_ratio, size="4px").classes("rounded").props("color=blue-400" if f_ratio < 0.8 else "color=red-400")
+
+                                                        # Weekly limit bar
+                                                        w_ratio = wk.get("usage_ratio", 0.0)
+                                                        w_tokens = wk.get("total_tokens", 0)
+                                                        w_limit = wk.get("limit_tokens", 0)
+                                                        w_pct = wk.get("percent_str", "0%")
+                                                        with ui.column().classes("w-full gap-0.5 mt-1"):
+                                                            with ui.row().classes("w-full justify-between text-[11px] text-slate-300"):
+                                                                ui.label("📅 주간 윈도우").classes("font-medium")
+                                                                ui.label(f"{w_tokens:,} / {w_limit:,} ({w_pct})").classes("font-mono text-slate-400 text-[10px]")
+                                                            ui.linear_progress(value=w_ratio, size="4px").classes("rounded").props("color=indigo-400" if w_ratio < 0.8 else "color=red-400")
+
+                                                        # Extra stats: calls, cost
+                                                        with ui.row().classes("w-full justify-between items-center text-[10px] text-slate-400 mt-1 pt-1 border-t border-slate-800"):
+                                                            ui.label(f"호출: 5h({f_h.get('calls', 0)}회) / 주간({wk.get('calls', 0)}회)")
+                                                            ui.label(f"비용(추정): ${f_h.get('cost_usd', 0):.4f}")
+
+                                    if client:
+                                        with client:
+                                            _render_usage()
+                                    else:
+                                        _render_usage()
+                                except Exception:
+                                    pass
+
+                            def on_refresh_usage_click():
+                                refresh_usage()
+                                ui.notify(i18n("notify_usage_refreshed"), type="info")
+
                     def on_refresh_artifacts_click():
                         refresh_artifacts()
                         ui.notify(i18n("notify_artifacts_refreshed"), type="info")
@@ -1264,6 +1349,7 @@ def run_app(
                         refresh_artifacts()
                         refresh_file_list()
                         refresh_jobs()
+                        refresh_usage()
 
                     def on_refresh_all_click_impl():
                         refresh_all()

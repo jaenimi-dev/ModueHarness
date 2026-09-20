@@ -153,6 +153,17 @@ class ConductorRunner:
         finally:
             self._active_adapter = None
 
+        self.blackboard.record_usage(
+            agent=self.conductor_name,
+            stdout=plan_result.stdout,
+            stderr=plan_result.stderr,
+            duration_sec=plan_result.duration_sec,
+            job_id=self.job_id,
+            model=getattr(conductor_adapter, "model", None),
+            prompt_length=len(plan_prompt),
+            is_success=plan_result.is_success,
+        )
+
         if self._is_cancelled:
             return {
                 "status": "cancelled",
@@ -279,6 +290,17 @@ class ConductorRunner:
                 })
                 break
 
+            self.blackboard.record_usage(
+                agent=assigned,
+                stdout=res.stdout,
+                stderr=res.stderr,
+                duration_sec=res.duration_sec,
+                job_id=self.job_id,
+                model=getattr(worker_adapter, "model", None),
+                prompt_length=len(worker_prompt),
+                is_success=res.is_success,
+            )
+
             task_record = {
                 "task_id": task_id,
                 "agent": assigned,
@@ -356,6 +378,18 @@ class ConductorRunner:
                 synth_res = conductor_adapter.execute(synth_ctx, timeout=self.timeout)
             finally:
                 self._active_adapter = None
+
+            self.blackboard.record_usage(
+                agent=self.conductor_name,
+                stdout=synth_res.stdout,
+                stderr=synth_res.stderr,
+                duration_sec=synth_res.duration_sec,
+                job_id=self.job_id,
+                model=getattr(conductor_adapter, "model", None),
+                prompt_length=len(synth_prompt),
+                is_success=synth_res.is_success,
+            )
+
             if synth_res.is_success:
                 self.blackboard.write_artifact(
                     "synthesis_report.md",
@@ -396,6 +430,10 @@ class ConductorRunner:
                     except Exception:
                         pass
 
+        # Collect usage summary for active team
+        team_agents = list(set([self.conductor_name] + list(self.worker_adapters.keys())))
+        usage_summary = self.blackboard.get_usage_summary(team_agents)
+
         return {
             "status": final_status,
             "success": overall_success,
@@ -403,5 +441,6 @@ class ConductorRunner:
             "subtasks": worker_results,
             "total_duration_sec": total_duration,
             "project_files": sorted(project_files),
+            "usage_summary": usage_summary,
             "error_message": failure_reason,
         }

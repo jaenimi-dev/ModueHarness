@@ -828,6 +828,7 @@ class InteractiveSession:
         self._active_foreground_runner = runner
         job.runner = runner
 
+        result: Dict[str, Any] = {}
         try:
             result = runner.run()
         finally:
@@ -862,6 +863,7 @@ class InteractiveSession:
             "total_duration_sec": result.get("total_duration_sec", 0.0),
             "project_files": project_files,
             "artifacts": artifacts,
+            "usage_summary": result.get("usage_summary", []),
             "error": result.get("error_message") or result.get("error"),
         }
 
@@ -1176,6 +1178,20 @@ class InteractiveSession:
                         jb_str = f" [{jb}]" if jb else ""
                         print(f"  📌 {af} (작성: {auth}{jb_str})")
 
+                if summary.get("usage_summary"):
+                    print(f"\n[AI 팀 사용량 및 리미트 현황]")
+                    for item in summary["usage_summary"]:
+                        ag = item.get("agent")
+                        f_h = item.get("five_hour", {})
+                        wk = item.get("weekly", {})
+                        st_label = item.get("status_label", "정상")
+                        f_tok = f_h.get("total_tokens", 0)
+                        w_tok = wk.get("total_tokens", 0)
+                        f_str = f"{f_tok:,} 토큰 ({f_h.get('percent_str', '0%')})"
+                        w_str = f"{w_tok:,} 토큰 ({wk.get('percent_str', '0%')})"
+                        res_str = f" [리셋: {item.get('resets_at')}]" if item.get("resets_at") else ""
+                        print(f"  • {ag:<10} : 5시간 {f_str} | 주간 {w_str} [{st_label}{res_str}]")
+
                 print("-" * 64 + "\n")
 
             except KeyboardInterrupt:
@@ -1405,6 +1421,33 @@ class InteractiveSession:
                     print(f"  • {time_part}{item['name']} ({author_part}{job_part}, {size_part})")
                 print()
 
+        elif cmd in ["/usage", "/limits", "/quota"]:
+            all_agents = list(self.agents.keys())
+            summary = self.blackboard.get_usage_summary(all_agents)
+            if not summary:
+                print("\n📊 기록된 AI 사용량 내역이 없습니다.\n")
+            else:
+                print(f"\n=== AI 팀 사용량 및 리미트 현황 ({len(summary)}개 에이전트) ===")
+                for item in summary:
+                    ag = item.get("agent")
+                    f_h = item.get("five_hour", {})
+                    wk = item.get("weekly", {})
+                    st_label = item.get("status_label", "정상")
+                    f_tok = f_h.get("total_tokens", 0)
+                    f_max = f_h.get("limit_tokens", 0)
+                    w_tok = wk.get("total_tokens", 0)
+                    w_max = wk.get("limit_tokens", 0)
+                    cost_5h = f_h.get("cost_usd", 0.0)
+                    cost_wk = wk.get("cost_usd", 0.0)
+                    calls_5h = f_h.get("calls", 0)
+                    calls_wk = wk.get("calls", 0)
+                    res_str = f" [리셋: {item.get('resets_at')}]" if item.get("resets_at") else ""
+
+                    print(f"\n• {ag} [{st_label}{res_str}]")
+                    print(f"    - 5시간 윈도우: {f_tok:,} / {f_max:,} 토큰 ({f_h.get('percent_str', '0%')}) | {calls_5h}회 호출 | ${cost_5h:.4f}")
+                    print(f"    - 주간 윈도우 : {w_tok:,} / {w_max:,} 토큰 ({wk.get('percent_str', '0%')}) | {calls_wk}회 호출 | ${cost_wk:.4f}")
+                print()
+
         elif cmd in ["/help", "/?"]:
             print("\n=== 사용 가능한 명령어 ===")
             print("  자연어 명령 입력        : 동기 방식으로 즉시 실행 (실시간 단계 및 CLI 명령 표시)")
@@ -1421,6 +1464,7 @@ class InteractiveSession:
             print("  /projects             : 전체 프로젝트 목록 조회")
             print("  /files (또는 /ls)     : 현재 프로젝트 내 구현 파일 목록")
             print("  /artifacts (또는 /art) : 블랙보드 산출물 목록 조회 (최신순, 작성자, 시간)")
+            print("  /usage (또는 /limits)  : AI 에이전트별 5시간 및 주간 사용량 / 한도 현황 조회")
             print("  /status               : 칠판 상태 및 백그라운드 작업 현황")
             print("  /help                 : 도움말 출력")
             print("  exit, quit, q         : 종료\n")

@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from modue_harness.core.events import EventBus, EventType, HarnessEvent
 from modue_harness.core.types import Task, TaskStatus
+from modue_harness.core.usage import UsageTracker
 
 
 class Blackboard:
@@ -37,7 +38,9 @@ class Blackboard:
         self.artifacts_dir = self.root_dir / "artifacts"
         self.logs_dir = self.root_dir / "logs"
         self.jobs_dir = self.root_dir / "jobs"
+        self.usage_dir = self.root_dir / "usage"
         self.event_bus = event_bus
+        self.usage_tracker = UsageTracker(self.root_dir)
 
     def for_project(self, project_name: str) -> "Blackboard":
         """Return a Blackboard instance isolated to a specific project subfolder."""
@@ -55,7 +58,7 @@ class Blackboard:
         subdirs = []
         try:
             for d in self.root_dir.iterdir():
-                if d.is_dir() and not d.name.startswith(".") and d.name not in {"tasks", "artifacts", "logs", "jobs"}:
+                if d.is_dir() and not d.name.startswith(".") and d.name not in {"tasks", "artifacts", "logs", "jobs", "usage"}:
                     if (d / "state.json").exists() or (d / "artifacts").exists() or (d / "tasks").exists() or (d / "jobs").exists():
                         subdirs.append(d)
         except Exception:
@@ -77,6 +80,7 @@ class Blackboard:
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
+        self.usage_dir.mkdir(parents=True, exist_ok=True)
 
         if not self.state_file.exists():
             initial_state = {
@@ -563,3 +567,39 @@ class Blackboard:
                 return json.load(f)
         except Exception:
             return None
+
+    # ---------------- Usage & Limit Tracking ---------------- #
+
+    def record_usage(
+        self,
+        agent: str,
+        stdout: str,
+        stderr: str,
+        duration_sec: float,
+        job_id: Optional[str] = None,
+        model: Optional[str] = None,
+        prompt_length: int = 0,
+        is_success: bool = True,
+        override_usage: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Record usage and check limits via the usage tracker."""
+        return self.usage_tracker.record_turn(
+            agent=agent,
+            stdout=stdout,
+            stderr=stderr,
+            duration_sec=duration_sec,
+            job_id=job_id,
+            model=model,
+            prompt_length=prompt_length,
+            is_success=is_success,
+            override_usage=override_usage,
+        )
+
+    def get_agent_usage(self, agent: str) -> Dict[str, Any]:
+        """Return 5-hour and weekly usage metrics and status for an agent."""
+        return self.usage_tracker.get_agent_status(agent)
+
+    def get_usage_summary(self, agent_names: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """Return usage summary for all requested or recorded agents."""
+        return self.usage_tracker.get_all_agents_summary(agent_names)
+

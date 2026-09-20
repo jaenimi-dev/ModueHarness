@@ -413,3 +413,12 @@ class UIController:
     def execute_command_async(self, command: str) -> BackgroundJob:
         """Execute a natural-language task asynchronously in background."""
         return self.session.execute_command_async(command)
+
+    def get_usage_summary(self) -> List[Dict[str, Any]]:
+        """Return 5-hour and weekly usage metrics and limit status for all agents."""
+        try:
+            team_agents = list(self.session.agents.keys())
+            return self.session.blackboard.get_usage_summary(team_agents)
+        except Exception:
+            return []
+
