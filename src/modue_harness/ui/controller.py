@@ -187,7 +187,7 @@ class UIController:
             return []
         try:
             matched = []
-            if self.session.blackboard.is_initialized():
+            if self.session.blackboard.is_initialized() or self.session.blackboard.artifacts_dir.exists():
                 try:
                     all_artifacts = self.session.blackboard.list_artifacts()
                 except Exception:

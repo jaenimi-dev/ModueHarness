@@ -76,6 +76,14 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "no_artifact_selected": "선택된 산출물이 없습니다.",
         "select_file": "프로젝트 파일 선택",
         "empty_content": "내용 없음",
+        "btn_refresh": "새로고침",
+        "tooltip_refresh_all": "전체 새로고침 (산출물, 파일, 작업 이력)",
+        "tooltip_refresh_artifacts": "블랙보드 산출물 목록 새로고침",
+        "tooltip_refresh_files": "프로젝트 파일 목록 새로고침",
+        "tooltip_refresh_projects": "프로젝트 목록 새로고침",
+        "notify_refreshed": "목록을 새로고침했습니다.",
+        "notify_artifacts_refreshed": "블랙보드 산출물 목록을 새로고침했습니다.",
+        "notify_files_refreshed": "프로젝트 파일 목록을 새로고침했습니다.",
 
         # Dialogs - Edit Agent
         "dialog_edit_title": "⚙️ AI 에이전트 설정",
@@ -169,6 +177,14 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "no_artifact_selected": "No artifact selected.",
         "select_file": "Select Project File",
         "empty_content": "Empty.",
+        "btn_refresh": "Refresh",
+        "tooltip_refresh_all": "Refresh all (artifacts, files, jobs)",
+        "tooltip_refresh_artifacts": "Refresh blackboard artifacts list",
+        "tooltip_refresh_files": "Refresh project files list",
+        "tooltip_refresh_projects": "Refresh projects list",
+        "notify_refreshed": "Refreshed successfully.",
+        "notify_artifacts_refreshed": "Blackboard artifacts refreshed.",
+        "notify_files_refreshed": "Project files refreshed.",
 
         # Dialogs - Edit Agent
         "dialog_edit_title": "⚙️ Configure AI Agent",

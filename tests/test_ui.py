@@ -689,3 +689,48 @@ def test_no_default_project_created_automatically(tmp_path: Path):
     assert (board_root / "my_web_app").exists()
     assert not (proj_root / "default").exists()
     assert not (board_root / "default").exists()
+
+
+def test_ui_controller_dynamic_refresh_on_new_files(tmp_path: Path):
+    """Test that UIController immediately detects new files and artifacts on disk without restart."""
+    proj_root = tmp_path / "projects"
+    board_root = tmp_path / "blackboard"
+
+    ctrl = UIController(
+        project_name="app_test",
+        projects_root=proj_root,
+        blackboard_dir=board_root,
+    )
+    ctrl.session.project_dir.mkdir(parents=True, exist_ok=True)
+    ctrl.session.blackboard.initialize()
+
+    # 1. Initially empty
+    assert ctrl.get_project_files() == []
+    assert ctrl.get_artifacts() == []
+
+    # 2. External creation of project file
+    new_code_file = ctrl.session.project_dir / "service.py"
+    new_code_file.write_text("def hello(): return 'world'", encoding="utf-8")
+
+    # Dynamic refresh: should immediately discover service.py and its content
+    files = ctrl.get_project_files()
+    assert "service.py" in files
+    assert "hello()" in ctrl.get_project_file_content("service.py")
+
+    # 3. External modification of project file
+    new_code_file.write_text("def hello(): return 'updated'", encoding="utf-8")
+    assert "updated" in ctrl.get_project_file_content("service.py")
+
+    # 4. External creation of blackboard artifact
+    art_file = ctrl.session.blackboard.artifacts_dir / "spec.md"
+    art_file.write_text("# Spec Document v1", encoding="utf-8")
+
+    # Dynamic refresh: should immediately discover spec.md and its content
+    artifacts = ctrl.get_artifacts()
+    assert any(a["name"] == "spec.md" for a in artifacts)
+    assert "# Spec Document v1" in ctrl.get_artifact_content("spec.md")
+
+    # 5. External modification of artifact
+    art_file.write_text("# Spec Document v2", encoding="utf-8")
+    assert "# Spec Document v2" in ctrl.get_artifact_content("spec.md")
+

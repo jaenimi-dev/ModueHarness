@@ -93,9 +93,10 @@ def run_app(
         # Forward declarations of handlers / variables
         prompt_input = None
         new_project_dialog = None
+        on_refresh_all_click = lambda: None
 
         def _render_dashboard_impl() -> None:
-            nonlocal prompt_input, new_project_dialog
+            nonlocal prompt_input, new_project_dialog, on_refresh_all_click
             # Clear containers
             header_container.clear()
             main_container.clear()
@@ -136,6 +137,26 @@ def run_app(
                             value=i18n("no_projects_yet"),
                         ).props("disable").classes("w-36 sm:w-44 bg-slate-800 text-slate-400 rounded text-xs")
 
+                    def refresh_projects():
+                        try:
+                            projs = ctrl.get_projects()
+                            cur = ctrl.project_name
+                            if cur and cur not in projs:
+                                projs.append(cur)
+                            if projs:
+                                project_select.options = projs
+                                if cur in projs:
+                                    project_select.value = cur
+                                elif not project_select.value or project_select.value not in projs:
+                                    project_select.value = projs[0]
+                                project_select.enable()
+                            else:
+                                project_select.options = [i18n("no_projects_yet")]
+                                project_select.value = i18n("no_projects_yet")
+                                project_select.disable()
+                        except Exception:
+                            pass
+
                     # + New Project button
                     ui.button(
                         i18n("btn_new_project"),
@@ -143,6 +164,14 @@ def run_app(
                     ).props("dense outline size=xs text-color=blue-300")\
                      .tooltip(i18n("tooltip_new_project"))\
                      .classes("text-xs border-blue-500/50 hover:bg-blue-900/30")
+
+                    # Refresh all button in header
+                    ui.button(
+                        icon="refresh",
+                        on_click=lambda: on_refresh_all_click(),
+                    ).props("dense outline size=xs text-color=slate-300")\
+                     .tooltip(i18n("tooltip_refresh_all"))\
+                     .classes("text-xs border-slate-600 hover:bg-slate-800")
 
                     bb_text = f"blackboard/{current_p}" if current_p else "blackboard"
                     bb_badge = ui.badge(bb_text, color="slate-700").classes("text-[10px] font-mono text-slate-400 hidden sm:inline-flex")
@@ -539,15 +568,25 @@ def run_app(
                 with ui.card().classes(
                     "w-1/4 h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
                 ):
-                    with ui.tabs().classes("w-full text-xs flex-shrink-0 border-b border-slate-700") as tabs:
-                        tab_artifacts = ui.tab(i18n("tab_artifacts"))
-                        tab_files = ui.tab(i18n("tab_files"))
-                        tab_jobs = ui.tab(i18n("tab_jobs"))
+                    with ui.row().classes("w-full items-center justify-between border-b border-slate-700 pb-1 flex-shrink-0"):
+                        with ui.tabs().classes("text-xs flex-1") as tabs:
+                            tab_artifacts = ui.tab(i18n("tab_artifacts"))
+                            tab_files = ui.tab(i18n("tab_files"))
+                            tab_jobs = ui.tab(i18n("tab_jobs"))
+                        ui.button(icon="refresh", on_click=lambda: on_refresh_all_click())\
+                            .props("flat dense round size=sm text-color=slate-300 hover:text-white")\
+                            .tooltip(i18n("tooltip_refresh_all"))
 
                     with ui.tab_panels(tabs, value=tab_artifacts).classes("w-full flex-1 min-h-0 bg-transparent overflow-hidden"):
                         # Tab 1: Artifacts (Project-isolated)
                         with ui.tab_panel(tab_artifacts).classes("p-0 h-full flex flex-col gap-2 overflow-hidden"):
-                            art_select = ui.select(options=[], label=i18n("select_artifact")).classes("w-full flex-shrink-0 text-xs")
+                            with ui.row().classes("w-full items-center gap-1.5 flex-shrink-0"):
+                                art_select = ui.select(options=[], label=i18n("select_artifact")).classes("flex-1 min-w-0 text-xs")
+                                ui.button(icon="refresh", on_click=lambda: on_refresh_artifacts_click())\
+                                    .props("dense outline size=sm text-color=blue-300")\
+                                    .tooltip(i18n("tooltip_refresh_artifacts"))\
+                                    .classes("border-blue-500/40 hover:bg-blue-900/30")
+
                             art_markdown = ui.markdown(i18n("no_artifact_selected")).classes(
                                 "text-xs text-slate-300 overflow-auto flex-1 min-h-0 p-2 bg-slate-900/50 rounded border border-slate-700/50"
                             )
@@ -577,7 +616,13 @@ def run_app(
 
                         # Tab 2: Project Files
                         with ui.tab_panel(tab_files).classes("p-0 h-full flex flex-col gap-2 overflow-hidden"):
-                            file_select = ui.select(options=[], label=i18n("select_file")).classes("w-full flex-shrink-0 text-xs")
+                            with ui.row().classes("w-full items-center gap-1.5 flex-shrink-0"):
+                                file_select = ui.select(options=[], label=i18n("select_file")).classes("flex-1 min-w-0 text-xs")
+                                ui.button(icon="refresh", on_click=lambda: on_refresh_files_click())\
+                                    .props("dense outline size=sm text-color=blue-300")\
+                                    .tooltip(i18n("tooltip_refresh_files"))\
+                                    .classes("border-blue-500/40 hover:bg-blue-900/30")
+
                             file_code = ui.code("", language="python").classes("text-xs flex-1 min-h-0 overflow-auto rounded")
 
                             def refresh_file_list():
@@ -619,6 +664,23 @@ def run_app(
                                                 ui.label(j['command']).classes("text-slate-400 truncate")
                                 except Exception:
                                     pass
+
+                    def on_refresh_artifacts_click():
+                        refresh_artifacts()
+                        ui.notify(i18n("notify_artifacts_refreshed"), type="info")
+
+                    def on_refresh_files_click():
+                        refresh_file_list()
+                        ui.notify(i18n("notify_files_refreshed"), type="info")
+
+                    def on_refresh_all_click_impl():
+                        refresh_projects()
+                        refresh_artifacts()
+                        refresh_file_list()
+                        refresh_jobs()
+                        ui.notify(i18n("notify_refreshed"), type="info")
+
+                    on_refresh_all_click = on_refresh_all_click_impl
 
                 # Initial data population
                 try:
