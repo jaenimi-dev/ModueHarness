@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-09-20
+
+### Added
+- **ChatGPT Codex CLI Guide (`docs/codex_guide.md`)**:
+  - Comprehensive installation, authentication (`codex login`), sandbox permissions (`--sandbox workspace-write`), and ModueHarness integration manual.
+- **Project Deletion Feature**:
+  - Web UI project deletion button in header with confirmation modal.
+  - Project directory and isolated blackboard directory cleanup (`delete_project` API).
+  - CLI `projects --delete <project_name>` support.
+- **Job History Compact Card & Detail Dialog**:
+  - Clean 3-row compact job cards preventing text overflow.
+  - "자세히 보기" (View Details) modal dialog displaying full command, execution stage, formatted logs, and error details.
+
+### Fixed
+- **Stream Output Improvements**:
+  - Limited CLI command preview display to prevent full prompt/JSON instruction leaks into live stream.
+  - Expanded subtask instruction preview length from 50/60 to 200 characters to prevent unwanted truncation.
+- **UI Overflow & Tab Layout Fixes**:
+  - Made header project dropdown dense and outlined to fit cleanly within 52px header bar.
+  - Resolved right panel and tab headers clipping issue with responsive flexbox proportions and dense tab styling.
+  - Removed redundant English suffixes in Korean tab labels.
+
+## [0.7.0] - 2026-09-20
+
+### Added
+- **Project-isolated Blackboard**:
+  - Independent blackboard workspaces per project (`blackboard/<project_name>/`).
+  - Automatic synchronization and refresh across project switches.
+- **Process Cancellation & Process Group Termination**:
+  - Subprocess cancellation with SIGTERM/SIGKILL across process groups.
+
 ## [0.6.0] - 2026-09-20
 
 ### Added

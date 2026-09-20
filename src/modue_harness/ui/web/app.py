@@ -146,7 +146,7 @@ def run_app(
                 with ui.row().classes("items-center gap-3"):
                     ui.icon("hub", size="md").classes("text-blue-400")
                     ui.label(i18n("app_title")).classes("text-lg font-bold tracking-tight")
-                    ui.badge("v0.7.0", color="blue-600").classes("text-xs")
+                    ui.badge("v0.8.0", color="blue-600").classes("text-xs")
 
                 with ui.row().classes("items-center gap-2 sm:gap-3"):
                     projects = ctrl.get_projects()

@@ -402,7 +402,7 @@ class InteractiveSession:
             agents_data[name] = entry
 
         doc = {
-            "version": "0.7.0",
+            "version": "0.8.0",
             "name": "modue-harness-team",
             "conductor": self.conductor_name,
             "agents": agents_data,
