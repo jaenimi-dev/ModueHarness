@@ -205,10 +205,11 @@ def run_app(
                     # + New Project button
                     ui.button(
                         i18n("btn_new_project"),
+                        icon="add",
                         on_click=lambda: new_project_dialog.open() if new_project_dialog else None,
-                    ).props("dense outline size=xs text-color=blue-300")\
+                    ).props("dense outline size=sm text-color=blue-300")\
                      .tooltip(i18n("tooltip_new_project"))\
-                     .classes("text-xs border-blue-500/50 hover:bg-blue-900/30")
+                     .classes("h-8 px-2.5 text-xs font-medium border-blue-500/50 hover:bg-blue-900/30")
 
                     # Delete Project button
                     def open_delete_project_dialog():
@@ -223,19 +224,21 @@ def run_app(
                         delete_project_dialog.open()
 
                     ui.button(
+                        i18n("btn_delete_project"),
                         icon="delete",
                         on_click=open_delete_project_dialog,
-                    ).props("dense outline size=xs text-color=red-400")\
+                    ).props("dense outline size=sm text-color=red-400")\
                      .tooltip(i18n("tooltip_delete_project"))\
-                     .classes("text-xs border-red-500/50 hover:bg-red-900/30")
+                     .classes("h-8 px-2.5 text-xs font-medium border-red-500/50 hover:bg-red-900/30")
 
                     # Refresh all button in header
                     ui.button(
+                        i18n("btn_refresh"),
                         icon="refresh",
                         on_click=lambda: on_refresh_all_click(),
-                    ).props("dense outline size=xs text-color=slate-300")\
+                    ).props("dense outline size=sm text-color=slate-200")\
                      .tooltip(i18n("tooltip_refresh_all"))\
-                     .classes("text-xs border-slate-600 hover:bg-slate-800")
+                     .classes("h-8 px-2.5 text-xs font-medium border-slate-600 hover:bg-slate-800")
 
                     bb_text = f"blackboard/{current_p}" if current_p else "blackboard"
                     bb_badge = ui.badge(bb_text, color="slate-700").classes("text-[10px] font-mono text-slate-400 hidden sm:inline-flex")
