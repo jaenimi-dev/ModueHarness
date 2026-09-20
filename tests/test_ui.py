@@ -459,14 +459,26 @@ def test_corrupt_artifact_metadata_and_windows_paths(tmp_path: Path):
 
     assert board.read_artifact_metadata("valid.md") is None
 
-    # 3. Windows path resolution test
+    # 3. UTF-8 with BOM .meta.json (exact Windows Notepad / PowerShell behavior)
+    bom_meta = board.artifacts_dir / ".bom.md.meta.json"
+    bom_meta.write_bytes(b'\xef\xbb\xbf{"path": "bom.md", "custom": {"project": "default"}}')
+    (board.artifacts_dir / "bom.md").write_bytes(b'\xef\xbb\xbf# BOM Document')
+
+    meta = board.read_artifact_metadata("bom.md")
+    assert meta is not None
+    assert meta.get("custom", {}).get("project") == "default"
+    assert "BOM Document" in board.read_artifact("bom.md")
+
+    # 4. Windows path resolution test
     resolved = board.resolve_artifact_path("blackboard\\artifacts\\subdir\\test.txt")
     assert resolved == board.artifacts_dir / "subdir" / "test.txt"
 
-    # 4. Controller get_artifacts with corrupt metadata should not crash
+    # 5. Controller get_artifacts with corrupt and BOM metadata should not crash
     ctrl = UIController(blackboard_dir=board_dir, projects_root=tmp_path / "projects")
     artifacts = ctrl.get_artifacts()
-    assert any(a["name"] == "valid.md" for a in artifacts)
+    # bom.md was tagged with project='default' so it is in matched artifacts for default project
+    assert any(a["name"] == "bom.md" for a in artifacts)
+    assert "BOM Document" in ctrl.get_artifact_content("bom.md")
 
 
 def test_ui_controller_posix_paths(tmp_path: Path):

@@ -13,7 +13,7 @@ def load_dotenv(env_path: Optional[Path] = None) -> None:
         return
 
     try:
-        content = target.read_text(encoding="utf-8")
+        content = target.read_text(encoding="utf-8-sig")
         for line in content.splitlines():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:

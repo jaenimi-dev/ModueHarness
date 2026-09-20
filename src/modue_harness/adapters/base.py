@@ -88,11 +88,15 @@ class BaseCLIAdapter(ABC):
         if context.input_artifacts:
             prompt_parts.append("### Input Artifacts / Context:")
             for artifact_rel_path in context.input_artifacts:
-                clean_rel = artifact_rel_path.replace("blackboard/artifacts/", "")
+                clean_rel = (
+                    artifact_rel_path.replace("\\", "/")
+                    .replace("blackboard/artifacts/", "")
+                    .lstrip("/")
+                )
                 artifact_file = context.blackboard_dir / "artifacts" / clean_rel
                 if artifact_file.exists():
                     try:
-                        content = artifact_file.read_text(encoding="utf-8")
+                        content = artifact_file.read_text(encoding="utf-8-sig")
                         prompt_parts.append(f"--- [Artifact: {artifact_rel_path}] ---\n{content}\n")
                     except Exception as e:
                         prompt_parts.append(f"--- [Artifact: {artifact_rel_path}] (Failed to read: {e}) ---\n")

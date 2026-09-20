@@ -18,7 +18,7 @@ def _parse_file(file_path: Path) -> Dict[str, Any]:
         raise FileNotFoundError(f"Configuration file not found: {file_path}")
 
     suffix = file_path.suffix.lower()
-    content = file_path.read_text(encoding="utf-8")
+    content = file_path.read_text(encoding="utf-8-sig")
 
     if suffix in [".yaml", ".yml"]:
         if not HAS_YAML:

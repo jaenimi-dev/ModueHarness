@@ -57,7 +57,7 @@ class Blackboard:
         """Load state.json contents."""
         if not self.state_file.exists():
             return {}
-        with open(self.state_file, "r", encoding="utf-8") as f:
+        with open(self.state_file, "r", encoding="utf-8-sig") as f:
             return json.load(f)
 
     def save_state(self, state: Dict[str, Any]) -> None:
@@ -101,7 +101,7 @@ class Blackboard:
         task_path = self.tasks_dir / f"{task_id}.json"
         if not task_path.exists():
             return None
-        with open(task_path, "r", encoding="utf-8") as f:
+        with open(task_path, "r", encoding="utf-8-sig") as f:
             return Task.from_dict(json.load(f))
 
     def update_task_status(
@@ -128,7 +128,7 @@ class Blackboard:
         tasks: List[Task] = []
         for file in sorted(self.tasks_dir.glob("*.json")):
             try:
-                with open(file, "r", encoding="utf-8") as f:
+                with open(file, "r", encoding="utf-8-sig") as f:
                     tasks.append(Task.from_dict(json.load(f)))
             except Exception:
                 continue
@@ -185,7 +185,7 @@ class Blackboard:
         target_path = self.resolve_artifact_path(relative_path)
         if not target_path.exists():
             raise FileNotFoundError(f"Artifact not found: {relative_path} (resolved: {target_path})")
-        with open(target_path, "r", encoding="utf-8") as f:
+        with open(target_path, "r", encoding="utf-8-sig") as f:
             return f.read()
 
     def read_artifact_metadata(self, relative_path: str) -> Optional[Dict[str, Any]]:
@@ -195,7 +195,7 @@ class Blackboard:
             meta_file = target_path.with_name(f".{target_path.name}.meta.json")
             if not meta_file.exists():
                 return None
-            with open(meta_file, "r", encoding="utf-8") as f:
+            with open(meta_file, "r", encoding="utf-8-sig") as f:
                 return json.load(f)
         except Exception:
             return None

@@ -256,7 +256,7 @@ class UIController:
             # 1. Project-local artifacts
             proj_art = self.session.project_dir / "artifacts" / name
             if proj_art.is_file():
-                return proj_art.read_text(encoding="utf-8", errors="replace")
+                return proj_art.read_text(encoding="utf-8-sig", errors="replace")
         except Exception:
             pass
         # 2. Blackboard
@@ -296,7 +296,7 @@ class UIController:
             target = (proj_dir / rel_path).resolve()
             if not target.is_relative_to(proj_dir) or not target.is_file():
                 return ""
-            return target.read_text(encoding="utf-8", errors="replace")
+            return target.read_text(encoding="utf-8-sig", errors="replace")
         except Exception:
             return ""
 
