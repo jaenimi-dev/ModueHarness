@@ -1,6 +1,6 @@
 # ModueHarness 설정 및 실전 사용 매뉴얼 (Configuration & Setup Guide)
 
-ModueHarness 설치를 마친 후, 다양한 AI CLI(Claude Code, Google Antigravity, Aider 등)를 연결하여 팀을 구성하고 실제 프로젝트 작업을 자율적으로 실행하기 위한 **단계별 설정 매뉴얼**입니다.
+ModueHarness 기본 설치([docs/installation.md](installation.md))를 마친 후, 다양한 AI CLI(Claude Code, Google Antigravity, OpenAI Codex, Aider 등)를 연결하여 팀을 구성하고 실제 프로젝트 작업을 자율적으로 실행하기 위한 **단계별 설정 매뉴얼**입니다.
 
 ---
 

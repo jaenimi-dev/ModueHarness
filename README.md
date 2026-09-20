@@ -11,10 +11,11 @@
 
 ## 🚀 빠른 시작 (Quick Start)
 
-### 1. 설치 및 환경 구성
+### 1. 설치 (Installation)
 
-#### [방법 1 - 추천] 원클릭 자동 설치 스크립트
-Git / GitHub CLI(gh)를 통한 저장소 클론 및 최신화(`git pull`), 전체 패키지(`pip install -e ".[all]"`) 설치 및 검증까지 자동으로 한 번에 수행합니다:
+> 📦 **상세 설치 및 환경 구성 매뉴얼**: **[docs/installation.md](docs/installation.md)**
+
+터미널에서 아래 원라인 명령어를 실행하면 저장소 복제/동기화부터 전체 패키지 설치(`pip install -e ".[all]"`) 및 검증까지 자동으로 완료됩니다:
 
 - **Linux / macOS**:
   ```bash
@@ -25,29 +26,7 @@ Git / GitHub CLI(gh)를 통한 저장소 클론 및 최신화(`git pull`), 전�
   irm https://raw.githubusercontent.com/jaenimi-dev/ModueHarness/main/install.ps1 | iex
   ```
 
----
-
-#### [방법 2] 수동 설치 (Git / gh CLI)
-저장소를 직접 내려받고 전체 패키지를 설치하려면:
-
-```bash
-# 1) 저장소 클론 (Git 또는 gh 중 편한 도구 사용)
-git clone https://github.com/jaenimi-dev/ModueHarness.git
-# (또는 GitHub CLI 사용 시: gh repo clone jaenimi-dev/ModueHarness)
-
-cd ModueHarness
-
-# 2) 전체 패키지 한 번에 설치 (Core + Dev + Web UI NiceGUI + Terminal TUI Textual)
-pip install -e ".[all]"
-
-# (이미 클론된 상태에서 최신 버전 갱신 시: git pull origin main && pip install -e ".[all]")
-# (또는 다운로드 후 스크립트 실행: ./install.sh)
-```
-
-> 💡 **의존성 옵션 안내**:  
-> - `pip install -e ".[all]"` : 코어, 개발 도구, 웹 UI(NiceGUI), 터미널 TUI(Textual) 전체 설치 (**권장**)  
-> - `pip install -e ".[dev]"` : CLI 코어 및 pytest 테스트 도구만 가볍게 설치  
-> - `pip install -e ".[ui]"`  : Web UI 및 TUI 대시보드 도구만 추가 설치
+*(Git 또는 GitHub CLI(`gh`)를 통한 수동 설치, 단계별 패키지 옵션(`[dev]`, `[ui]`) 및 트러블슈팅은 **[설치 가이드(docs/installation.md)](docs/installation.md)**를 참조하세요.)*
 
 ### 2. 테스트 검증
 ```bash
@@ -109,6 +88,8 @@ python run.py debate --topic "REST vs GraphQL for Mobile Backend" --proposer cla
 
 자세한 설정 방법 및 아키텍처는 `docs/` 디렉터리에서 확인하실 수 있습니다:
 
+- 📦 **[설치 및 환경 구성 가이드 (Installation Guide)](docs/installation.md)**  
+  원클릭 자동 설치 스크립트, Git/gh 수동 설치, 단계별 의존성 패키지 옵션 및 트러블슈팅
 - 📖 **[설정 및 실전 사용 매뉴얼 (Configuration & Setup Guide)](docs/configuration_guide.md)**  
   설치 후 실제 AI CLI(Claude, AGY, Codex, Aider) 연결, `.env` 환경 변수 설정, 팀 구성 및 트러블슈팅 단계별 가이드
 - 🤖 **[Claude Code 연동 및 퀵스타트 가이드 (Claude Code Guide)](docs/claude_guide.md)**  
