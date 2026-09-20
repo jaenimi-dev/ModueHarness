@@ -991,6 +991,90 @@ def run_app(
 
                             jobs_container = ui.column().classes("w-full flex-1 min-h-0 overflow-y-auto gap-2 pr-0.5")
 
+                            # Shared job detail dialog
+                            job_detail_dialog = ui.dialog().props("maximized=false")
+                            job_detail_state: Dict[str, Any] = {}
+
+                            with job_detail_dialog, ui.card().classes(
+                                "w-[600px] max-w-[95vw] max-h-[80vh] p-4 bg-slate-900 border border-slate-700 text-white flex flex-col gap-2"
+                            ):
+                                with ui.row().classes("w-full items-center justify-between flex-shrink-0"):
+                                    job_detail_title = ui.label(i18n("dialog_job_detail_title")).classes("text-sm font-bold text-blue-400")
+                                    ui.button(icon="close", on_click=job_detail_dialog.close).props("flat dense round text-color=slate-400")
+
+                                job_detail_body = ui.column().classes("w-full flex-1 min-h-0 overflow-y-auto gap-2")
+
+                            def open_job_detail(j: Dict[str, Any]):
+                                job_detail_state.update(j)
+                                job_detail_body.clear()
+                                st = (j.get("status") or "running").lower()
+                                badge_color = {
+                                    "completed": "green-700",
+                                    "running": "amber-700",
+                                    "failed": "red-700",
+                                    "cancelled": "slate-600",
+                                }.get(st, "slate-700")
+                                status_icon = {
+                                    "completed": "✓",
+                                    "running": "▶",
+                                    "failed": "✗",
+                                    "cancelled": "⏹",
+                                }.get(st, "•")
+                                dur_sec = j.get("duration_sec", 0.0)
+
+                                with job_detail_body:
+                                    # Header row: job id, status, duration
+                                    with ui.row().classes("w-full items-center gap-2 flex-wrap"):
+                                        ui.badge(f"{status_icon} {st}", color=badge_color).classes("text-[10px] font-bold")
+                                        ui.label(j.get("id", "job")).classes("text-xs font-mono font-bold text-white")
+                                        ui.label(f"{dur_sec:.1f}s").classes("text-[11px] font-mono text-slate-400")
+                                        if j.get("project"):
+                                            ui.badge(j["project"], color="slate-700").classes("text-[10px]")
+
+                                    ui.separator().classes("my-0.5")
+
+                                    # Command
+                                    cmd_text = j.get("command", "")
+                                    if cmd_text:
+                                        ui.label(i18n("dialog_job_detail_command")).classes("text-[10px] font-semibold text-slate-400 uppercase tracking-wide")
+                                        ui.label(cmd_text).classes("text-xs text-white bg-slate-800 p-2 rounded font-mono whitespace-pre-wrap break-all border border-slate-700")
+
+                                    # Stage
+                                    stage_text = j.get("stage", "")
+                                    if stage_text:
+                                        ui.label(i18n("dialog_job_detail_stage")).classes("text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-1")
+                                        ui.label(stage_text).classes("text-xs font-mono text-slate-300 bg-slate-800/50 px-2 py-1 rounded")
+
+                                    # Error
+                                    if j.get("error"):
+                                        ui.label(i18n("dialog_job_detail_error")).classes("text-[10px] font-semibold text-red-400 uppercase tracking-wide mt-1")
+                                        ui.label(str(j["error"])).classes("text-xs text-red-300 bg-red-900/20 p-2 rounded whitespace-pre-wrap break-all border border-red-800/40")
+
+                                    # Logs
+                                    logs = j.get("logs", [])
+                                    if logs:
+                                        ui.label(f"{i18n('dialog_job_detail_logs')} ({len(logs)})").classes("text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-1")
+                                        log_box = ui.column().classes("w-full bg-slate-950 rounded border border-slate-800 p-2 gap-0 max-h-[40vh] overflow-y-auto")
+                                        with log_box:
+                                            for log_line in logs:
+                                                for sub in str(log_line).splitlines():
+                                                    lc = "text-slate-300"
+                                                    if any(k in sub for k in ("✓", "SUCCESS", "완료")):
+                                                        lc = "text-green-400"
+                                                    elif any(k in sub for k in ("✗", "❌", "FAILED", "실패", "Error")):
+                                                        lc = "text-red-400"
+                                                    elif any(k in sub for k in ("🧠", "[1/3]")):
+                                                        lc = "text-blue-300"
+                                                    elif any(k in sub for k in ("🛠️", "[2/3]")):
+                                                        lc = "text-amber-300"
+                                                    elif any(k in sub for k in ("📝", "[3/3]")):
+                                                        lc = "text-indigo-300"
+                                                    ui.label(sub or " ").classes(f"font-mono text-[11px] {lc} whitespace-pre-wrap break-all leading-relaxed")
+                                    else:
+                                        ui.label(i18n("empty_content")).classes("text-xs text-slate-500 italic")
+
+                                job_detail_dialog.open()
+
                             def refresh_jobs():
                                 try:
                                     jobs = ctrl.get_jobs()
@@ -1010,7 +1094,6 @@ def run_app(
                                                         "failed": "red-700",
                                                         "cancelled": "slate-600",
                                                     }.get(st, "slate-700")
-
                                                     status_icon = {
                                                         "completed": "✓",
                                                         "running": "▶",
@@ -1018,29 +1101,35 @@ def run_app(
                                                         "cancelled": "⏹",
                                                     }.get(st, "•")
 
-                                                    with ui.card().classes("w-full p-2.5 bg-slate-900 border border-slate-700 rounded gap-1 flex-shrink-0"):
-                                                        with ui.row().classes("w-full items-center justify-between no-wrap"):
-                                                            with ui.row().classes("items-center gap-1.5 min-w-0"):
-                                                                ui.badge(f"{status_icon} {st}", color=badge_color).classes("text-[10px] font-bold")
+                                                    with ui.card().classes("w-full p-2 bg-slate-900 border border-slate-700 rounded gap-0.5 flex-shrink-0 overflow-hidden"):
+                                                        # Top row: badge + id + duration
+                                                        with ui.row().classes("w-full items-center justify-between no-wrap overflow-hidden gap-1"):
+                                                            with ui.row().classes("items-center gap-1.5 min-w-0 overflow-hidden"):
+                                                                ui.badge(f"{status_icon} {st}", color=badge_color).classes("text-[10px] font-bold flex-shrink-0")
                                                                 ui.label(j.get("id", "job")).classes("text-xs font-mono font-bold text-white truncate")
                                                             dur_sec = j.get("duration_sec", 0.0)
-                                                            ui.label(f"{dur_sec:.1f}s").classes("text-[11px] font-mono text-slate-400")
+                                                            ui.label(f"{dur_sec:.1f}s").classes("text-[11px] font-mono text-slate-400 flex-shrink-0")
 
+                                                        # Command preview (1 line, truncated)
                                                         cmd_text = j.get("command", "")
                                                         if cmd_text:
-                                                            ui.label(cmd_text).classes("text-xs text-slate-300 line-clamp-2 mt-0.5")
+                                                            preview = cmd_text.splitlines()[0][:80] + ("…" if len(cmd_text) > 80 or "\n" in cmd_text else "")
+                                                            ui.label(preview).classes("text-[11px] text-slate-400 truncate w-full mt-0.5")
 
-                                                        stage_text = j.get("stage", "")
-                                                        if stage_text:
-                                                            with ui.row().classes("items-center gap-1 mt-0.5 text-[11px] text-slate-400"):
-                                                                ui.icon("hourglass_empty" if st == "running" else "flag", size="xs").classes("text-slate-400")
-                                                                ui.label(stage_text).classes("text-[10px] font-mono text-slate-400 truncate")
+                                                        # Bottom row: detail button + cancel button
+                                                        with ui.row().classes("w-full items-center justify-between mt-1 gap-1"):
+                                                            def make_detail_handler(job_data=j):
+                                                                def _open():
+                                                                    open_job_detail(job_data)
+                                                                return _open
 
-                                                        if j.get("error"):
-                                                            ui.label(f"❌ {j['error']}").classes("text-[11px] text-red-400 line-clamp-2 mt-0.5")
+                                                            ui.button(
+                                                                i18n("btn_job_detail"),
+                                                                icon="info_outline",
+                                                                on_click=make_detail_handler(j),
+                                                            ).props("dense outline size=xs text-color=blue-300").classes("text-[10px]")
 
-                                                        if st == "running":
-                                                            with ui.row().classes("w-full justify-end mt-1"):
+                                                            if st == "running":
                                                                 def make_cancel_handler(jid=j.get("id")):
                                                                     def _cancel():
                                                                         ctrl.cancel_job(jid)
@@ -1049,7 +1138,7 @@ def run_app(
                                                                     return _cancel
 
                                                                 ui.button(
-                                                                    f"{i18n('btn_cancel_job')}",
+                                                                    i18n("btn_cancel_job"),
                                                                     icon="stop",
                                                                     color="red",
                                                                     on_click=make_cancel_handler(j.get("id")),
