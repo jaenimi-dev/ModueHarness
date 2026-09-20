@@ -20,13 +20,15 @@ flowchart TB
     subgraph UserInterface["사용자 및 CLI 제어 인터페이스"]
         CLICommand["Direct CLI Command\n(modue-harness '<명령>' -P <프로젝트>)"]
         REPL["Interactive REPL\n(modue-harness -i)"]
+        WebUI["Web UI Dashboard\n(NiceGUI - Browser Cockpit)"]
+        TUI["Terminal TUI Dashboard\n(Textual - Console Fullscreen)"]
         LegacyWorkflow["Workflow Runner\n(modue-harness run -c ...)"]
     end
 
     subgraph CoreEngine["ModueHarness Core Engine"]
         InteractiveEngine["InteractiveSession\n(Project Dispatcher & REPL Loop)"]
         WorkflowMgr["Workflow Topologies\n(Conductor / Pipeline / Debate)"]
-        Blackboard["Shared State & Blackboard\n(state.json, tasks/, artifacts/, logs/)"]
+        Blackboard["Shared State & Blackboard\n(state.json, tasks/, artifacts/, jobs/, logs/)"]
         EventBus["EventBus (Pub/Sub Lifecycle Events)"]
         Supervisor["ProcessSupervisor & Safety Watchdog\n(Timeouts, Stalls, Loop Detection)"]
         WorkspaceMgr["Workspace & Git Isolation\n(Worktree, Diff, Snapshot)"]
@@ -45,19 +47,21 @@ flowchart TB
         
         ClaudeAdapter["ClaudeCode Adapter\n(claude)"]
         AGYAdapter["Antigravity Adapter\n(agy)"]
+        CodexAdapter["Codex Adapter\n(codex)"]
         AiderAdapter["Aider Adapter\n(aider)"]
         GenericAdapter["Generic CLI Adapter\n(Custom scripts/models)"]
         
         BaseAdapter --> ClaudeAdapter
         BaseAdapter --> AGYAdapter
+        BaseAdapter --> CodexAdapter
         BaseAdapter --> AiderAdapter
         BaseAdapter --> GenericAdapter
     end
 
     subgraph StorageSpaces["작업 및 저장 공간의 분리"]
         direction LR
-        subgraph BlackboardSpace["공용 칠판 (AI 정보 교환 전용)"]
-            BBDir["blackboard/\n• state.json (진행 상태)\n• tasks/ (태스크 큐)\n• artifacts/ (plan.md, synthesis.md)\n• logs/ (실행 원시 로그)"]
+        subgraph BlackboardSpace["프로젝트별 격리 칠판 (AI 정보 교환 전용)"]
+            BBDir["blackboard/<프로젝트명>/\n• state.json (진행 상태)\n• tasks/ (태스크 큐)\n• artifacts/ (plan.md, synthesis.md)\n• jobs/ (작업 이력)\n• logs/ (실행 원시 로그)"]
         end
 
         subgraph ProjectSpace["프로젝트 작업 공간 (실제 소스코드 구현)"]
@@ -67,6 +71,8 @@ flowchart TB
 
     CLICommand --> InteractiveEngine
     REPL --> InteractiveEngine
+    WebUI --> InteractiveEngine
+    TUI --> InteractiveEngine
     LegacyWorkflow --> WorkflowMgr
 
     CoreEngine --> AdapterLayer
@@ -78,26 +84,27 @@ flowchart TB
 
 ## 3. 핵심 컴포넌트 상세
 
-### 3.1 공용 칠판(`blackboard/`)과 프로젝트 공간(`projects/`)의 분리
-ModueHarness는 AI 간 통신과 실제 구현 코드의 오염을 방지하기 위해 저장소를 이원화합니다:
+### 3.1 프로젝트별 공용 칠판(`blackboard/<프로젝트명>/`)과 작업 공간(`projects/`)의 분리
+ModueHarness는 AI 간 통신과 실제 구현 코드의 오염을 방지하고 다중 프로젝트를 독립적으로 운영할 수 있도록 저장소를 이원화 및 격리합니다:
 
-1. **공용 칠판 (`blackboard/`)**:
+1. **프로젝트별 격리 칠판 (`blackboard/<프로젝트명>/`)**:
    - AI 에이전트들이 메모리를 직접 공유하지 않고 파일 기반으로 상태와 결과물을 안전하게 교환하는 가시적 공간.
    - `state.json`: 현재 세션, 활성 프로젝트, 진행 상태
    - `tasks/`: 서브태스크 정의 및 진행 현황 (`task_1.json` 등)
    - `artifacts/`: 기획서(`plan.md`), 판정 합의안(`consensus.md`), 최종 종합 보고서(`synthesis_report.md`)
+   - `jobs/`: 백그라운드 및 포그라운드 작업 이력 및 로그
    - `logs/`: 각 AI CLI의 프로세스 stdout/stderr 원시 로그
 
 2. **프로젝트 작업 공간 (`projects/<프로젝트명>/`)**:
    - AI CLI 어댑터가 실행될 때 서브프로세스의 작업 디렉터리(`cwd`)로 지정됩니다.
-   - AI 에이전트(Claude Code, AGY, Aider 등)가 직접 파일 생성, 편집, 테스트 명령을 수행하는 격리된 실제 소스코드 디렉터리입니다.
+   - AI 에이전트(Claude Code, Google Antigravity, OpenAI Codex, Aider 등)가 직접 파일 생성, 편집, 테스트 명령을 수행하는 격리된 실제 소스코드 디렉터리입니다.
    - `.gitignore`에 등록되어 ModueHarness 프레임워크 자체 저장소와 분리 관리됩니다.
 
 ---
 
 ### 3.2 대화형 CLI 세션 (`InteractiveSession`)
 - 사용자가 복잡한 YAML 워크플로우를 작성하지 않고도 터미널에서 즉시 프로젝트를 개발할 수 있도록 지원합니다.
-- 시스템 환경에 설치된 AI CLI(`claude`, `agy`, `aider`)를 자동 감지하여 Leader(아키텍트)와 Worker(개발자, 리뷰어) 팀을 즉시 구성합니다.
+- 시스템 환경에 설치된 AI CLI(`claude`, `agy`, `codex`, `aider`)를 자동 감지하여 Leader(아키텍트)와 Worker(개발자, 리뷰어) 팀을 즉시 구성합니다.
 - `/project <이름>`, `/projects`, `/files`, `/status` 등의 슬래시 명령어로 다중 프로젝트를 유연하게 전환하고 관리할 수 있습니다.
 
 ---

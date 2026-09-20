@@ -84,7 +84,23 @@ ModueHarness는 사용자의 시스템에 설치된 실제 AI CLI 명령어를 �
   aider --message "echo OK" --yes-always --no-git
   ```
 
-### 4. 로컬 LLM 및 범용 스크립트 (`generic`)
+### 4. OpenAI ChatGPT Codex (`codex`)
+- **설치**:
+  - macOS / Linux: `curl -fsSL https://chatgpt.com/codex/install.sh | sh`
+  - Windows: `powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"`  
+    *(설치 후 새로운 PowerShell 창을 열거나 재기동하여 PATH 적용)*
+- **인증**:
+  ```bash
+  codex login
+  ```
+- **지원 모델**: `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`
+- **동작 검증**:
+  ```bash
+  codex exec --sandbox workspace-write "echo OK"
+  ```
+- 💡 **상세 매뉴얼**: 설치 및 권한, 모델 설정, ModueHarness 연동 방법은 **[docs/codex_guide.md](codex_guide.md)**를 참조하십시오.
+
+### 5. 로컬 LLM 및 범용 스크립트 (`generic`)
 - Ollama(`ollama run llama3`), 로컬 Python 스크립트, Shell 명령 등은 별도 클라우드 API 키 없이 즉시 `generic` 어댑터로 등록할 수 있습니다.
 
 ---

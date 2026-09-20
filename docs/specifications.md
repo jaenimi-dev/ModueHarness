@@ -19,12 +19,12 @@ ModueHarness는 정적 파이프라인 및 복잡한 배치 자동화를 위해 
 어떤 AI CLI 도구(Claude, AGY, Aider 등)와 모델, 권한, 역할을 가진 팀원들로 구성할지 선언합니다.
 
 ```yaml
-version: "0.6.0"
+version: "0.8.0"
 name: "modue-engineering-team"
 
 agents:
   planner:
-    adapter: "claude"                  # claude, antigravity (agy), aider, generic
+    adapter: "claude"                  # claude, antigravity (agy), codex, aider, generic
     command: "claude"                  # 실행할 CLI 명령어
     args: ["--permission-mode", "auto"] # 추가 실행 인자 (프롬프트 멈춤 방지)
     model: "claude-3-7-sonnet-latest"  # 선택적 모델 지정 (sonnet, opus, haiku 등)
@@ -33,19 +33,18 @@ agents:
     system_instruction: "You are the lead architect..."
 
   coder:
+    adapter: "codex"                   # OpenAI ChatGPT Codex
+    command: "codex"
+    model: "gpt-5.6-terra"
+    effort: "high"
+    role: "Software Engineer"
+
+  reviewer:
     adapter: "antigravity"             # 또는 agy
     command: "agy"
     args: ["--dangerously-skip-permissions"]
     model: "gemini-3.8-flash-high"
     effort: "medium"
-    role: "Software Engineer"
-
-  reviewer:
-    adapter: "claude"
-    command: "claude"
-    args: ["--permission-mode", "auto"]
-    model: "claude-3-7-sonnet-latest"
-    effort: "high"
     role: "Quality Reviewer"
 ```
 
@@ -56,7 +55,7 @@ agents:
 실제 프로젝트에서 수행할 태스크, 산출물 입출력 연계, 실행 조건, 격리 옵션을 정의합니다.
 
 ```yaml
-version: "0.6.0"
+version: "0.8.0"
 name: "data-pipeline-feature"
 
 # 사용할 AI 팀 명세 파일 지정 (상대 경로 가능)

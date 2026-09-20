@@ -102,19 +102,25 @@ python run.py "기존 코드베이스 분석 및 버그 수정" -P my-repo
 - `--projects-dir`: 프로젝트 루트 디렉터리 경로 (기본값: `projects`)
 - `--dir`, `-d`: 공용 칠판 디렉터리 경로 (기본값: `blackboard`)
 - `--agents`, `-a`: 사용할 AI 팀 명세 파일 (`config/agents.yaml` 미존재 시 시스템 CLI 도구 자동 감지)
-- `--agent`: 특정 단일 AI 에이전트 어댑터 지정 (예: `claude`, `agy` 또는 `antigravity`, `aider`, `generic`)
-- `-m`, `--model`: 사용할 AI 모델명 지정 (Claude: `sonnet`, `opus`, `haiku` 등 / Antigravity: `gemini-3.8-flash-high`, `gemini-3.5-pro` 등)
-- `-e`, `--effort`: AI 추론 노력(Reasoning Effort) 수준 지정 (Claude: `low`, `medium`, `high`, `max` / Antigravity: `low`, `medium`, `high`)
+- `--agent`: 특정 단일 AI 에이전트 어댑터 지정 (예: `claude`, `agy` 또는 `antigravity`, `codex`, `aider`, `generic`)
+- `-m`, `--model`: 사용할 AI 모델명 지정 (Claude: `sonnet`, `opus` 등 / Antigravity: `gemini-3.8-flash-high` 등 / Codex: `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`)
+- `-e`, `--effort`: AI 추론 노력(Reasoning Effort) 수준 지정 (Claude: `low`, `medium`, `high`, `max` / Antigravity & Codex: `low`, `medium`, `high`)
 - `-t`, `--timeout`: AI 실행 1턴당 타임아웃(초) 지정 (기본값: `None` / 무제한 대기)
 
 ---
 
-## 3. 프로젝트 목록 조회 (`projects`)
+## 3. 프로젝트 목록 조회 및 삭제 (`projects`)
 
-생성된 프로젝트 폴더 목록을 확인합니다.
+생성된 프로젝트 폴더 목록을 확인하거나 특정 프로젝트를 삭제합니다.
 
 ```bash
-python3 -m modue_harness.cli projects [--projects-dir <path>]
+# 생성된 프로젝트 목록 조회
+python run.py projects
+# (또는: modue-harness projects)
+
+# 프로젝트 및 해당 격리 블랙보드 영구 삭제
+python run.py projects --delete <프로젝트명>
+# (또는: modue-harness projects --delete <프로젝트명>)
 ```
 
 ---
