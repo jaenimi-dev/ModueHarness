@@ -713,22 +713,28 @@ def run_app(
                                     lines = data.get("lines", [])
                                     for line in lines:
                                         loop.call_soon_threadsafe(push_log, line)
-                                    if event in ("planning_end", "task_start", "task_end"):
+                                    if event in ("planning_end", "task_start", "task_end", "synthesis_end"):
                                         loop.call_soon_threadsafe(refresh_tasks)
                                         loop.call_soon_threadsafe(refresh_artifacts)
+                                        loop.call_soon_threadsafe(refresh_jobs)
 
                                 def on_sync():
                                     return ctrl.execute_command(cmd, on_progress=handle_progress)
 
                                 res = await loop.run_in_executor(None, on_sync)
                                 success = res.get("success", False)
-                                state["status_text_key"] = "status_completed" if success else "status_failed"
-                                state["status_color"] = "green-600" if success else "red-600"
+                                is_cancelled = res.get("status") == "cancelled"
+                                if is_cancelled:
+                                    state["status_text_key"] = "status_cancelled"
+                                    state["status_color"] = "red-700"
+                                else:
+                                    state["status_text_key"] = "status_completed" if success else "status_failed"
+                                    state["status_color"] = "green-600" if success else "red-600"
                                 status_badge.set_text(i18n(state["status_text_key"]))
                                 status_badge.props(f"color={state['status_color']}")
 
                                 push_log("\n" + "=" * 54)
-                                status_text = "SUCCESS" if success else "FAILED"
+                                status_text = "CANCELLED" if is_cancelled else ("SUCCESS" if success else "FAILED")
                                 dur = res.get("total_duration_sec", 0.0)
                                 push_log(f"상태: {status_text} (소요 시간: {dur:.2f}s)")
                                 push_log(f"프로젝트 구현 폴더: {res.get('project_dir', ctrl.project_dir)}")
@@ -765,7 +771,14 @@ def run_app(
 
                     run_btn.on_click(lambda: run_task(is_async=False))
                     async_btn.on_click(lambda: run_task(is_async=True))
-                    cancel_btn.on_click(lambda: (ctrl.cancel_job(), ui.notify(i18n("notify_task_cancelled"), type="warning")))
+
+                    def on_cancel_btn_click():
+                        ctrl.cancel_job()
+                        push_log("\n⚠️ [ModueHarness] 작업 중단 요청됨 (작업 취소 중...)")
+                        ui.notify(i18n("notify_task_cancelled"), type="warning")
+                        refresh_jobs()
+
+                    cancel_btn.on_click(on_cancel_btn_click)
 
                 # Right Pane: Blackboard Tasks, Artifacts & Project Files
                 with ui.card().classes(
@@ -920,23 +933,92 @@ def run_app(
                                 )
                             )
 
-                        # Tab 3: Background Jobs
+                        # Tab 3: Task & Background Jobs History
                         with ui.tab_panel(tab_jobs).classes("p-0 h-full flex flex-col gap-2 overflow-hidden"):
-                            jobs_container = ui.column().classes("w-full flex-1 min-h-0 overflow-y-auto gap-2")
+                            with ui.row().classes("w-full items-center justify-between flex-shrink-0"):
+                                jobs_title_label = ui.label(i18n("jobs_overview")).classes("text-xs font-semibold text-slate-300")
+                                ui.button(icon="refresh", on_click=lambda: on_refresh_jobs_click())\
+                                    .props("dense outline size=sm text-color=blue-300")\
+                                    .tooltip(i18n("tooltip_refresh_jobs"))\
+                                    .classes("border-blue-500/40 hover:bg-blue-900/30")
+
+                            jobs_container = ui.column().classes("w-full flex-1 min-h-0 overflow-y-auto gap-2 pr-0.5")
 
                             def refresh_jobs():
                                 try:
-                                    jobs_container.clear()
-                                    with jobs_container:
-                                        jobs = ctrl.get_jobs()
-                                        if not jobs:
-                                            ui.label(i18n("empty_content")).classes("text-xs text-slate-400 italic p-2")
-                                        for j in jobs:
-                                            with ui.card().classes("w-full p-2 bg-slate-900 rounded text-xs"):
-                                                ui.label(f"[{j['id']}] {j['status']} ({j['duration_sec']:.1f}s)").classes("font-bold")
-                                                ui.label(j['command']).classes("text-slate-400 truncate")
+                                    jobs = ctrl.get_jobs()
+                                    jobs_title_label.set_text(f"{i18n('jobs_overview')} ({len(jobs)})")
+
+                                    def _render_jobs():
+                                        jobs_container.clear()
+                                        with jobs_container:
+                                            if not jobs:
+                                                ui.label(i18n("no_jobs_yet")).classes("text-xs text-slate-400 italic p-3 text-center")
+                                            else:
+                                                for j in jobs:
+                                                    st = (j.get("status") or "running").lower()
+                                                    badge_color = {
+                                                        "completed": "green-700",
+                                                        "running": "amber-700",
+                                                        "failed": "red-700",
+                                                        "cancelled": "slate-600",
+                                                    }.get(st, "slate-700")
+
+                                                    status_icon = {
+                                                        "completed": "✓",
+                                                        "running": "▶",
+                                                        "failed": "✗",
+                                                        "cancelled": "⏹",
+                                                    }.get(st, "•")
+
+                                                    with ui.card().classes("w-full p-2.5 bg-slate-900 border border-slate-700 rounded gap-1 flex-shrink-0"):
+                                                        with ui.row().classes("w-full items-center justify-between no-wrap"):
+                                                            with ui.row().classes("items-center gap-1.5 min-w-0"):
+                                                                ui.badge(f"{status_icon} {st}", color=badge_color).classes("text-[10px] font-bold")
+                                                                ui.label(j.get("id", "job")).classes("text-xs font-mono font-bold text-white truncate")
+                                                            dur_sec = j.get("duration_sec", 0.0)
+                                                            ui.label(f"{dur_sec:.1f}s").classes("text-[11px] font-mono text-slate-400")
+
+                                                        cmd_text = j.get("command", "")
+                                                        if cmd_text:
+                                                            ui.label(cmd_text).classes("text-xs text-slate-300 line-clamp-2 mt-0.5")
+
+                                                        stage_text = j.get("stage", "")
+                                                        if stage_text:
+                                                            with ui.row().classes("items-center gap-1 mt-0.5 text-[11px] text-slate-400"):
+                                                                ui.icon("hourglass_empty" if st == "running" else "flag", size="xs").classes("text-slate-400")
+                                                                ui.label(stage_text).classes("text-[10px] font-mono text-slate-400 truncate")
+
+                                                        if j.get("error"):
+                                                            ui.label(f"❌ {j['error']}").classes("text-[11px] text-red-400 line-clamp-2 mt-0.5")
+
+                                                        if st == "running":
+                                                            with ui.row().classes("w-full justify-end mt-1"):
+                                                                def make_cancel_handler(jid=j.get("id")):
+                                                                    def _cancel():
+                                                                        ctrl.cancel_job(jid)
+                                                                        ui.notify(i18n("notify_task_cancelled"), type="warning")
+                                                                        refresh_all()
+                                                                    return _cancel
+
+                                                                ui.button(
+                                                                    f"{i18n('btn_cancel_job')}",
+                                                                    icon="stop",
+                                                                    color="red",
+                                                                    on_click=make_cancel_handler(j.get("id")),
+                                                                ).props("dense outline size=xs")
+
+                                    if client:
+                                        with client:
+                                            _render_jobs()
+                                    else:
+                                        _render_jobs()
                                 except Exception:
                                     pass
+
+                            def on_refresh_jobs_click():
+                                refresh_jobs()
+                                ui.notify(i18n("notify_jobs_refreshed"), type="info")
 
                     def on_refresh_artifacts_click():
                         refresh_artifacts()

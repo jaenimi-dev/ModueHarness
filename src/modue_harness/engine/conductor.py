@@ -40,10 +40,16 @@ class ConductorRunner:
         self.progress_callback = progress_callback
         self.timeout = timeout
         self._is_cancelled: bool = False
+        self._active_adapter: Optional[Any] = None
 
     def cancel(self) -> None:
-        """Request cancellation of running workflow."""
+        """Request cancellation of running workflow and terminate active adapter subprocess."""
         self._is_cancelled = True
+        if self._active_adapter and hasattr(self._active_adapter, "cancel"):
+            try:
+                self._active_adapter.cancel()
+            except Exception:
+                pass
 
     def _notify(self, event: str, data: Dict[str, Any]) -> None:
         """Emit real-time progress event to registered callback."""
@@ -138,7 +144,22 @@ class ConductorRunner:
             "full_command_str": plan_full_cmd_str,
         })
 
-        plan_result = conductor_adapter.execute(plan_context, timeout=self.timeout)
+        self._active_adapter = conductor_adapter
+        try:
+            plan_result = conductor_adapter.execute(plan_context, timeout=self.timeout)
+        finally:
+            self._active_adapter = None
+
+        if self._is_cancelled:
+            return {
+                "status": "cancelled",
+                "success": False,
+                "goal": self.goal,
+                "subtasks": [],
+                "error_message": "작업이 취소되었습니다 (User cancelled)",
+                "total_duration_sec": time.time() - start_time,
+            }
+
         if not plan_result.is_success:
             self._notify("planning_end", {"conductor": self.conductor_name, "is_success": False, "error": plan_result.error_message})
             return {
@@ -232,7 +253,27 @@ class ConductorRunner:
                 "full_command_str": worker_full_cmd_str,
             })
 
-            res = worker_adapter.execute(turn_ctx, timeout=self.timeout)
+            self._active_adapter = worker_adapter
+            try:
+                res = worker_adapter.execute(turn_ctx, timeout=self.timeout)
+            finally:
+                self._active_adapter = None
+
+            if self._is_cancelled:
+                overall_success = False
+                failure_reason = "작업이 취소되었습니다 (User cancelled)"
+                self.blackboard.update_task_status(task_id, TaskStatus.FAILED, {"error": "작업이 취소되었습니다."})
+                self._notify("task_end", {
+                    "task_id": task_id,
+                    "agent": assigned,
+                    "is_success": False,
+                    "duration_sec": res.duration_sec,
+                    "error": "작업이 취소되었습니다 (Cancelled by user)",
+                    "command": worker_cmd_display,
+                    "full_command_str": worker_full_cmd_str,
+                })
+                break
+
             task_record = {
                 "task_id": task_id,
                 "agent": assigned,
@@ -305,7 +346,11 @@ class ConductorRunner:
                 "command": synth_cmd_display,
                 "full_command_str": synth_full_cmd_str,
             })
-            synth_res = conductor_adapter.execute(synth_ctx, timeout=self.timeout)
+            self._active_adapter = conductor_adapter
+            try:
+                synth_res = conductor_adapter.execute(synth_ctx, timeout=self.timeout)
+            finally:
+                self._active_adapter = None
             if synth_res.is_success:
                 self.blackboard.write_artifact(
                     "synthesis_report.md",

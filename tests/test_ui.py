@@ -934,4 +934,134 @@ def test_project_switch_auto_refreshes_tasks_and_artifacts(tmp_path: Path):
     assert not any(a["name"] == "spec_b.md" for a in arts_a_again)
 
 
+def test_job_history_populated_and_persisted(tmp_path: Path):
+    """Test that task executions are tracked in get_jobs() and persisted on blackboard."""
+    projects_root = tmp_path / "projects"
+    board_root = tmp_path / "blackboard"
+
+    ctrl = UIController(
+        project_name="job_demo",
+        projects_root=projects_root,
+        blackboard_dir=board_root,
+    )
+
+    # Initial jobs should be empty
+    assert len(ctrl.get_jobs()) == 0
+
+    # Save a mock job directly to blackboard
+    job_dict = {
+        "id": "job_1",
+        "command": "build login page",
+        "project": "job_demo",
+        "status": "completed",
+        "stage": "완료 (done)",
+        "started_at": 1000.0,
+        "ended_at": 1005.0,
+        "duration_sec": 5.0,
+        "error": None,
+        "logs": ["Planning started", "Task completed"],
+    }
+    ctrl.session.blackboard.save_job(job_dict)
+
+    # Must be returned by ctrl.get_jobs()
+    jobs = ctrl.get_jobs()
+    assert len(jobs) == 1
+    assert jobs[0]["id"] == "job_1"
+    assert jobs[0]["command"] == "build login page"
+    assert jobs[0]["status"] == "completed"
+
+    # Now create a new controller pointing to same storage - must still find the job
+    ctrl2 = UIController(
+        project_name="job_demo",
+        projects_root=projects_root,
+        blackboard_dir=board_root,
+    )
+    jobs2 = ctrl2.get_jobs()
+    assert len(jobs2) == 1
+    assert jobs2[0]["id"] == "job_1"
+
+
+def test_job_cancellation_flow(tmp_path: Path):
+    """Test that ctrl.cancel_job() cancels active running jobs and updates status."""
+    projects_root = tmp_path / "projects"
+    board_root = tmp_path / "blackboard"
+
+    ctrl = UIController(
+        project_name="cancel_demo",
+        projects_root=projects_root,
+        blackboard_dir=board_root,
+    )
+
+    # Submit an async job with an echo command
+    job = ctrl.execute_command_async("echo 'running'")
+    assert job.status in ("running", "completed")
+
+    # Cancel the job
+    ctrl.cancel_job(job.id)
+    jobs = ctrl.get_jobs()
+    assert len(jobs) == 1
+    assert jobs[0]["id"] == job.id
+    assert jobs[0]["status"] in ("cancelled", "completed")
+
+
+def test_adapter_cancel_terminates_subprocess(tmp_path: Path):
+    """Test that BaseCLIAdapter.cancel() terminates a running process."""
+    import time
+    import threading
+    from modue_harness.adapters.generic import GenericCLIAdapter
+    from modue_harness.core.types import TurnContext
+
+    adapter = GenericCLIAdapter(name="tester", command="python3", default_args=["-c", "import time; time.sleep(10)"])
+    ctx = TurnContext(
+        step_id="step1",
+        instruction="run",
+        blackboard_dir=tmp_path / "board",
+        workspace_dir=tmp_path / "ws",
+    )
+    (tmp_path / "ws").mkdir(parents=True, exist_ok=True)
+
+    def _run():
+        return adapter.execute(ctx)
+
+    t = threading.Thread(target=_run)
+    t.start()
+
+    # Wait until process is running
+    time.sleep(0.1)
+    assert adapter._current_process is not None
+
+    # Call cancel
+    adapter.cancel()
+    t.join(timeout=3.0)
+    assert not t.is_alive()
+    assert adapter._is_cancelled
+
+
+def test_sync_execution_records_job_in_controller(tmp_path: Path):
+    """Test that synchronous execute_command also registers a job in get_jobs()."""
+    projects_root = tmp_path / "projects"
+    board_root = tmp_path / "blackboard"
+
+    ctrl = UIController(
+        project_name="sync_demo",
+        projects_root=projects_root,
+        blackboard_dir=board_root,
+    )
+
+    # Use a dummy agent so it runs fast
+    from modue_harness.adapters.generic import GenericCLIAdapter
+    dummy_agent = GenericCLIAdapter(name="architect", command="python3", default_args=["-c", "print('[]')"])
+    ctrl.session.agents = {"architect": dummy_agent}
+    ctrl.session.conductor_name = "architect"
+
+    assert len(ctrl.get_jobs()) == 0
+
+    res = ctrl.execute_command("test command")
+    jobs = ctrl.get_jobs()
+    assert len(jobs) >= 1
+    assert jobs[0]["command"] == "test command"
+    assert jobs[0]["project"] == "sync_demo"
+    assert jobs[0]["status"] in ("completed", "failed")
+
+
 

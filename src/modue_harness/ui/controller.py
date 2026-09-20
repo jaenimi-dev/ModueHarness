@@ -308,36 +308,38 @@ class UIController:
             return ""
 
     def get_jobs(self) -> List[Dict[str, Any]]:
-        """List background jobs and statuses."""
-        jobs_list = []
+        """List background and foreground jobs and statuses for current project."""
+        jobs_map: Dict[str, Dict[str, Any]] = {}
+        # 1. Load persisted jobs from blackboard
+        if hasattr(self.session, "blackboard") and hasattr(self.session.blackboard, "list_jobs"):
+            try:
+                for j_data in self.session.blackboard.list_jobs():
+                    if isinstance(j_data, dict) and "id" in j_data:
+                        jobs_map[j_data["id"]] = j_data
+            except Exception:
+                pass
+
+        # 2. In-memory session jobs override/update
         for j in self.session.jobs.values():
-            jobs_list.append({
-                "id": j.id,
-                "command": j.command,
-                "status": j.status,
-                "stage": j.stage,
-                "duration_sec": j.duration_sec,
-                "error": j.error,
-                "started_at": j.started_at,
-                "logs": list(getattr(j, "logs", [])),
-            })
-        return sorted(jobs_list, key=lambda x: x["started_at"], reverse=True)
+            if not self.session.project_name or j.project == self.session.project_name:
+                jobs_map[j.id] = {
+                    "id": j.id,
+                    "command": j.command,
+                    "project": j.project,
+                    "status": j.status,
+                    "stage": j.stage,
+                    "duration_sec": j.duration_sec,
+                    "error": j.error,
+                    "started_at": j.started_at,
+                    "ended_at": j.ended_at,
+                    "logs": list(getattr(j, "logs", [])),
+                }
+
+        return sorted(list(jobs_map.values()), key=lambda x: x.get("started_at", 0), reverse=True)
 
     def cancel_job(self, job_id: Optional[str] = None) -> bool:
         """Cancel a running background job or active foreground job."""
-        if job_id:
-            job = self.session.jobs.get(job_id)
-            if job and job.status == "running" and job.runner:
-                job.runner.cancel()
-                job.status = "cancelled"
-                job.stage = "cancelled by user"
-                return True
-            return False
-        # If no job_id specified, cancel active foreground runner if any
-        if self.session._active_foreground_runner:
-            self.session._active_foreground_runner.cancel()
-            return True
-        return False
+        return self.session.cancel_job(job_id)
 
     def execute_command(
         self,

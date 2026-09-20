@@ -48,6 +48,36 @@ class BackgroundJob:
         end = self.ended_at or time.time()
         return max(0.0, end - self.started_at)
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "command": self.command,
+            "project": self.project,
+            "project_dir": str(self.project_dir),
+            "status": self.status,
+            "stage": self.stage,
+            "started_at": self.started_at,
+            "ended_at": self.ended_at,
+            "duration_sec": self.duration_sec,
+            "error": self.error,
+            "logs": list(self.logs),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "BackgroundJob":
+        return cls(
+            id=data.get("id", "job_unknown"),
+            command=data.get("command", ""),
+            project=data.get("project", ""),
+            project_dir=Path(data.get("project_dir", ".")),
+            status=data.get("status", "completed"),
+            stage=data.get("stage", "done"),
+            started_at=data.get("started_at", time.time()),
+            ended_at=data.get("ended_at"),
+            error=data.get("error"),
+            logs=list(data.get("logs", [])),
+        )
+
 
 def load_or_detect_agents(
     agents_file: Optional[Path] = None,
@@ -514,6 +544,17 @@ class InteractiveSession:
             "current_project": self.project_name,
             "project_dir": str(self.project_dir),
         })
+
+        # Load any persisted jobs for this project from blackboard
+        if hasattr(self.blackboard, "list_jobs"):
+            try:
+                for j_data in self.blackboard.list_jobs():
+                    jid = j_data.get("id")
+                    if jid and jid not in self.jobs:
+                        self.jobs[jid] = BackgroundJob.from_dict(j_data)
+            except Exception:
+                pass
+
         return self.project_dir
 
     def list_projects(self) -> List[str]:
@@ -532,7 +573,7 @@ class InteractiveSession:
                     if (
                         p.is_dir()
                         and not p.name.startswith(".")
-                        and p.name not in {"tasks", "artifacts", "logs"}
+                        and p.name not in {"tasks", "artifacts", "logs", "jobs"}
                     ):
                         projects.add(p.name)
             except Exception:
@@ -594,9 +635,28 @@ class InteractiveSession:
 
         self.last_commands = []
 
+        self._job_counter += 1
+        job_id = f"job_{self._job_counter}"
+
+        job = BackgroundJob(
+            id=job_id,
+            command=command,
+            project=self.project_name,
+            project_dir=self.project_dir,
+            status="running",
+            stage="기획 중 (planning)",
+        )
+        self.jobs[job_id] = job
+        if hasattr(self.blackboard, "save_job"):
+            try:
+                self.blackboard.save_job(job.to_dict())
+            except Exception:
+                pass
+
         def _console_progress(event: str, data: Dict[str, Any]) -> None:
             lines = []
             if event == "planning_start":
+                job.stage = "기획 중 (planning)"
                 lines.append(f"  [1/3] 🧠 Conductor({data.get('conductor')}) 작업 목표 분석 및 계획 수립 중...")
                 if data.get("command"):
                     lines.append(f"        💻 CLI 실행: {data.get('command')}")
@@ -608,18 +668,21 @@ class InteractiveSession:
                     })
             elif event == "planning_end":
                 if data.get("is_success"):
+                    job.stage = "서브태스크 준비"
                     tasks = data.get("tasks", [])
                     lines.append(f"  ✓ 기획 완료: {len(tasks)}개 서브태스크 생성 (blackboard/tasks)")
                     for t in tasks:
                         desc = (t.get("instruction") or "")[:50]
                         lines.append(f"    • [{t.get('id')}] {t.get('assigned_agent')}: {desc}")
                 else:
+                    job.stage = "기획 실패"
                     err_msg = data.get("error") or "계획 수립 실패"
                     lines.append(f"  ✗ 기획 실패: {err_msg}")
             elif event == "task_start":
                 idx = data.get("index", 1)
                 tot = data.get("total", 1)
                 desc = (data.get("instruction") or "")[:60]
+                job.stage = f"태스크 [{idx}/{tot}] {data.get('agent')} ({data.get('task_id')})"
                 lines.append(f"  [2/3] 🛠️ [{idx}/{tot}] {data.get('agent')} 실행 중 ({data.get('task_id')})...")
                 lines.append(f"        지시: {desc}")
                 if data.get("command"):
@@ -639,6 +702,7 @@ class InteractiveSession:
                     lines.append(f"  ✗ [{data.get('task_id')}] 실행 실패 ({dur:.1f}s)")
                     lines.append(f"        ❌ 서브태스크 실패 원인: {err_str}")
             elif event == "synthesis_start":
+                job.stage = "최종 종합 보고서 작성 중 (synthesis)"
                 lines.append(f"  [3/3] 📝 Conductor({data.get('conductor')}) 최종 검토 및 종합 보고서 작성 중...")
                 if data.get("command"):
                     lines.append(f"        💻 CLI 실행: {data.get('command')}")
@@ -650,10 +714,19 @@ class InteractiveSession:
                     })
             elif event == "synthesis_end":
                 if data.get("is_success"):
+                    job.stage = "완료 (done)"
                     lines.append("  ✓ 최종 종합 보고서 저장: blackboard/artifacts/synthesis_report.md")
                 else:
+                    job.stage = "보고서 작성 실패"
                     err_str = data.get("error") or "종합 보고서 작성 실패"
                     lines.append(f"  ✗ 최종 종합 보고서 작성 실패: {err_str}")
+
+            job.logs.extend(lines)
+            if hasattr(self.blackboard, "save_job"):
+                try:
+                    self.blackboard.save_job(job.to_dict())
+                except Exception:
+                    pass
 
             if live_progress:
                 for l in lines:
@@ -679,11 +752,22 @@ class InteractiveSession:
             timeout=self.timeout,
         )
         self._active_foreground_runner = runner
+        job.runner = runner
 
         try:
             result = runner.run()
         finally:
             self._active_foreground_runner = None
+            job.ended_at = time.time()
+            job.result = result
+            job.status = result.get("status", "completed" if result.get("success") else "failed")
+            job.error = result.get("error_message") or result.get("error")
+            job.stage = "취소됨 (cancelled)" if job.status == "cancelled" else ("완료 (done)" if job.status == "completed" else "실패 (failed)")
+            if hasattr(self.blackboard, "save_job"):
+                try:
+                    self.blackboard.save_job(job.to_dict())
+                except Exception:
+                    pass
 
         # Gather created files and artifacts
         project_files = self.list_project_files()
@@ -729,16 +813,26 @@ class InteractiveSession:
             project=self.project_name,
             project_dir=self.project_dir,
             status="running",
-            stage="planning",
+            stage="기획 중 (planning)",
         )
         self.jobs[job_id] = job
 
         # Ensure project and blackboard directories exist
         self.project_dir.mkdir(parents=True, exist_ok=True)
         self.blackboard.initialize()
+        if hasattr(self.blackboard, "save_job"):
+            try:
+                self.blackboard.save_job(job.to_dict())
+            except Exception:
+                pass
 
         def _bg_worker():
+            if job.status == "cancelled":
+                return
+
             def _bg_progress(event: str, data: Dict[str, Any]):
+                if job.status == "cancelled":
+                    return
                 lines = []
                 if event == "planning_start":
                     job.stage = "기획 중 (planning)"
@@ -747,12 +841,14 @@ class InteractiveSession:
                         lines.append(f"        💻 CLI 실행: {data.get('command')}")
                 elif event == "planning_end":
                     if data.get("is_success"):
+                        job.stage = "서브태스크 준비"
                         tasks = data.get("tasks", [])
                         lines.append(f"  ✓ 기획 완료: {len(tasks)}개 서브태스크 생성 (blackboard/tasks)")
                         for t in tasks:
                             desc = (t.get("instruction") or "")[:50]
                             lines.append(f"    • [{t.get('id')}] {t.get('assigned_agent')}: {desc}")
                     else:
+                        job.stage = "기획 실패"
                         lines.append(f"  ✗ 기획 실패: {data.get('error') or '실패'}")
                 elif event == "task_start":
                     idx = data.get("index", 1)
@@ -776,12 +872,20 @@ class InteractiveSession:
                         lines.append(f"        💻 CLI 실행: {data.get('command')}")
                 elif event == "synthesis_end":
                     if data.get("is_success"):
+                        job.stage = "완료 (done)"
                         lines.append("  ✓ 최종 종합 보고서 저장: blackboard/artifacts/synthesis_report.md")
                     else:
+                        job.stage = "보고서 작성 실패"
                         lines.append(f"  ✗ 최종 종합 보고서 작성 실패: {data.get('error')}")
 
                 for l in lines:
                     job.logs.append(l)
+
+                if hasattr(self.blackboard, "save_job"):
+                    try:
+                        self.blackboard.save_job(job.to_dict())
+                    except Exception:
+                        pass
 
             runner = ConductorRunner(
                 goal=command,
@@ -796,12 +900,15 @@ class InteractiveSession:
             job.runner = runner
 
             try:
+                if job.status == "cancelled":
+                    return
                 res = runner.run()
-                job.result = res
-                job.status = res.get("status", "completed")
-                if not res.get("success", False) and not job.error:
-                    job.error = res.get("error_message") or res.get("error")
-                job.stage = "done"
+                if job.status != "cancelled":
+                    job.result = res
+                    job.status = res.get("status", "completed")
+                    if not res.get("success", False) and not job.error:
+                        job.error = res.get("error_message") or res.get("error")
+                    job.stage = "취소됨 (cancelled)" if job.status == "cancelled" else ("완료 (done)" if job.status == "completed" else "실패 (failed)")
 
                 status_text = "SUCCESS" if res.get("success") else "FAILED"
                 job.logs.append(f"\n<<< [{job.id}] 작업 완료 (상태: {status_text}, 소요 시간: {job.duration_sec:.1f}s)")
@@ -817,6 +924,11 @@ class InteractiveSession:
                 job.logs.append(f"\n❌ [{job.id}] 작업 오류: {e}")
             finally:
                 job.ended_at = time.time()
+                if hasattr(self.blackboard, "save_job"):
+                    try:
+                        self.blackboard.save_job(job.to_dict())
+                    except Exception:
+                        pass
                 # Print async completion toast to terminal
                 print(
                     f"\n🔔 [알림] 백그라운드 작업 '{job.id}' 종료 ({job.status}, {job.duration_sec:.1f}s)\n"
@@ -835,11 +947,17 @@ class InteractiveSession:
         """Cancel a running background job or active foreground runner."""
         if job_id:
             job = self.jobs.get(job_id)
-            if job and job.status == "running" and job.runner:
-                job.runner.cancel()
+            if job and job.status == "running":
+                if job.runner:
+                    job.runner.cancel()
                 job.status = "cancelled"
-                job.stage = "cancelled"
+                job.stage = "취소됨 (cancelled)"
                 job.ended_at = time.time()
+                if hasattr(self.blackboard, "save_job"):
+                    try:
+                        self.blackboard.save_job(job.to_dict())
+                    except Exception:
+                        pass
                 return True
             return False
 
@@ -850,11 +968,17 @@ class InteractiveSession:
             cancelled_any = True
 
         for j in self.jobs.values():
-            if j.status == "running" and j.runner:
-                j.runner.cancel()
+            if j.status == "running":
+                if j.runner:
+                    j.runner.cancel()
                 j.status = "cancelled"
-                j.stage = "cancelled"
+                j.stage = "취소됨 (cancelled)"
                 j.ended_at = time.time()
+                if hasattr(self.blackboard, "save_job"):
+                    try:
+                        self.blackboard.save_job(j.to_dict())
+                    except Exception:
+                        pass
                 cancelled_any = True
 
         return cancelled_any

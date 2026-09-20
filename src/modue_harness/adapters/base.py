@@ -4,7 +4,9 @@ from abc import ABC
 import os
 import re
 import shlex
+import signal
 import subprocess
+import sys
 import time
 from typing import Any, Dict, Generator, List, Optional
 
@@ -37,6 +39,8 @@ class BaseCLIAdapter(ABC):
         self.prompt_delivery = prompt_delivery
         self.prompt_flag = prompt_flag
         self.system_instruction = system_instruction
+        self._current_process: Optional[subprocess.Popen] = None
+        self._is_cancelled: bool = False
 
     def build_command(self, prompt: str, extra_args: Optional[List[str]] = None) -> List[str]:
         """Construct the CLI command argument list."""
@@ -108,25 +112,53 @@ class BaseCLIAdapter(ABC):
 
         return "\n\n".join(prompt_parts)
 
+    def cancel(self) -> None:
+        """Terminate active running process and its process group."""
+        self._is_cancelled = True
+        proc = self._current_process
+        if proc and proc.poll() is None:
+            try:
+                if sys.platform != "win32":
+                    try:
+                        pgid = os.getpgid(proc.pid)
+                        os.killpg(pgid, signal.SIGTERM)
+                    except Exception:
+                        proc.terminate()
+                else:
+                    proc.terminate()
+
+                try:
+                    proc.wait(timeout=0.5)
+                except Exception:
+                    if sys.platform != "win32":
+                        try:
+                            pgid = os.getpgid(proc.pid)
+                            os.killpg(pgid, signal.SIGKILL)
+                        except Exception:
+                            proc.kill()
+                    else:
+                        proc.kill()
+            except Exception:
+                pass
+
     def execute(
         self,
         context: TurnContext,
-        timeout: Optional[float] = None,
         extra_args: Optional[List[str]] = None,
         custom_env: Optional[Dict[str, str]] = None,
+        timeout: Optional[float] = None,
     ) -> TurnResult:
-        """Execute a single turn using the wrapped CLI tool."""
+        """Execute the CLI command synchronously with context and environment."""
         full_prompt = self.prepare_prompt(context)
         cmd = self.build_command(full_prompt, extra_args=extra_args)
-        cmd_display = self.format_command_display(cmd, max_prompt_len=None)
-        try:
-            full_cmd_str = shlex.join(cmd)
-        except Exception:
-            full_cmd_str = " ".join(cmd)
+        cmd_display = self.format_command_display(cmd)
+
         cmd_metadata = {
-            "command": cmd,
-            "command_display": cmd_display,
-            "full_command_str": full_cmd_str,
+            "agent": self.name,
+            "command": cmd[0],
+            "full_command": cmd,
+            "display_command": cmd_display,
+            "step_id": context.step_id,
         }
 
         env = os.environ.copy()
@@ -138,21 +170,46 @@ class BaseCLIAdapter(ABC):
         stdin_input = full_prompt if self.prompt_delivery == "stdin" else None
 
         start_time = time.time()
+        self._current_process = None
+        self._is_cancelled = False
+        process: Optional[subprocess.Popen] = None
         try:
-            process = subprocess.run(
+            kwargs = {}
+            if sys.platform != "win32":
+                kwargs["start_new_session"] = True
+
+            process = subprocess.Popen(
                 cmd,
-                input=stdin_input,
-                capture_output=True,
+                stdin=subprocess.PIPE if stdin_input is not None else None,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 cwd=str(context.workspace_dir),
                 env=env,
-                timeout=timeout,
                 encoding="utf-8",
                 errors="replace",
+                **kwargs,
             )
+            self._current_process = process
+            try:
+                stdout_raw, stderr_raw = process.communicate(input=stdin_input, timeout=timeout)
+            finally:
+                self._current_process = None
+
             duration = time.time() - start_time
-            stdout_clean = strip_ansi(process.stdout or "")
-            stderr_clean = strip_ansi(process.stderr or "")
+            stdout_clean = strip_ansi(stdout_raw or "")
+            stderr_clean = strip_ansi(stderr_raw or "")
+
+            if self._is_cancelled:
+                return TurnResult(
+                    status=TaskStatus.FAILED,
+                    stdout=stdout_clean,
+                    stderr=stderr_clean,
+                    exit_code=process.returncode or 1,
+                    duration_sec=duration,
+                    error_message="작업이 취소되었습니다 (Execution cancelled by user)",
+                    metadata=cmd_metadata,
+                )
 
             status = TaskStatus.COMPLETED if process.returncode == 0 else TaskStatus.FAILED
             if process.returncode == 0:
@@ -189,13 +246,19 @@ class BaseCLIAdapter(ABC):
                 metadata=cmd_metadata,
             )
         except subprocess.TimeoutExpired as e:
+            if process:
+                try:
+                    process.kill()
+                    stdout_t, stderr_t = process.communicate()
+                except Exception:
+                    stdout_t, stderr_t = "", ""
             duration = time.time() - start_time
             return TurnResult(
                 status=TaskStatus.FAILED,
                 exit_code=124,
                 duration_sec=duration,
-                stdout=strip_ansi(e.stdout or "") if isinstance(e.stdout, str) else "",
-                stderr=strip_ansi(e.stderr or "") if isinstance(e.stderr, str) else "",
+                stdout=strip_ansi(stdout_t or (e.stdout if isinstance(e.stdout, str) else "")),
+                stderr=strip_ansi(stderr_t or (e.stderr if isinstance(e.stderr, str) else "")),
                 error_message=f"Execution timed out after {timeout} seconds",
                 metadata=cmd_metadata,
             )
@@ -226,6 +289,12 @@ class BaseCLIAdapter(ABC):
             env.update(custom_env)
 
         start_time = time.time()
+        self._current_process = None
+        self._is_cancelled = False
+        kwargs = {}
+        if sys.platform != "win32":
+            kwargs["start_new_session"] = True
+
         process = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE if self.prompt_delivery == "stdin" else None,
@@ -236,24 +305,29 @@ class BaseCLIAdapter(ABC):
             env=env,
             encoding="utf-8",
             errors="replace",
+            **kwargs,
         )
+        self._current_process = process
 
-        if self.prompt_delivery == "stdin" and process.stdin:
-            try:
-                process.stdin.write(full_prompt)
-                process.stdin.flush()
-                process.stdin.close()
-            except Exception:
-                pass
+        try:
+            if self.prompt_delivery == "stdin" and process.stdin:
+                try:
+                    process.stdin.write(full_prompt)
+                    process.stdin.flush()
+                    process.stdin.close()
+                except Exception:
+                    pass
 
-        accumulated_stdout: List[str] = []
-        if process.stdout:
-            for line in process.stdout:
-                clean_line = strip_ansi(line)
-                accumulated_stdout.append(clean_line)
-                yield clean_line
+            accumulated_stdout: List[str] = []
+            if process.stdout:
+                for line in process.stdout:
+                    clean_line = strip_ansi(line)
+                    accumulated_stdout.append(clean_line)
+                    yield clean_line
 
-        process.wait()
+            process.wait()
+        finally:
+            self._current_process = None
         stderr_text = process.stderr.read() if process.stderr else ""
         duration = time.time() - start_time
 

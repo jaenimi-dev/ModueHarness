@@ -35,6 +35,7 @@ class Blackboard:
         self.tasks_dir = self.root_dir / "tasks"
         self.artifacts_dir = self.root_dir / "artifacts"
         self.logs_dir = self.root_dir / "logs"
+        self.jobs_dir = self.root_dir / "jobs"
         self.event_bus = event_bus
 
     def for_project(self, project_name: str) -> "Blackboard":
@@ -53,8 +54,8 @@ class Blackboard:
         subdirs = []
         try:
             for d in self.root_dir.iterdir():
-                if d.is_dir() and not d.name.startswith(".") and d.name not in {"tasks", "artifacts", "logs"}:
-                    if (d / "state.json").exists() or (d / "artifacts").exists() or (d / "tasks").exists():
+                if d.is_dir() and not d.name.startswith(".") and d.name not in {"tasks", "artifacts", "logs", "jobs"}:
+                    if (d / "state.json").exists() or (d / "artifacts").exists() or (d / "tasks").exists() or (d / "jobs").exists():
                         subdirs.append(d)
         except Exception:
             pass
@@ -74,6 +75,7 @@ class Blackboard:
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
+        self.jobs_dir.mkdir(parents=True, exist_ok=True)
 
         if not self.state_file.exists():
             initial_state = {
@@ -445,3 +447,40 @@ class Blackboard:
             )
 
         return log_file
+
+    # ---------------- Jobs Management ---------------- #
+
+    def save_job(self, job_dict: Dict[str, Any]) -> Path:
+        """Save job state to blackboard jobs directory."""
+        self.jobs_dir.mkdir(parents=True, exist_ok=True)
+        job_id = job_dict.get("id", "job_unknown")
+        file_path = self.jobs_dir / f"{job_id}.json"
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(job_dict, f, indent=2, ensure_ascii=False)
+        return file_path
+
+    def list_jobs(self) -> List[Dict[str, Any]]:
+        """List all saved jobs for this blackboard, sorted by started_at descending."""
+        if not self.jobs_dir.exists():
+            return []
+        jobs = []
+        for p in self.jobs_dir.glob("*.json"):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        jobs.append(data)
+            except Exception:
+                pass
+        return sorted(jobs, key=lambda x: x.get("started_at", 0), reverse=True)
+
+    def load_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Load a specific job by ID from blackboard jobs directory."""
+        file_path = self.jobs_dir / f"{job_id}.json"
+        if not file_path.exists():
+            return None
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
