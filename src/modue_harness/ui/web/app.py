@@ -211,16 +211,19 @@ def run_app(
             # Left Pane: Command Dispatcher & Agent Settings
             with ui.card().classes("w-1/4 h-full flex flex-col justify-between p-4 bg-slate-800 border border-slate-700 overflow-y-auto"):
                 with ui.column().classes("w-full gap-3"):
-                    ui.label("🎯 Task Dispatcher").classes("text-base font-semibold text-blue-300")
-                    prompt_input = ui.textarea(
-                        label="Natural Language Instruction",
-                        placeholder="Enter what you want the AI team to implement...",
-                    ).classes("w-full h-28")
+                    # Task Dispatcher Card (clean spacing and no overlap)
+                    with ui.card().classes("w-full p-3 bg-slate-900 border border-slate-700 rounded gap-2"):
+                        ui.label("🎯 Task Dispatcher").classes("text-sm font-bold text-blue-300")
+                        prompt_input = ui.textarea(
+                            label="Natural Language Instruction",
+                            placeholder="Enter what you want the AI team to implement...",
+                        ).props("rows=3 outlined autogrow=false")\
+                         .classes("w-full text-xs")
 
-                    with ui.row().classes("w-full gap-2 justify-between"):
-                        run_btn = ui.button("Execute", icon="play_arrow", color="primary").classes("flex-1")
-                        async_btn = ui.button("Background (&)", icon="schedule", color="secondary").classes("flex-1")
-                        cancel_btn = ui.button(icon="stop", color="red").props("outline")
+                        with ui.row().classes("w-full gap-2 justify-between items-center mt-1"):
+                            run_btn = ui.button("Execute", icon="play_arrow", color="primary").props("dense").classes("flex-1 text-xs font-semibold")
+                            async_btn = ui.button("Background (&)", icon="schedule", color="secondary").props("dense").classes("flex-1 text-xs font-semibold")
+                            cancel_btn = ui.button(icon="stop", color="red").props("outline dense").tooltip("Cancel active task")
 
                     ui.separator().classes("my-1")
 
@@ -312,23 +315,31 @@ def run_app(
                         ui.notify(f"Background Job {job.id} dispatched", type="info")
                         refresh_jobs()
                     else:
+                        run_btn.props("loading")
+                        run_btn.disable()
+                        async_btn.disable()
                         status_badge.set_text("Executing...")
                         status_badge.props("color=amber-600")
                         log_view.push(f"\n>>> Executing: {cmd}")
 
-                        def on_sync():
-                            res = ctrl.execute_command(cmd)
-                            return res
+                        try:
+                            def on_sync():
+                                res = ctrl.execute_command(cmd)
+                                return res
 
-                        loop = asyncio.get_event_loop()
-                        res = await loop.run_in_executor(None, on_sync)
-                        status_badge.set_text("Completed" if res.get("success") else "Failed")
-                        status_badge.props(f"color={'green-600' if res.get('success') else 'red-600'}")
-                        log_view.push(f"\n<<< Finished with status: {res.get('status')} ({res.get('total_duration_sec', 0.0):.1f}s)")
-                        if not res.get("success") and res.get("error"):
-                            log_view.push(f"❌ Error: {res.get('error')}")
-                        refresh_file_list()
-                        refresh_artifacts()
+                            loop = asyncio.get_event_loop()
+                            res = await loop.run_in_executor(None, on_sync)
+                            status_badge.set_text("Completed" if res.get("success") else "Failed")
+                            status_badge.props(f"color={'green-600' if res.get('success') else 'red-600'}")
+                            log_view.push(f"\n<<< Finished with status: {res.get('status')} ({res.get('total_duration_sec', 0.0):.1f}s)")
+                            if not res.get("success") and res.get("error"):
+                                log_view.push(f"❌ Error: {res.get('error')}")
+                            refresh_file_list()
+                            refresh_artifacts()
+                        finally:
+                            run_btn.props(remove="loading")
+                            run_btn.enable()
+                            async_btn.enable()
 
                 run_btn.on_click(lambda: run_task(is_async=False))
                 async_btn.on_click(lambda: run_task(is_async=True))
