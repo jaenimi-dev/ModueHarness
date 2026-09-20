@@ -85,6 +85,7 @@ class ConductorRunner:
     def run(self) -> Dict[str, Any]:
         """Execute the Leader-Worker workflow."""
         self.blackboard.initialize()
+        self.blackboard.clear_tasks()
         start_time = time.time()
 
         conductor_adapter = self.worker_adapters.get(self.conductor_name)

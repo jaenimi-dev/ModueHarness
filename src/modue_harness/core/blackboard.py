@@ -215,6 +215,18 @@ class Blackboard:
         updated = self.create_task(task)
         return updated
 
+    def clear_tasks(self) -> int:
+        """Clear all active subtasks from tasks/ directory for a fresh execution."""
+        count = 0
+        if self.tasks_dir.exists():
+            for file in self.tasks_dir.glob("*.json"):
+                try:
+                    file.unlink()
+                    count += 1
+                except Exception:
+                    pass
+        return count
+
     def list_tasks(self) -> List[Task]:
         """List all tasks sorted by task ID."""
         tasks: List[Task] = []

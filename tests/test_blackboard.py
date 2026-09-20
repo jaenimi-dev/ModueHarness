@@ -68,6 +68,11 @@ def test_blackboard_task_lifecycle(temp_board: Blackboard):
     assert updated.status == TaskStatus.COMPLETED
     assert updated.result == {"file": "plan.md"}
 
+    # Clear tasks
+    cleared_count = temp_board.clear_tasks()
+    assert cleared_count == 1
+    assert len(temp_board.list_tasks()) == 0
+
 
 def test_blackboard_artifacts(temp_board: Blackboard):
     """Verify writing, reading, and listing artifacts."""

@@ -696,6 +696,7 @@ class InteractiveSession:
         # Ensure project and blackboard directories exist
         self.project_dir.mkdir(parents=True, exist_ok=True)
         self.blackboard.initialize()
+        self.blackboard.clear_tasks()
 
         self.blackboard.update_state({
             "current_project": self.project_name,
