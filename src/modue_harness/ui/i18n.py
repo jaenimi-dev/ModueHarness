@@ -67,6 +67,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "log_finished": "\n<<< 작업 완료 (상태: {status}, 소요 시간: {duration:.1f}초)",
         "log_error": "❌ 오류: {error}",
         "notify_task_cancelled": "작업이 취소되었습니다.",
+        "tooltip_clear_stream": "스트림 로그 지우기",
+        "notify_stream_cleared": "스트림 로그가 초기화되었습니다.",
 
         # Right Pane - Tabs & Content
         "tab_tasks": "태스크 (Tasks)",
@@ -173,6 +175,8 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "log_finished": "\n<<< Finished with status: {status} ({duration:.1f}s)",
         "log_error": "❌ Error: {error}",
         "notify_task_cancelled": "Task cancelled",
+        "tooltip_clear_stream": "Clear stream logs",
+        "notify_stream_cleared": "Stream logs cleared.",
 
         # Right Pane - Tabs & Content
         "tab_tasks": "Tasks",

@@ -868,3 +868,70 @@ def test_ui_controller_execute_command_async_logs(tmp_path: Path):
     assert jobs[0]["logs"] == job.logs
 
 
+def test_project_switch_auto_refreshes_tasks_and_artifacts(tmp_path: Path):
+    """Test that switching projects isolates and automatically refreshes tasks and artifacts."""
+    proj_root = tmp_path / "projects"
+    board_root = tmp_path / "blackboard"
+
+    # Set up project A with an artifact and task
+    ctrl = UIController(
+        project_name="proj_a",
+        projects_root=proj_root,
+        blackboard_dir=board_root,
+    )
+    ctrl.session.project_dir.mkdir(parents=True, exist_ok=True)
+    ctrl.session.blackboard.initialize()
+    ctrl.session.blackboard.write_artifact("spec_a.md", "# Specification A")
+    ctrl.session.blackboard.create_task(Task(
+        id="task_a",
+        title="Task A",
+        assigned_agent="developer",
+        status=TaskStatus.COMPLETED,
+        description="Do work on A",
+        output_artifact="spec_a.md",
+    ))
+
+    # Set up project B on disk with different artifact and task
+    board_b = Blackboard(root_dir=board_root, project="proj_b")
+    board_b.initialize()
+    board_b.write_artifact("spec_b.md", "# Specification B")
+    board_b.create_task(Task(
+        id="task_b",
+        title="Task B",
+        assigned_agent="reviewer",
+        status=TaskStatus.IN_PROGRESS,
+        description="Review B",
+        output_artifact="spec_b.md",
+    ))
+
+    # Currently on proj_a
+    tasks_a = ctrl.get_tasks()
+    arts_a = ctrl.get_artifacts()
+    assert len(tasks_a) == 1
+    assert tasks_a[0]["id"] == "task_a"
+    assert any(a["name"] == "spec_a.md" for a in arts_a)
+    assert not any(a["name"] == "spec_b.md" for a in arts_a)
+
+    # Switch project to proj_b
+    ctrl.switch_project("proj_b")
+    tasks_b = ctrl.get_tasks()
+    arts_b = ctrl.get_artifacts()
+
+    # Must immediately and automatically reflect proj_b tasks & artifacts
+    assert len(tasks_b) == 1
+    assert tasks_b[0]["id"] == "task_b"
+    assert tasks_b[0]["assigned_agent"] == "reviewer"
+    assert any(a["name"] == "spec_b.md" for a in arts_b)
+    assert not any(a["name"] == "spec_a.md" for a in arts_b)
+
+    # Switch back to proj_a
+    ctrl.switch_project("proj_a")
+    tasks_a_again = ctrl.get_tasks()
+    arts_a_again = ctrl.get_artifacts()
+    assert len(tasks_a_again) == 1
+    assert tasks_a_again[0]["id"] == "task_a"
+    assert any(a["name"] == "spec_a.md" for a in arts_a_again)
+    assert not any(a["name"] == "spec_b.md" for a in arts_a_again)
+
+
+

@@ -33,6 +33,10 @@ GLOBAL_VIEWPORT_CSS = """
         overflow: hidden !important;
         padding: 0 !important;
     }
+    .nicegui-log, .nicegui-scroll-area, .q-scrollarea {
+        height: 100% !important;
+        width: 100% !important;
+    }
 </style>
 """
 
@@ -90,14 +94,24 @@ def run_app(
         main_container = ui.row().classes("w-full h-full p-2.5 gap-2.5 no-wrap box-border overflow-hidden")
         dialogs_container = ui.column().classes("hidden")
 
+        try:
+            client = getattr(ui.context, "client", None)
+        except Exception:
+            client = None
+
         # Forward declarations of handlers / variables
         prompt_input = None
         new_project_dialog = None
-        on_refresh_all_click = lambda: None
+        push_log = lambda text: None
         refresh_tasks = lambda: None
+        refresh_artifacts = lambda: None
+        refresh_file_list = lambda: None
+        refresh_jobs = lambda: None
+        refresh_projects = lambda: None
+        on_refresh_all_click = lambda: None
 
         def _render_dashboard_impl() -> None:
-            nonlocal prompt_input, new_project_dialog, on_refresh_all_click, refresh_tasks
+            nonlocal prompt_input, new_project_dialog, push_log, refresh_tasks, refresh_artifacts, refresh_file_list, refresh_jobs, refresh_projects, on_refresh_all_click
             # Clear containers
             header_container.clear()
             main_container.clear()
@@ -124,12 +138,15 @@ def run_app(
                         ).classes("w-36 sm:w-44 bg-slate-800 text-white rounded text-xs")
 
                         def on_project_change(e):
-                            if e.value and e.value in projects:
+                            if e.value and e.value != i18n("no_projects_yet"):
                                 ctrl.switch_project(e.value)
                                 bb_badge.set_text(f"blackboard/{e.value}")
                                 ui.notify(i18n("switch_project_notify", name=e.value), type="info")
-                                refresh_file_list()
+                                push_log(f"\n📂 [프로젝트 전환] 활성 프로젝트: '{e.value}' (blackboard/{e.value})")
+                                refresh_tasks()
                                 refresh_artifacts()
+                                refresh_file_list()
+                                refresh_jobs()
 
                         project_select.on_value_change(on_project_change)
                     else:
@@ -138,7 +155,7 @@ def run_app(
                             value=i18n("no_projects_yet"),
                         ).props("disable").classes("w-36 sm:w-44 bg-slate-800 text-slate-400 rounded text-xs")
 
-                    def refresh_projects():
+                    def refresh_projects_impl():
                         try:
                             projs = ctrl.get_projects()
                             cur = ctrl.project_name
@@ -155,8 +172,11 @@ def run_app(
                                 project_select.options = [i18n("no_projects_yet")]
                                 project_select.value = i18n("no_projects_yet")
                                 project_select.disable()
+                            project_select.update()
                         except Exception:
                             pass
+
+                    refresh_projects = refresh_projects_impl
 
                     # + New Project button
                     ui.button(
@@ -491,18 +511,90 @@ def run_app(
                     "w-1/2 h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
                 ):
                     with ui.row().classes("w-full items-center justify-between border-b border-slate-700 pb-2 flex-shrink-0"):
-                        ui.label(i18n("realtime_stream")).classes("text-base font-semibold text-green-400")
-                        status_badge = ui.badge(i18n(state["status_text_key"]), color=state["status_color"]).classes("text-xs")
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon("terminal", size="sm").classes("text-green-400")
+                            ui.label(i18n("realtime_stream")).classes("text-base font-semibold text-green-400")
 
-                    log_view = ui.log().classes(
-                        "w-full flex-1 min-h-0 font-mono text-xs bg-slate-950 text-slate-200 p-2.5 rounded my-1.5 overflow-auto"
+                        with ui.row().classes("items-center gap-2"):
+                            def clear_stream_logs():
+                                state["logs"] = []
+                                log_scroll.clear()
+                                ui.notify(i18n("notify_stream_cleared"), type="info")
+
+                            ui.button(
+                                icon="delete_sweep",
+                                on_click=clear_stream_logs,
+                            ).props("dense outline size=xs text-color=slate-400 hover:text-red-400")\
+                             .tooltip(i18n("tooltip_clear_stream"))
+
+                            status_badge = ui.badge(i18n(state["status_text_key"]), color=state["status_color"]).classes("text-xs")
+
+                    # Native scrollable container: 100% visible, never collapsed by Quasar
+                    log_scroll = ui.column().classes(
+                        "w-full flex-1 min-h-0 overflow-y-auto bg-slate-950 text-slate-200 p-3 rounded my-1.5 font-mono text-xs border border-slate-900 gap-0.5 select-text"
                     )
-                    for line in state["logs"]:
-                        log_view.push(line)
 
-                    def push_log(text: str):
+                    def render_line_label(line: str):
+                        if not line.strip():
+                            ui.label("").classes("h-1.5")
+                            return
+                        line_color = "text-slate-300"
+                        if any(k in line for k in ("✓", "SUCCESS", "성공", "completed")):
+                            line_color = "text-green-400 font-medium"
+                        elif any(k in line for k in ("✗", "❌", "FAILED", "실패", "오류", "failed", "Error")):
+                            line_color = "text-red-400 font-semibold"
+                        elif any(k in line for k in ("🧠 Conductor", "기획", "[1/3]")):
+                            line_color = "text-blue-300 font-semibold"
+                        elif any(k in line for k in ("🛠️", "[2/3]")):
+                            line_color = "text-amber-300 font-medium"
+                        elif any(k in line for k in ("📝", "[3/3]")):
+                            line_color = "text-indigo-300 font-medium"
+                        elif any(k in line for k in ("🚀", "===", "✦")):
+                            line_color = "text-cyan-300 font-bold"
+                        elif "💻 CLI" in line:
+                            line_color = "text-purple-300 font-mono"
+                        elif any(k in line for k in ("📄", "📌")):
+                            line_color = "text-emerald-300"
+
+                        ui.label(line).classes(f"font-mono text-xs {line_color} whitespace-pre-wrap break-all leading-relaxed select-text")
+
+                    def push_log_impl(text: str):
                         state["logs"].append(text)
-                        log_view.push(text)
+                        def _do_append():
+                            with log_scroll:
+                                for line in str(text).splitlines():
+                                    render_line_label(line)
+                            try:
+                                log_scroll.run_method("scrollTo", {"top": 999999, "behavior": "smooth"})
+                            except Exception:
+                                pass
+
+                        try:
+                            if client:
+                                with client:
+                                    _do_append()
+                            else:
+                                _do_append()
+                        except Exception:
+                            pass
+
+                    push_log = push_log_impl
+
+                    # Populate existing logs or ready message
+                    if not state["logs"]:
+                        ready_msg = (
+                            f"✦ [ModueHarness] {i18n('realtime_stream')} 준비 완료\n"
+                            f"  • 활성 프로젝트: '{ctrl.project_name or '선택되지 않음'}'\n"
+                            f"  • 좌측 '작업 지시' 창에서 자연어로 목표를 입력하고 [실행] 또는 [백그라운드] 버튼을 누르면\n"
+                            f"    Conductor와 AI 팀의 기획, 서브태스크 실행 및 종합 보고서 작성 과정이 실시간으로 출력됩니다.\n"
+                            f"─────────────────────────────────────────────────────────────────────────────"
+                        )
+                        push_log(ready_msg)
+                    else:
+                        with log_scroll:
+                            for log_entry in state["logs"]:
+                                for line in str(log_entry).splitlines():
+                                    render_line_label(line)
 
                     # Command execution logic
                     async def run_task(is_async: bool = False):
@@ -512,10 +604,14 @@ def run_app(
                             return
 
                         if not ctrl.project_name:
-                            ui.notify(i18n("notify_select_project_first"), type="warning")
-                            if new_project_dialog:
-                                new_project_dialog.open()
-                            return
+                            projs = ctrl.get_projects()
+                            if projs:
+                                ctrl.switch_project(projs[0])
+                            else:
+                                ctrl.switch_project("project_1")
+                            refresh_projects()
+                            refresh_tasks()
+                            refresh_artifacts()
 
                         if is_async:
                             job = ctrl.execute_command_async(cmd)
@@ -618,10 +714,7 @@ def run_app(
                                         push_log(f"  📌 {af}")
                                 push_log("=" * 54)
 
-                                refresh_tasks()
-                                refresh_file_list()
-                                refresh_artifacts()
-                                refresh_jobs()
+                                refresh_all()
                             finally:
                                 state["is_running"] = False
                                 run_btn.props(remove="loading")
@@ -663,41 +756,48 @@ def run_app(
                                     tasks_container.clear()
                                     tasks = ctrl.get_tasks()
                                     tasks_title_label.set_text(f"{i18n('tasks_overview')} ({len(tasks)})")
-                                    with tasks_container:
-                                        if not tasks:
-                                            ui.label(i18n("no_tasks_yet")).classes("text-xs text-slate-400 italic p-3 text-center")
-                                        else:
-                                            for t in tasks:
-                                                st = (t.get("status") or "pending").lower()
-                                                badge_color = {
-                                                    "completed": "green-700",
-                                                    "in_progress": "amber-700",
-                                                    "failed": "red-700",
-                                                    "pending": "slate-700",
-                                                }.get(st, "slate-600")
+                                    def _render_tasks():
+                                        with tasks_container:
+                                            if not tasks:
+                                                ui.label(i18n("no_tasks_yet")).classes("text-xs text-slate-400 italic p-3 text-center")
+                                            else:
+                                                for t in tasks:
+                                                    st = (t.get("status") or "pending").lower()
+                                                    badge_color = {
+                                                        "completed": "green-700",
+                                                        "in_progress": "amber-700",
+                                                        "failed": "red-700",
+                                                        "pending": "slate-700",
+                                                    }.get(st, "slate-600")
 
-                                                status_icon = {
-                                                    "completed": "✓",
-                                                    "in_progress": "▶",
-                                                    "failed": "✗",
-                                                    "pending": "○",
-                                                }.get(st, "•")
+                                                    status_icon = {
+                                                        "completed": "✓",
+                                                        "in_progress": "▶",
+                                                        "failed": "✗",
+                                                        "pending": "○",
+                                                    }.get(st, "•")
 
-                                                with ui.card().classes("w-full p-2.5 bg-slate-900 border border-slate-700 rounded gap-1 flex-shrink-0"):
-                                                    with ui.row().classes("w-full items-center justify-between no-wrap"):
-                                                        with ui.row().classes("items-center gap-1.5 min-w-0"):
-                                                            ui.badge(f"{status_icon} {st}", color=badge_color).classes("text-[10px] font-bold")
-                                                            ui.label(t.get("id", "task")).classes("text-xs font-mono font-bold text-white truncate")
-                                                        ui.badge(t.get("assigned_agent", "N/A"), color="purple-700").classes("text-[10px]")
+                                                    with ui.card().classes("w-full p-2.5 bg-slate-900 border border-slate-700 rounded gap-1 flex-shrink-0"):
+                                                        with ui.row().classes("w-full items-center justify-between no-wrap"):
+                                                            with ui.row().classes("items-center gap-1.5 min-w-0"):
+                                                                ui.badge(f"{status_icon} {st}", color=badge_color).classes("text-[10px] font-bold")
+                                                                ui.label(t.get("id", "task")).classes("text-xs font-mono font-bold text-white truncate")
+                                                            ui.badge(t.get("assigned_agent", "N/A"), color="purple-700").classes("text-[10px]")
 
-                                                    desc = t.get("instruction") or t.get("title") or ""
-                                                    if desc:
-                                                        ui.label(desc).classes("text-xs text-slate-300 line-clamp-3 mt-0.5")
+                                                        desc = t.get("instruction") or t.get("title") or ""
+                                                        if desc:
+                                                            ui.label(desc).classes("text-xs text-slate-300 line-clamp-3 mt-0.5")
 
-                                                    if t.get("output_artifact"):
-                                                        with ui.row().classes("items-center gap-1 mt-1 text-[11px] text-blue-300"):
-                                                            ui.icon("description", size="xs").classes("text-blue-400")
-                                                            ui.label(t["output_artifact"]).classes("font-mono text-[10px]")
+                                                        if t.get("output_artifact"):
+                                                            with ui.row().classes("items-center gap-1 mt-1 text-[11px] text-blue-300"):
+                                                                ui.icon("description", size="xs").classes("text-blue-400")
+                                                                ui.label(t["output_artifact"]).classes("font-mono text-[10px]")
+
+                                    if client:
+                                        with client:
+                                            _render_tasks()
+                                    else:
+                                        _render_tasks()
                                 except Exception:
                                     pass
 
@@ -730,10 +830,12 @@ def run_app(
                                     else:
                                         art_select.value = None
                                         art_markdown.set_content(i18n("no_artifact_selected"))
+                                    art_select.update()
                                 except Exception as ex:
                                     art_select.options = []
                                     art_select.value = None
                                     art_markdown.set_content(i18n("no_artifact_selected"))
+                                    art_select.update()
 
                             art_select.on_value_change(
                                 lambda e: art_markdown.set_content(
@@ -763,10 +865,12 @@ def run_app(
                                     else:
                                         file_select.value = None
                                         file_code.set_content("")
+                                    file_select.update()
                                 except Exception as ex:
                                     file_select.options = []
                                     file_select.value = None
                                     file_code.set_content("")
+                                    file_select.update()
 
                             file_select.on_value_change(
                                 lambda e: file_code.set_content(
