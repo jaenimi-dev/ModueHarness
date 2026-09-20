@@ -11,22 +11,43 @@
 
 ## 🚀 빠른 시작 (Quick Start)
 
-### 1. 설치
+### 1. 설치 및 환경 구성
+
+#### [방법 1 - 추천] 원클릭 자동 설치 스크립트
+Git / GitHub CLI(gh)를 통한 저장소 클론 및 최신화(`git pull`), 전체 패키지(`pip install -e ".[all]"`) 설치 및 검증까지 자동으로 한 번에 수행합니다:
+
+- **Linux / macOS**:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/jaenimi-dev/ModueHarness/main/install.sh | bash
+  ```
+- **Windows (PowerShell)**:
+  ```powershell
+  irm https://raw.githubusercontent.com/jaenimi-dev/ModueHarness/main/install.ps1 | iex
+  ```
+
+---
+
+#### [방법 2] 수동 설치 (Git / gh CLI)
+저장소를 직접 내려받고 전체 패키지를 설치하려면:
+
 ```bash
+# 1) 저장소 클론 (Git 또는 gh 중 편한 도구 사용)
 git clone https://github.com/jaenimi-dev/ModueHarness.git
+# (또는 GitHub CLI 사용 시: gh repo clone jaenimi-dev/ModueHarness)
+
 cd ModueHarness
 
-# 기본 CLI 및 테스트 도구 설치
-pip install -e ".[dev]"
+# 2) 전체 패키지 한 번에 설치 (Core + Dev + Web UI NiceGUI + Terminal TUI Textual)
+pip install -e ".[all]"
 
-# (선택) Web UI(NiceGUI) 및 Terminal TUI(Textual) 대시보드를 사용하려면 [ui] 패키지 추가 설치
-pip install -e ".[ui]"
-# 전체 패키지 한 번에 설치: pip install -e ".[all]"
+# (이미 클론된 상태에서 최신 버전 갱신 시: git pull origin main && pip install -e ".[all]")
+# (또는 다운로드 후 스크립트 실행: ./install.sh)
 ```
 
-> ⚠️ **UI 실행 시 `NiceGUI is not installed` 또는 `Textual is not installed` 오류가 발생하는 경우**:  
-> UI 기능은 기본 의존성을 가볍게 유지하기 위해 선택적 의존성(`[ui]`)으로 분리되어 있습니다.  
-> `pip install "modue-harness[ui]"` (또는 `pip install nicegui`, `pip install textual`)을 실행하여 필요한 패키지를 설치해 주시면 즉시 정상 동작합니다.
+> 💡 **의존성 옵션 안내**:  
+> - `pip install -e ".[all]"` : 코어, 개발 도구, 웹 UI(NiceGUI), 터미널 TUI(Textual) 전체 설치 (**권장**)  
+> - `pip install -e ".[dev]"` : CLI 코어 및 pytest 테스트 도구만 가볍게 설치  
+> - `pip install -e ".[ui]"`  : Web UI 및 TUI 대시보드 도구만 추가 설치
 
 ### 2. 테스트 검증
 ```bash

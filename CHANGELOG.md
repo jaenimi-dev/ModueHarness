@@ -8,8 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.8.0] - 2026-09-20
 
 ### Added
+- **Automated All-in-One Installer Scripts (`install.sh`, `install.ps1`)**:
+  - One-line / automated setup scripts for Linux/macOS and Windows PowerShell.
+  - Automatically fetches/updates repo via Git or GitHub CLI (`gh`), installs all dependencies (`pip install -e ".[all]"`), and runs validation tests.
+- **OpenAI ChatGPT Codex CLI Adapter & Web UI Integration**:
+  - Dedicated `CodexCLIAdapter` supporting headless `codex exec`, sandbox permissions (`--sandbox workspace-write`), dynamic model configuration.
+  - Web UI adapter selection (`codex`) with emerald styling and latest model presets (`gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`).
 - **ChatGPT Codex CLI Guide (`docs/codex_guide.md`)**:
-  - Comprehensive installation, authentication (`codex login`), sandbox permissions (`--sandbox workspace-write`), and ModueHarness integration manual.
+  - Comprehensive installation, authentication (`codex login`), sandbox permissions, PowerShell restart notices, and ModueHarness integration manual.
 - **Project Deletion Feature**:
   - Web UI project deletion button in header with confirmation modal.
   - Project directory and isolated blackboard directory cleanup (`delete_project` API).
