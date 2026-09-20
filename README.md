@@ -11,11 +11,10 @@
 
 ## 🚀 빠른 시작 (Quick Start)
 
-### 1. 설치 (Installation)
+> 📦 **상세 설치 및 환경 구성 매뉴얼**: **[docs/installation.md](docs/installation.md)**  
+> 🛠️ **CLI 명령어 레퍼런스 및 실전 옵션**: **[docs/cli_reference.md](docs/cli_reference.md)**
 
-> 📦 **상세 설치 및 환경 구성 매뉴얼**: **[docs/installation.md](docs/installation.md)**
-
-터미널에서 아래 원라인 명령어를 실행하면 저장소 복제/동기화부터 전체 패키지 설치(`pip install -e ".[all]"`) 및 검증까지 자동으로 완료됩니다:
+터미널에서 아래 원라인 명령어를 실행하면 저장소 복제부터 전체 패키지 설치(`pip install -e ".[all]"`) 및 검증까지 자동으로 완료됩니다:
 
 - **Linux / macOS**:
   ```bash
@@ -26,50 +25,13 @@
   irm https://raw.githubusercontent.com/jaenimi-dev/ModueHarness/main/install.ps1 | iex
   ```
 
-*(Git 또는 GitHub CLI(`gh`)를 통한 수동 설치, 단계별 패키지 옵션(`[dev]`, `[ui]`) 및 트러블슈팅은 **[설치 가이드(docs/installation.md)](docs/installation.md)**를 참조하세요.)*
-
-### 2. 테스트 검증
+설치 후 즉시 원하는 모드로 시작할 수 있습니다:
 ```bash
-python3 -m pytest -q
-# 101 passed
+python run.py -i -P my-project    # [추천] 대화형 CLI 모드 (REPL)
+python run.py --ui -P my-project  # 🌐 Web UI 대시보드 (브라우저 화면)
 ```
 
-### 3. CLI 및 UI 실행 예시 (워크플로우 파일 없이 직접 명령 실행)
-
-> 💡 **실행 방법 (아래 2가지 중 편한 방법 선택)**:
-> - **방법 A (루트 실행 파일, 환경변수 불필요)**: `python run.py [옵션]`
-> - **방법 B (전용 CLI 명령어, pip 설치 후)**: `modue-harness [옵션]`
-
-```bash
-# [추천] 대화형 CLI 모드 실행 (REPL)
-python run.py -i -P my-web-app
-# (또는 pip 설치 후: modue-harness -i -P my-web-app)
-
-# 🌐 Web UI 대시보드 실행 (NiceGUI, 브라우저 화면)
-python run.py --ui -P my-web-app
-# (또는 pip 설치 후: modue-harness ui -P my-web-app)
-
-# 💻 Terminal TUI 대시보드 실행 (Textual, 터미널 콘솔/SSH 화면)
-python run.py --tui -P my-web-app
-# (또는 pip 설치 후: modue-harness tui -P my-web-app)
-
-# Google Antigravity(AGY)를 지정하여 실행
-python run.py -i -P my-web-app --agent agy -m gemini-3.8-flash-high -e high
-
-# OpenAI ChatGPT Codex를 지정하여 실행
-python run.py -i -P my-web-app --agent codex -m gpt-5.6-terra -e high
-
-# 단일 명령어로 즉시 프로젝트에 작업 구현
-python run.py "FastAPI 기반 REST API와 테스트 코드를 작성해줘" -P my-api
-
-# 기존 Git / GitHub(gh) 저장소를 클론받아 작업할 때
-git clone https://github.com/username/my-repo.git projects/my-repo
-# (또는 gh repo clone username/my-repo projects/my-repo)
-python run.py -i -P my-repo
-
-# Multi-AI 토론 및 합의 (Debate) 실행 (Claude vs Antigravity)
-python run.py debate --topic "REST vs GraphQL for Mobile Backend" --proposer claude --challenger agy
-```
+*(수동 설치, 세부 패키지 옵션(`[dev]`, `[ui]`), 단위 테스트 검증 및 트러블슈팅은 **[설치 가이드(docs/installation.md)](docs/installation.md)**를, 전체 CLI 명령어와 옵션 예시는 **[CLI 레퍼런스(docs/cli_reference.md)](docs/cli_reference.md)**를 참조하세요.)*
 
 ---
 

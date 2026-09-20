@@ -103,7 +103,28 @@ python run.py --version
 
 ---
 
-## ⚠️ 5. 트러블슈팅 (Troubleshooting)
+## 🚀 5. 기본 실행 (Getting Started)
+
+설치 완료 후 아래 방법 중 원하는 모드를 선택하여 실행합니다:
+
+```bash
+# 1) [추천] 대화형 CLI 모드 (REPL) 실행
+python run.py -i -P my-web-app
+# (또는 pip 설치 후: modue-harness -i -P my-web-app)
+
+# 2) 🌐 Web UI 대시보드 (NiceGUI 브라우저 화면: http://127.0.0.1:8080)
+python run.py --ui -P my-web-app
+
+# 3) 💻 Terminal TUI 대시보드 (Textual 터미널 콘솔 화면)
+python run.py --tui -P my-web-app
+
+# 4) 단일 자연어 명령 직접 실행
+python run.py "FastAPI 기반 REST API와 테스트 코드를 작성해줘" -P my-api
+```
+
+---
+
+## ⚠️ 6. 트러블슈팅 (Troubleshooting)
 
 ### Q1. UI 실행 시 `NiceGUI is not installed` 또는 `Textual is not installed` 오류가 발생합니다.
 * **원인**: 패키지 설치 시 `[ui]` 또는 `[all]` 옵션을 제외하고 설치한 경우 발생합니다.
@@ -122,9 +143,9 @@ python run.py --version
 
 ## 📚 다음 단계 (Next Steps)
 
-설치를 마쳤다면 다음 가이드를 참고하여 원하는 모드로 실행을 시작하세요:
+설치를 마쳤다면 다음 가이드를 참고하여 AI 팀 설정 및 고급 기능을 활용해 보세요:
 
-* **[빠른 시작 및 CLI 실행 예시](../README.md#3-cli-및-ui-실행-예시-워크플로우-파일-없이-직접-명령-실행)**
+* **[CLI 명령어 레퍼런스 및 실전 옵션](cli_reference.md)**
 * **[AI CLI 설정 및 실전 매뉴얼](configuration_guide.md)**
 * **[Claude Code 연동 가이드](claude_guide.md)**
 * **[Google Antigravity 연동 가이드](antigravity_guide.md)**
