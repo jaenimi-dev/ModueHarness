@@ -429,7 +429,7 @@ def run_app(
             with main_container:
                 # Left Pane: Command Dispatcher & Agent Settings
                 with ui.card().classes(
-                    "w-1/4 h-full min-h-0 max-h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
+                    "w-[24%] min-w-[260px] max-w-[320px] flex-shrink-0 h-full min-h-0 max-h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
                 ).style("height: 100%; max-height: 100%; min-height: 0;"):
                     # Task Dispatcher Card (Compact, fixed height)
                     with ui.card().classes("w-full p-2.5 bg-slate-900 border border-slate-700 rounded gap-1.5 flex-shrink-0"):
@@ -530,7 +530,7 @@ def run_app(
 
                 # Center Pane: Real-time Live Stream & Stage
                 with ui.card().classes(
-                    "w-1/2 h-full min-h-0 max-h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
+                    "flex-1 min-w-0 h-full min-h-0 max-h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
                 ).style("height: 100%; max-height: 100%; min-height: 0;"):
                     with ui.row().classes("w-full items-center justify-between border-b border-slate-700 pb-2 flex-shrink-0"):
                         with ui.row().classes("items-center gap-2"):
@@ -782,14 +782,14 @@ def run_app(
 
                 # Right Pane: Blackboard Tasks, Artifacts & Project Files
                 with ui.card().classes(
-                    "w-1/4 h-full min-h-0 max-h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
+                    "w-[28%] min-w-[340px] max-w-[460px] flex-shrink-0 h-full min-h-0 max-h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
                 ).style("height: 100%; max-height: 100%; min-height: 0;"):
                     with ui.row().classes("w-full items-center justify-between border-b border-slate-700 pb-1 flex-shrink-0"):
-                        with ui.tabs().classes("text-xs flex-1") as tabs:
-                            tab_tasks = ui.tab(i18n("tab_tasks"))
-                            tab_artifacts = ui.tab(i18n("tab_artifacts"))
-                            tab_files = ui.tab(i18n("tab_files"))
-                            tab_jobs = ui.tab(i18n("tab_jobs"))
+                        with ui.tabs().props("dense no-caps inline-label outside-arrows mobile-arrows narrow-indicator").classes("text-xs flex-1 min-w-0") as tabs:
+                            tab_tasks = ui.tab(i18n("tab_tasks")).props("no-caps dense").classes("px-1.5 text-xs min-h-[32px]")
+                            tab_artifacts = ui.tab(i18n("tab_artifacts")).props("no-caps dense").classes("px-1.5 text-xs min-h-[32px]")
+                            tab_files = ui.tab(i18n("tab_files")).props("no-caps dense").classes("px-1.5 text-xs min-h-[32px]")
+                            tab_jobs = ui.tab(i18n("tab_jobs")).props("no-caps dense").classes("px-1.5 text-xs min-h-[32px]")
                         ui.button(icon="refresh", on_click=lambda: on_refresh_all_click())\
                             .props("flat dense round size=sm text-color=slate-300 hover:text-white")\
                             .tooltip(i18n("tooltip_refresh_all"))
@@ -863,7 +863,7 @@ def run_app(
                         # Tab 1: Artifacts (Project-isolated)
                         with ui.tab_panel(tab_artifacts).classes("p-0 h-full flex flex-col gap-2 overflow-hidden"):
                             with ui.row().classes("w-full items-center gap-1.5 flex-shrink-0"):
-                                art_select = ui.select(options=[], label=i18n("select_artifact")).classes("flex-1 min-w-0 text-xs")
+                                art_select = ui.select(options=[], label=i18n("select_artifact")).props("dense outlined").classes("flex-1 min-w-0 text-xs")
                                 ui.button(icon="refresh", on_click=lambda: on_refresh_artifacts_click())\
                                     .props("dense outline size=sm text-color=blue-300")\
                                     .tooltip(i18n("tooltip_refresh_artifacts"))\
@@ -901,7 +901,7 @@ def run_app(
                         # Tab 2: Project Files
                         with ui.tab_panel(tab_files).classes("p-0 h-full flex flex-col gap-2 overflow-hidden"):
                             with ui.row().classes("w-full items-center gap-1.5 flex-shrink-0"):
-                                file_select = ui.select(options=[], label=i18n("select_file")).classes("flex-1 min-w-0 text-xs")
+                                file_select = ui.select(options=[], label=i18n("select_file")).props("dense outlined").classes("flex-1 min-w-0 text-xs")
                                 ui.button(icon="refresh", on_click=lambda: on_refresh_files_click())\
                                     .props("dense outline size=sm text-color=blue-300")\
                                     .tooltip(i18n("tooltip_refresh_files"))\

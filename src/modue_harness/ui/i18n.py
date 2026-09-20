@@ -73,10 +73,10 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "notify_stream_cleared": "스트림 로그가 초기화되었습니다.",
 
         # Right Pane - Tabs & Content
-        "tab_tasks": "태스크 (Tasks)",
-        "tab_artifacts": "산출물 (Artifacts)",
+        "tab_tasks": "태스크",
+        "tab_artifacts": "산출물",
         "tab_files": "프로젝트 파일",
-        "tab_jobs": "작업 이력 (Jobs)",
+        "tab_jobs": "작업 이력",
         "tasks_overview": "블랙보드 태스크 목록",
         "jobs_overview": "작업 이력 목록",
         "no_tasks_yet": "등록된 태스크가 없습니다.",
