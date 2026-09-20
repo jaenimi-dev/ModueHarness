@@ -161,27 +161,94 @@ class UIController:
             "artifacts_count": len(self.session.blackboard.list_artifacts()) if self.session.blackboard.is_initialized() else 0,
         }
 
+    @property
+    def config_file_path(self) -> Optional[Path]:
+        """Return the configuration file path for the active AI team."""
+        return getattr(self.session, "agents_file", None)
+
+    @property
+    def config_file_name(self) -> str:
+        """Return a human-friendly display name for the active agents configuration file."""
+        p = self.config_file_path
+        if p:
+            try:
+                return str(p.relative_to(Path.cwd()))
+            except Exception:
+                return p.name
+        return "config/agents.yaml"
+
     def get_artifacts(self) -> List[Dict[str, Any]]:
-        """List artifacts available on the blackboard."""
+        """List artifacts available for the current project on blackboard or project directory."""
         if not self.session.blackboard.is_initialized():
             return []
-        results = []
-        for name in self.session.blackboard.list_artifacts():
+
+        all_artifacts = self.session.blackboard.list_artifacts()
+        current_project = self.session.project_name
+
+        has_tagged = False
+        matched = []
+        untagged = []
+
+        for name in all_artifacts:
+            meta = self.session.blackboard.read_artifact_metadata(name)
             p = self.session.blackboard.artifacts_dir / name
             size = p.stat().st_size if p.exists() else 0
             mtime = p.stat().st_mtime if p.exists() else 0
-            results.append({
+            item = {
                 "name": name,
                 "size_bytes": size,
                 "modified_at": mtime,
                 "path": str(p),
-            })
-        return results
+            }
+
+            proj_meta = None
+            if meta:
+                custom = meta.get("custom", {})
+                proj_meta = custom.get("project") if isinstance(custom, dict) else meta.get("project")
+
+            if proj_meta:
+                has_tagged = True
+                if proj_meta == current_project:
+                    matched.append(item)
+            else:
+                untagged.append(item)
+
+        # Also inspect project_dir / "artifacts"
+        proj_art_dir = self.session.project_dir / "artifacts"
+        if proj_art_dir.is_dir():
+            for p in sorted(proj_art_dir.rglob("*")):
+                if p.is_file() and not p.name.startswith("."):
+                    rel = str(p.relative_to(proj_art_dir))
+                    if not any(r["name"] == rel for r in matched):
+                        matched.append({
+                            "name": rel,
+                            "size_bytes": p.stat().st_size,
+                            "modified_at": p.stat().st_mtime,
+                            "path": str(p),
+                        })
+
+        if matched:
+            return matched
+        elif not has_tagged:
+            return untagged
+        else:
+            return []
 
     def get_artifact_content(self, name: str) -> str:
-        """Read artifact content as string."""
-        content = self.session.blackboard.read_artifact(name)
-        return content if content is not None else ""
+        """Read artifact content as string for the current project."""
+        # 1. Project-local artifacts
+        proj_art = self.session.project_dir / "artifacts" / name
+        if proj_art.is_file():
+            try:
+                return proj_art.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+        # 2. Blackboard
+        try:
+            content = self.session.blackboard.read_artifact(name)
+            return content if content is not None else ""
+        except Exception:
+            return ""
 
     def get_tasks(self) -> List[Dict[str, Any]]:
         """List task objects from the blackboard."""

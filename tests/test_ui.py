@@ -368,3 +368,79 @@ def test_cli_ui_command_language_flags(monkeypatch):
     mock_run.assert_called_once()
     assert mock_run.call_args[1]["lang"] == "ko"
 
+
+def test_ui_controller_agent_config_persistence(tmp_path: Path):
+    """Test modifying AI agents in UI persists to config YAML, not modifying code."""
+    import yaml
+
+    config_file = tmp_path / "config" / "agents.yaml"
+    ctrl = UIController(
+        project_name="demo",
+        projects_root=tmp_path / "projects",
+        blackboard_dir=tmp_path / "blackboard",
+        agents_file=config_file,
+    )
+
+    # 1. Update an agent
+    first_agent = ctrl.get_agents_info()[0]["name"]
+    ctrl.update_agent(first_agent, model="claude-3-7-sonnet", effort="high")
+
+    assert config_file.exists(), "Configuration file must be created/updated!"
+    with open(config_file, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    assert "agents" in data
+    assert first_agent in data["agents"]
+    assert data["agents"][first_agent]["model"] == "claude-3-7-sonnet"
+    assert data["agents"][first_agent]["effort"] == "high"
+
+    # 2. Add a new agent
+    ctrl.add_agent("security_auditor", adapter_type="claude", model="opus")
+    with open(config_file, "r", encoding="utf-8") as f:
+        data2 = yaml.safe_load(f)
+    assert "security_auditor" in data2["agents"]
+    assert data2["agents"]["security_auditor"]["model"] == "opus"
+
+
+def test_ui_controller_project_artifacts_isolation(tmp_path: Path):
+    """Test switching projects switches the artifacts view accordingly."""
+    projects_dir = tmp_path / "projects"
+    board_dir = tmp_path / "blackboard"
+
+    board = Blackboard(root_dir=board_dir)
+    board.initialize()
+
+    # Project A writes an artifact with metadata
+    board.write_artifact("plan_a.md", "# Project A Plan", metadata={"project": "projA"})
+
+    ctrl = UIController(
+        project_name="projA",
+        projects_root=projects_dir,
+        blackboard_dir=board_dir,
+    )
+
+    # In projA: plan_a.md is listed and readable
+    arts_a = ctrl.get_artifacts()
+    assert len(arts_a) == 1
+    assert arts_a[0]["name"] == "plan_a.md"
+    assert ctrl.get_artifact_content("plan_a.md") == "# Project A Plan"
+
+    # Switch to projB: plan_a.md should NOT be listed for projB!
+    ctrl.switch_project("projB")
+    arts_b = ctrl.get_artifacts()
+    assert len(arts_b) == 0
+
+    # Project B writes its own artifact
+    board.write_artifact("plan_b.md", "# Project B Plan", metadata={"project": "projB"})
+    arts_b_after = ctrl.get_artifacts()
+    assert len(arts_b_after) == 1
+    assert arts_b_after[0]["name"] == "plan_b.md"
+    assert ctrl.get_artifact_content("plan_b.md") == "# Project B Plan"
+
+    # Switch back to projA
+    ctrl.switch_project("projA")
+    arts_a_again = ctrl.get_artifacts()
+    assert len(arts_a_again) == 1
+    assert arts_a_again[0]["name"] == "plan_a.md"
+
+

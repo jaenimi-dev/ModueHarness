@@ -81,6 +81,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_cancel": "취소",
         "btn_save": "저장",
         "notify_agent_updated": "에이전트 '{name}' 설정이 저장되었습니다.",
+        "notify_agent_saved_to": "에이전트 '{name}' 설정이 {path}에 저장되었습니다.",
 
         # Dialogs - Add Agent
         "dialog_add_title": "➕ AI 팀 멤버 추가",
@@ -163,6 +164,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "btn_cancel": "Cancel",
         "btn_save": "Save",
         "notify_agent_updated": "Updated agent '{name}'",
+        "notify_agent_saved_to": "Agent '{name}' configuration saved to {path}.",
 
         # Dialogs - Add Agent
         "dialog_add_title": "➕ Add AI Team Member",

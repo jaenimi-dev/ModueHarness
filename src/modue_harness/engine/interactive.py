@@ -239,8 +239,19 @@ class InteractiveSession:
         self.model = model
         self.effort = effort
         self.timeout = timeout
+        if agents_file:
+            self.agents_file = Path(agents_file).resolve()
+        else:
+            base_dir = (projects_root.parent if projects_root else Path.cwd()).resolve()
+            if (base_dir / "config" / "agents.yaml").exists():
+                self.agents_file = (base_dir / "config" / "agents.yaml").resolve()
+            elif (base_dir / "agents.yaml").exists():
+                self.agents_file = (base_dir / "agents.yaml").resolve()
+            else:
+                self.agents_file = (base_dir / "config" / "agents.yaml").resolve()
+
         self.agents = agents or load_or_detect_agents(
-            agents_file=agents_file,
+            agents_file=self.agents_file,
             specific_agent=specific_agent,
             model=model,
             effort=effort,
@@ -297,10 +308,67 @@ class InteractiveSession:
         self.timeout = timeout
         return self.timeout
 
+    def save_agents_config(self, filepath: Optional[Path] = None) -> Path:
+        """Persist current AI team configuration to YAML config file."""
+        import yaml
+
+        target = filepath or self.agents_file or (Path.cwd() / "config" / "agents.yaml")
+        target = target.resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+        agents_data: Dict[str, Any] = {}
+        for name, agent in self.agents.items():
+            adapter_type = "generic"
+            cls_name = agent.__class__.__name__.lower()
+            if "claude" in cls_name:
+                adapter_type = "claude"
+            elif "agy" in cls_name or "antigravity" in cls_name:
+                adapter_type = "agy"
+            elif "aider" in cls_name:
+                adapter_type = "aider"
+
+            entry: Dict[str, Any] = {
+                "adapter": adapter_type,
+            }
+            cmd = getattr(agent, "command", None)
+            if cmd and cmd != "generic" and not ("python" in str(cmd).lower()):
+                entry["command"] = cmd
+            args = getattr(agent, "default_args", None)
+            if args:
+                entry["args"] = args
+            mod = getattr(agent, "model", None)
+            if mod:
+                entry["model"] = mod
+            eff = getattr(agent, "effort", None)
+            if eff:
+                entry["effort"] = eff
+            ins = getattr(agent, "system_instruction", None)
+            if ins:
+                entry["system_instruction"] = ins
+
+            agents_data[name] = entry
+
+        doc = {
+            "version": "0.7.0",
+            "name": "modue-harness-team",
+            "conductor": self.conductor_name,
+            "agents": agents_data,
+        }
+
+        with open(target, "w", encoding="utf-8") as f:
+            yaml.safe_dump(doc, f, sort_keys=False, allow_unicode=True)
+
+        self.agents_file = target
+        return target
+
     def set_conductor(self, agent_name: str) -> bool:
         """Set an existing agent as the team leader/conductor."""
         if agent_name in self.agents:
             self.conductor_name = agent_name
+            try:
+                self.save_agents_config()
+            except Exception:
+                pass
             return True
         return False
 
@@ -326,6 +394,10 @@ class InteractiveSession:
         self.agents[name] = adapter
         if is_conductor:
             self.conductor_name = name
+        try:
+            self.save_agents_config()
+        except Exception:
+            pass
         return adapter
 
     def remove_agent(self, name: str) -> bool:
@@ -336,6 +408,10 @@ class InteractiveSession:
             del self.agents[name]
             if self.conductor_name == name:
                 self.conductor_name = next(iter(self.agents.keys()))
+            try:
+                self.save_agents_config()
+            except Exception:
+                pass
             return True
         return False
 
@@ -387,6 +463,11 @@ class InteractiveSession:
 
         if is_conductor:
             self.conductor_name = name
+
+        try:
+            self.save_agents_config()
+        except Exception:
+            pass
         return True
 
     def switch_project(self, project_name: str) -> Path:

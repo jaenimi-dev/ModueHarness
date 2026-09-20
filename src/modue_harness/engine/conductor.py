@@ -152,12 +152,22 @@ class ConductorRunner:
             }
 
         # Save plan to blackboard
-        self.blackboard.write_artifact("plan.json", plan_result.stdout.strip(), author_agent=self.conductor_name)
+        self.blackboard.write_artifact(
+            "plan.json",
+            plan_result.stdout.strip(),
+            author_agent=self.conductor_name,
+            metadata={"project": self.workspace_dir.name},
+        )
         subtasks_data = self._extract_tasks_json(plan_result.stdout)
 
         if not subtasks_data:
             # If no JSON tasks parsed, treat full response as plan document
-            self.blackboard.write_artifact("plan.md", plan_result.stdout.strip(), author_agent=self.conductor_name)
+            self.blackboard.write_artifact(
+                "plan.md",
+                plan_result.stdout.strip(),
+                author_agent=self.conductor_name,
+                metadata={"project": self.workspace_dir.name},
+            )
             subtasks_data = [
                 {
                     "id": "task_1",
@@ -233,7 +243,12 @@ class ConductorRunner:
             }
             if res.is_success:
                 if output_art and res.stdout:
-                    self.blackboard.write_artifact(output_art, res.stdout.strip(), author_agent=assigned)
+                    self.blackboard.write_artifact(
+                        output_art,
+                        res.stdout.strip(),
+                        author_agent=assigned,
+                        metadata={"project": self.workspace_dir.name},
+                    )
                 self.blackboard.update_task_status(task_id, TaskStatus.COMPLETED)
                 worker_results.append(task_record)
                 self._notify("task_end", {
@@ -292,7 +307,12 @@ class ConductorRunner:
             })
             synth_res = conductor_adapter.execute(synth_ctx, timeout=self.timeout)
             if synth_res.is_success:
-                self.blackboard.write_artifact("synthesis_report.md", synth_res.stdout.strip(), author_agent=self.conductor_name)
+                self.blackboard.write_artifact(
+                    "synthesis_report.md",
+                    synth_res.stdout.strip(),
+                    author_agent=self.conductor_name,
+                    metadata={"project": self.workspace_dir.name},
+                )
             else:
                 overall_success = False
                 if not failure_reason:
