@@ -10,6 +10,7 @@ from modue_harness.adapters import (
     ClaudeCLIAdapter,
     AGYCLIAdapter,
     AiderCLIAdapter,
+    CodexCLIAdapter,
     create_adapter,
     strip_ansi,
 )
@@ -35,6 +36,12 @@ def test_adapter_factory():
 
     aider = create_adapter("aider")
     assert isinstance(aider, AiderCLIAdapter)
+
+    codex = create_adapter("codex")
+    assert isinstance(codex, CodexCLIAdapter)
+
+    chatgpt = create_adapter("chatgpt")
+    assert isinstance(chatgpt, CodexCLIAdapter)
 
     generic = create_adapter("unknown-custom")
     assert isinstance(generic, GenericCLIAdapter)
@@ -226,6 +233,47 @@ def test_resolve_agy_binary_windows(monkeypatch, tmp_path: Path):
 
     resolved = resolve_agy_binary("agy")
     assert resolved == str(fake_exe)
+
+
+def test_codex_adapter_command_building():
+    """Verify CodexCLIAdapter command line construction and dynamic updates."""
+    codex = CodexCLIAdapter(
+        name="codex-worker",
+        command="codex",
+        model="o3-mini",
+        effort="high",
+        sandbox="workspace-write",
+    )
+    cmd = codex.build_command("Analyze and implement feature")
+    assert "codex" in cmd[0]
+    assert "exec" in cmd
+    assert "--sandbox" in cmd
+    assert "workspace-write" in cmd
+    assert "-m" in cmd
+    assert "o3-mini" in cmd
+    assert cmd[-1] == "Analyze and implement feature"
+
+    # Test dynamic model update
+    codex.set_model("gpt-4o")
+    cmd2 = codex.build_command("Build test app")
+    assert "gpt-4o" in cmd2
+    assert "o3-mini" not in cmd2
+
+
+def test_resolve_codex_binary(monkeypatch, tmp_path: Path):
+    """Verify resolve_codex_binary finds binary in custom paths."""
+    from modue_harness.adapters.codex import resolve_codex_binary
+
+    fake_local = tmp_path / ".local" / "bin"
+    fake_local.mkdir(parents=True)
+    fake_codex = fake_local / "codex"
+    fake_codex.touch()
+
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setattr("shutil.which", lambda x: None)
+
+    resolved = resolve_codex_binary("codex")
+    assert resolved == str(fake_codex)
 
 
 

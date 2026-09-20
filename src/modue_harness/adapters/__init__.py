@@ -6,6 +6,7 @@ from modue_harness.adapters.agy import AGYCLIAdapter
 from modue_harness.adapters.aider import AiderCLIAdapter
 from modue_harness.adapters.base import BaseCLIAdapter, strip_ansi
 from modue_harness.adapters.claude import ClaudeCLIAdapter
+from modue_harness.adapters.codex import CodexCLIAdapter
 from modue_harness.adapters.generic import GenericCLIAdapter
 
 ADAPTER_REGISTRY: Dict[str, Type[BaseCLIAdapter]] = {
@@ -15,6 +16,8 @@ ADAPTER_REGISTRY: Dict[str, Type[BaseCLIAdapter]] = {
     "agy": AGYCLIAdapter,
     "antigravity": AGYCLIAdapter,
     "aider": AiderCLIAdapter,
+    "codex": CodexCLIAdapter,
+    "chatgpt": CodexCLIAdapter,
 }
 
 
@@ -33,6 +36,7 @@ __all__ = [
     "ClaudeCLIAdapter",
     "AGYCLIAdapter",
     "AiderCLIAdapter",
+    "CodexCLIAdapter",
     "create_adapter",
     "strip_ansi",
     "ADAPTER_REGISTRY",

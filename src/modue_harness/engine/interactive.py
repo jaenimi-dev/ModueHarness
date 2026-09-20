@@ -16,6 +16,7 @@ from modue_harness.adapters import (
     ClaudeCLIAdapter,
     AGYCLIAdapter,
     AiderCLIAdapter,
+    CodexCLIAdapter,
     GenericCLIAdapter,
     create_adapter,
 )
@@ -110,6 +111,12 @@ def load_or_detect_agents(
             kwargs = {"command": "aider"}
             if model:
                 kwargs["model"] = model
+        elif specific_agent.lower() in ["codex", "chatgpt"]:
+            kwargs = {"command": "codex"}
+            if model:
+                kwargs["model"] = model
+            if effort:
+                kwargs["effort"] = effort
         return {specific_agent: create_adapter(specific_agent, name=specific_agent, **kwargs)}
 
     # 2. User specified agents file
@@ -161,6 +168,7 @@ def load_or_detect_agents(
 
     claude_bin = _find_bin("claude")
     agy_bin = _find_bin("agy")
+    codex_bin = _find_bin("codex")
     aider_bin = _find_bin("aider")
 
     if claude_bin:
@@ -210,6 +218,31 @@ def load_or_detect_agents(
             "reviewer": AGYCLIAdapter(
                 name="reviewer",
                 command=agy_bin,
+                model=model,
+                effort=effort,
+                system_instruction="You verify and review implementation code and write test validations.",
+            ),
+        }
+
+    if codex_bin:
+        return {
+            "architect": CodexCLIAdapter(
+                name="architect",
+                command=codex_bin,
+                model=model,
+                effort=effort,
+                system_instruction="You design modular software architecture and decompose tasks clearly.",
+            ),
+            "developer": CodexCLIAdapter(
+                name="developer",
+                command=codex_bin,
+                model=model,
+                effort=effort,
+                system_instruction="You write clean, tested, production-ready code in the project directory.",
+            ),
+            "reviewer": CodexCLIAdapter(
+                name="reviewer",
+                command=codex_bin,
                 model=model,
                 effort=effort,
                 system_instruction="You verify and review implementation code and write test validations.",
@@ -490,6 +523,8 @@ class InteractiveSession:
             current_adapter = "agy"
         elif "aider" in cls_name:
             current_adapter = "aider"
+        elif "codex" in cls_name or "chatgpt" in cls_name:
+            current_adapter = "codex"
 
         target_adapter = (adapter_type or current_adapter).lower()
         if target_adapter != current_adapter:

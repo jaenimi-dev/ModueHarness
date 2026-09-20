@@ -85,6 +85,8 @@ class UIController:
                 adapter_type = "agy"
             elif "aider" in cls_name:
                 adapter_type = "aider"
+            elif "codex" in cls_name or "chatgpt" in cls_name:
+                adapter_type = "codex"
 
             info.append({
                 "name": name,

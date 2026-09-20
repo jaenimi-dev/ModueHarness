@@ -322,7 +322,7 @@ def run_app(
                     edit_name_label = ui.label("").classes("text-xs font-mono text-slate-400 mb-1")
 
                     edit_adapter = ui.select(
-                        options=["claude", "agy", "aider", "generic"],
+                        options=["claude", "agy", "codex", "aider", "generic"],
                         label=i18n("adapter_type"),
                     ).classes("w-full bg-slate-800 text-white rounded")
 
@@ -331,12 +331,15 @@ def run_app(
                         placeholder=i18n("model_placeholder"),
                     ).classes("w-full")
 
-                    with ui.row().classes("gap-1 items-center"):
+                    with ui.row().classes("gap-1 items-center flex-wrap"):
                         ui.label(i18n("presets")).classes("text-[11px] text-slate-400")
                         ui.button("sonnet", on_click=lambda: edit_model.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
-                        ui.button("opus", on_click=lambda: edit_model.set_value("opus")).props("dense outline size=xs text-color=slate-300")
                         ui.button("flash-high", on_click=lambda: edit_model.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")
+                        ui.button("o3-mini", on_click=lambda: edit_model.set_value("o3-mini")).props("dense outline size=xs text-color=emerald-300")
+                        ui.button("o1", on_click=lambda: edit_model.set_value("o1")).props("dense outline size=xs text-color=emerald-300")
+                        ui.button("gpt-4o", on_click=lambda: edit_model.set_value("gpt-4o")).props("dense outline size=xs text-color=emerald-300")
                         ui.button("pro", on_click=lambda: edit_model.set_value("gemini-3.5-pro")).props("dense outline size=xs text-color=slate-300")
+                        ui.button("opus", on_click=lambda: edit_model.set_value("opus")).props("dense outline size=xs text-color=slate-300")
 
                     edit_effort = ui.select(
                         options=["default", "low", "medium", "high", "max", "off"],
@@ -395,7 +398,7 @@ def run_app(
                     ).classes("w-full")
 
                     add_adapter = ui.select(
-                        options=["claude", "agy", "aider", "generic"],
+                        options=["claude", "agy", "codex", "aider", "generic"],
                         value="claude",
                         label=i18n("adapter_type"),
                     ).classes("w-full bg-slate-800 text-white rounded")
@@ -405,10 +408,14 @@ def run_app(
                         placeholder=i18n("model_placeholder"),
                     ).classes("w-full")
 
-                    with ui.row().classes("gap-1 items-center"):
+                    with ui.row().classes("gap-1 items-center flex-wrap"):
                         ui.label(i18n("presets")).classes("text-[11px] text-slate-400")
                         ui.button("sonnet", on_click=lambda: add_model.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
                         ui.button("flash-high", on_click=lambda: add_model.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")
+                        ui.button("o3-mini", on_click=lambda: add_model.set_value("o3-mini")).props("dense outline size=xs text-color=emerald-300")
+                        ui.button("o1", on_click=lambda: add_model.set_value("o1")).props("dense outline size=xs text-color=emerald-300")
+                        ui.button("gpt-4o", on_click=lambda: add_model.set_value("gpt-4o")).props("dense outline size=xs text-color=emerald-300")
+                        ui.button("pro", on_click=lambda: add_model.set_value("gemini-3.5-pro")).props("dense outline size=xs text-color=slate-300")
 
                     add_effort = ui.select(
                         options=["default", "low", "medium", "high", "max", "off"],
@@ -546,6 +553,8 @@ def run_app(
                                         adapter_color = {
                                             "claude": "purple-600",
                                             "agy": "blue-600",
+                                            "codex": "emerald-600",
+                                            "chatgpt": "emerald-600",
                                             "aider": "teal-600",
                                         }.get(a["adapter"], "slate-600")
                                         ui.badge(a["adapter"], color=adapter_color).classes("text-[10px]")

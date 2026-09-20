@@ -7,6 +7,7 @@ from modue_harness.adapters import (
     AiderCLIAdapter,
     BaseCLIAdapter,
     ClaudeCLIAdapter,
+    CodexCLIAdapter,
     GenericCLIAdapter,
     create_adapter,
 )
@@ -54,6 +55,7 @@ __all__ = [
     "ClaudeCLIAdapter",
     "AGYCLIAdapter",
     "AiderCLIAdapter",
+    "CodexCLIAdapter",
     "create_adapter",
     "PipelineRunner",
     "ConductorRunner",
