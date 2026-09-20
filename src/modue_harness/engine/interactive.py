@@ -1273,6 +1273,38 @@ class InteractiveSession:
                     else:
                         print("⚠️ 모델을 적용할 수 있는 에이전트를 찾을 수 없습니다.")
 
+        elif cmd in ["/models", "/available-models"]:
+            target_adp = (arg.strip() or "").lower()
+            show_all = not target_adp
+            if show_all or target_adp in ("agy", "antigravity"):
+                from modue_harness.adapters.agy import get_available_agy_models
+                agy_models = get_available_agy_models(force_refresh=True)
+                print(f"\n🚀 Google Antigravity (`agy models` 최신 조회 - {len(agy_models)}개):")
+                for m in agy_models:
+                    print(f"  • {m['id']:<26} - {m['name']}")
+                print("  👉 적용 예: /model agy gemini-3.8-flash-high")
+            if show_all or target_adp in ("codex", "chatgpt"):
+                print("\n🧠 OpenAI ChatGPT Codex 지원 모델:")
+                codex_models = [
+                    ("gpt-5.6-terra", "GPT-5.6 Terra (Thinking, 권장)"),
+                    ("gpt-5.6-luna", "GPT-5.6 Luna"),
+                    ("gpt-5.5", "GPT-5.5 (Fast)"),
+                ]
+                for mid, mdesc in codex_models:
+                    print(f"  • {mid:<26} - {mdesc}")
+                print("  👉 적용 예: /model codex gpt-5.6-terra")
+            if show_all or target_adp in ("claude", "claude-code"):
+                print("\n🎭 Claude Code 지원 모델 (별칭 및 최신 모델):")
+                claude_models = [
+                    ("sonnet", "Claude Sonnet (기본 권장, Latest)"),
+                    ("opus", "Claude Opus (심층 사고/설계)"),
+                    ("haiku", "Claude Haiku (경량/고속)"),
+                ]
+                for mid, mdesc in claude_models:
+                    print(f"  • {mid:<26} - {mdesc}")
+                print("  👉 적용 예: /model sonnet (또는 /model claude-3-7-sonnet-latest)")
+            print()
+
         elif cmd in ["/effort", "/e"]:
             valid_levels = {"low", "medium", "high", "xhigh", "max", "off", "none", "default"}
             if not arg:
@@ -1361,6 +1393,7 @@ class InteractiveSession:
             print("\n=== 사용 가능한 명령어 ===")
             print("  자연어 명령 입력        : 동기 방식으로 즉시 실행 (실시간 단계 및 CLI 명령 표시)")
             print("  자연어 명령 &          : 백그라운드 비동기 실행 (프롬프트 즉시 반환)")
+            print("  /models [agy|codex|..] : 어댑터별 지원/사용 가능한 실시간 AI 모델 목록 조회")
             print("  /model [이름] [모델]    : AI 모델 확인 및 변경 (예: /model sonnet)")
             print("  /effort [이름] [수준]   : Claude 추론 노력 수준 설정 (low, medium, high, max)")
             print("  /timeout [초|off]      : AI 실행 타임아웃 설정 또는 해제 (기본: 해제/무제한)")

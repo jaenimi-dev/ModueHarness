@@ -2,7 +2,11 @@
 
 from typing import Any, Dict, Type
 
-from modue_harness.adapters.agy import AGYCLIAdapter
+from modue_harness.adapters.agy import (
+    AGYCLIAdapter,
+    get_agy_model_ids,
+    get_available_agy_models,
+)
 from modue_harness.adapters.aider import AiderCLIAdapter
 from modue_harness.adapters.base import BaseCLIAdapter, strip_ansi
 from modue_harness.adapters.claude import ClaudeCLIAdapter
@@ -40,4 +44,6 @@ __all__ = [
     "create_adapter",
     "strip_ansi",
     "ADAPTER_REGISTRY",
+    "get_available_agy_models",
+    "get_agy_model_ids",
 ]

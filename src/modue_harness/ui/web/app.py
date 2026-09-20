@@ -334,15 +334,46 @@ def run_app(
                         placeholder=i18n("model_placeholder"),
                     ).classes("w-full")
 
-                    with ui.row().classes("gap-1 items-center flex-wrap"):
-                        ui.label(i18n("presets")).classes("text-[11px] text-slate-400")
-                        ui.button("sonnet", on_click=lambda: edit_model.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
-                        ui.button("flash-high", on_click=lambda: edit_model.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")
-                        ui.button("5.6-terra", on_click=lambda: edit_model.set_value("gpt-5.6-terra")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.6-terra")
-                        ui.button("5.6-luna", on_click=lambda: edit_model.set_value("gpt-5.6-luna")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.6-luna")
-                        ui.button("gpt-5.5", on_click=lambda: edit_model.set_value("gpt-5.5")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.5")
-                        ui.button("pro", on_click=lambda: edit_model.set_value("gemini-3.5-pro")).props("dense outline size=xs text-color=slate-300")
-                        ui.button("opus", on_click=lambda: edit_model.set_value("opus")).props("dense outline size=xs text-color=slate-300")
+                    edit_presets_row = ui.row().classes("gap-1 items-center flex-wrap")
+
+                    def render_presets(row, target_input, adapter_name, force_refresh=False):
+                        row.clear()
+                        adp = (adapter_name or "claude").lower()
+                        models = ctrl.get_adapter_models(adp, force_refresh=force_refresh)
+                        with row:
+                            ui.label(i18n("presets")).classes("text-[11px] text-slate-400")
+                            if adp in ("agy", "antigravity"):
+                                for m in models[:7]:
+                                    short_label = m["id"].replace("gemini-", "").replace("claude-", "")
+                                    ui.button(
+                                        short_label,
+                                        on_click=lambda mid=m["id"]: target_input.set_value(mid),
+                                    ).props("dense outline size=xs text-color=sky-300").tooltip(f"{m['id']} ({m['name']})")
+
+                                def refresh_agy():
+                                    render_presets(row, target_input, "agy", force_refresh=True)
+                                    ui.notify("Antigravity (agy models) 최신 목록 갱신 완료", type="positive")
+
+                                ui.button("🔄", on_click=refresh_agy).props("dense flat size=xs text-color=sky-400").tooltip("agy models로 최신 모델 새로고침")
+                            elif adp in ("codex", "chatgpt"):
+                                for m in models:
+                                    short_label = m["id"].replace("gpt-", "")
+                                    ui.button(
+                                        short_label,
+                                        on_click=lambda mid=m["id"]: target_input.set_value(mid),
+                                    ).props("dense outline size=xs text-color=emerald-300").tooltip(f"{m['id']} ({m['name']})")
+                            elif adp in ("claude", "claude-code"):
+                                for m in models:
+                                    ui.button(
+                                        m["id"],
+                                        on_click=lambda mid=m["id"]: target_input.set_value(mid),
+                                    ).props("dense outline size=xs text-color=amber-300").tooltip(m["name"])
+                            else:
+                                ui.button("sonnet", on_click=lambda: target_input.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
+                                ui.button("flash-high", on_click=lambda: target_input.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")
+                                ui.button("5.6-terra", on_click=lambda: target_input.set_value("gpt-5.6-terra")).props("dense outline size=xs text-color=emerald-300")
+
+                    edit_adapter.on_value_change(lambda e: render_presets(edit_presets_row, edit_model, e.value))
 
                     edit_effort = ui.select(
                         options=["default", "low", "medium", "high", "max", "off"],
@@ -386,6 +417,7 @@ def run_app(
                     edit_name_label.set_text(i18n("agent_name_label", name=agent_info["name"]))
                     edit_adapter.set_value(agent_info["adapter"])
                     edit_model.set_value(agent_info.get("model") or "")
+                    render_presets(edit_presets_row, edit_model, agent_info["adapter"])
                     edit_effort.set_value(agent_info.get("effort") or "default")
                     edit_leader_cb.set_value(agent_info["is_leader"])
                     edit_instruction.set_value(agent_info.get("system_instruction") or "")
@@ -411,14 +443,9 @@ def run_app(
                         placeholder=i18n("model_placeholder"),
                     ).classes("w-full")
 
-                    with ui.row().classes("gap-1 items-center flex-wrap"):
-                        ui.label(i18n("presets")).classes("text-[11px] text-slate-400")
-                        ui.button("sonnet", on_click=lambda: add_model.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
-                        ui.button("flash-high", on_click=lambda: add_model.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")
-                        ui.button("5.6-terra", on_click=lambda: add_model.set_value("gpt-5.6-terra")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.6-terra")
-                        ui.button("5.6-luna", on_click=lambda: add_model.set_value("gpt-5.6-luna")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.6-luna")
-                        ui.button("gpt-5.5", on_click=lambda: add_model.set_value("gpt-5.5")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.5")
-                        ui.button("pro", on_click=lambda: add_model.set_value("gemini-3.5-pro")).props("dense outline size=xs text-color=slate-300")
+                    add_presets_row = ui.row().classes("gap-1 items-center flex-wrap")
+                    add_adapter.on_value_change(lambda e: render_presets(add_presets_row, add_model, e.value))
+                    render_presets(add_presets_row, add_model, add_adapter.value)
 
                     add_effort = ui.select(
                         options=["default", "low", "medium", "high", "max", "off"],

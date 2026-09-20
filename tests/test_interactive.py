@@ -545,5 +545,28 @@ def test_interactive_timeout_management(tmp_path: Path, capsys):
     assert "세션 타임아웃이 해제되었습니다" in out
 
 
+def test_interactive_session_models_command(tmp_path: Path, capsys):
+    """Test /models slash command in interactive session."""
+    session = InteractiveSession(
+        project_name="model_test_proj",
+        projects_root=tmp_path / "projects",
+        blackboard_dir=tmp_path / "blackboard",
+    )
+    session._handle_special_command("/models agy")
+    out = capsys.readouterr().out
+    assert "Google Antigravity" in out
+    assert "gemini" in out
+
+    session._handle_special_command("/models codex")
+    out = capsys.readouterr().out
+    assert "OpenAI ChatGPT Codex" in out
+    assert "gpt-5.6-terra" in out
+
+    session._handle_special_command("/models claude")
+    out = capsys.readouterr().out
+    assert "Claude Code" in out
+    assert "sonnet" in out
+
+
 
 

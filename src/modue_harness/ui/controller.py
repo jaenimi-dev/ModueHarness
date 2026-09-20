@@ -100,6 +100,26 @@ class UIController:
             })
         return info
 
+    def get_adapter_models(self, adapter_type: str, force_refresh: bool = False) -> List[Dict[str, str]]:
+        """Return available models for a given adapter type."""
+        adp = (adapter_type or "").lower()
+        if adp in ("agy", "antigravity"):
+            from modue_harness.adapters.agy import get_available_agy_models
+            return get_available_agy_models(force_refresh=force_refresh)
+        elif adp in ("codex", "chatgpt"):
+            return [
+                {"id": "gpt-5.6-terra", "name": "GPT-5.6 Terra (Thinking)"},
+                {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna"},
+                {"id": "gpt-5.5", "name": "GPT-5.5 (Fast)"},
+            ]
+        elif adp in ("claude", "claude-code"):
+            return [
+                {"id": "sonnet", "name": "Claude Sonnet (Latest)"},
+                {"id": "opus", "name": "Claude Opus (Latest)"},
+                {"id": "haiku", "name": "Claude Haiku (Latest)"},
+            ]
+        return []
+
     def set_model(self, model: Optional[str], agent_name: Optional[str] = None) -> List[str]:
         """Dynamically update model for an agent or all agents."""
         return self.session.set_model(model, agent_name=agent_name)

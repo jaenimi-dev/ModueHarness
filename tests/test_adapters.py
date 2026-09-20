@@ -276,4 +276,51 @@ def test_resolve_codex_binary(monkeypatch, tmp_path: Path):
     assert resolved == str(fake_codex)
 
 
+def test_agy_get_available_models(monkeypatch):
+    """Verify get_available_agy_models parses models correctly from subprocess."""
+    from modue_harness.adapters.agy import get_available_agy_models, get_agy_model_ids
+    import subprocess
+
+    fake_stdout = (
+        "gemini-3.8-flash-high\tGemini 3.8 Flash (High)\n"
+        "gemini-3.1-pro-high\tGemini 3.1 Pro (High)\n"
+        "claude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)\n"
+    )
+
+    class FakeCompletedProcess:
+        returncode = 0
+        stdout = fake_stdout
+        stderr = ""
+
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: FakeCompletedProcess())
+
+    models = get_available_agy_models(force_refresh=True)
+    assert len(models) == 3
+    assert models[0]["id"] == "gemini-3.8-flash-high"
+    assert models[0]["name"] == "Gemini 3.8 Flash (High)"
+    assert models[1]["id"] == "gemini-3.1-pro-high"
+
+    ids = get_agy_model_ids(force_refresh=False)
+    assert ids == ["gemini-3.8-flash-high", "gemini-3.1-pro-high", "claude-sonnet-4-6"]
+
+
+def test_ui_controller_get_adapter_models():
+    """Verify UIController.get_adapter_models returns valid models for adapters."""
+    from modue_harness.ui.controller import UIController
+
+    ctrl = UIController(project_name="test_proj")
+
+    agy_models = ctrl.get_adapter_models("agy")
+    assert len(agy_models) > 0
+    assert any("gemini" in m["id"] for m in agy_models)
+
+    codex_models = ctrl.get_adapter_models("codex")
+    assert len(codex_models) >= 3
+    assert codex_models[0]["id"] == "gpt-5.6-terra"
+
+    claude_models = ctrl.get_adapter_models("claude")
+    assert len(claude_models) >= 3
+    assert claude_models[0]["id"] == "sonnet"
+
+
 
