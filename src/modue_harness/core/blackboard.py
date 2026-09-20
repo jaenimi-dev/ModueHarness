@@ -2,6 +2,7 @@
 
 import datetime
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -306,10 +307,28 @@ class Blackboard:
         content: str,
         metadata: Optional[Dict[str, Any]] = None,
         author_agent: Optional[str] = None,
+        job_id: Optional[str] = None,
     ) -> Path:
         """Write content and companion metadata to blackboard/artifacts/."""
         target_path = self.resolve_artifact_path(relative_path)
         target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        effective_job = job_id or ((metadata or {}).get("job_id") if isinstance(metadata, dict) else None)
+
+        # Archive previous version to .history/ if file already exists with different content
+        if target_path.exists() and not target_path.name.startswith("."):
+            try:
+                old_content = target_path.read_text(encoding="utf-8", errors="ignore")
+                if old_content.strip() != content.strip():
+                    history_dir = self.artifacts_dir / ".history"
+                    history_dir.mkdir(parents=True, exist_ok=True)
+                    mtime = os.path.getmtime(target_path)
+                    old_ts = datetime.datetime.fromtimestamp(mtime).strftime("%Y%m%d_%H%M%S")
+                    archived_name = f"{target_path.stem}_{old_ts}{target_path.suffix}"
+                    (history_dir / archived_name).write_text(old_content, encoding="utf-8")
+            except Exception:
+                pass
+
         with open(target_path, "w", encoding="utf-8") as f:
             f.write(content)
 
@@ -317,6 +336,7 @@ class Blackboard:
         meta_payload = {
             "path": relative_path,
             "author": author_agent or "unknown",
+            "job_id": effective_job,
             "size_bytes": len(content.encode("utf-8")),
             "created_at": datetime.datetime.now().isoformat(),
             "custom": metadata or {},
@@ -329,11 +349,58 @@ class Blackboard:
                 HarnessEvent(
                     event_type=EventType.ARTIFACT_PRODUCED,
                     agent_name=author_agent,
-                    payload={"artifact_path": relative_path, "size_bytes": len(content)},
+                    payload={"artifact_path": relative_path, "size_bytes": len(content), "job_id": effective_job},
                 )
             )
 
         return target_path
+
+    def list_artifacts_detailed(self, newest_first: bool = True) -> List[Dict[str, Any]]:
+        """List all artifacts with path, created_at, author, job_id, size_bytes, and formatted time."""
+        paths = self.list_artifacts()
+        detailed: List[Dict[str, Any]] = []
+        for rel in paths:
+            meta = self.read_artifact_metadata(rel) or {}
+            target_p = self.resolve_artifact_path(rel)
+            size = meta.get("size_bytes")
+            if size is None and target_p.exists():
+                try:
+                    size = target_p.stat().st_size
+                except Exception:
+                    size = 0
+            created = meta.get("created_at")
+            if not created and target_p.exists():
+                try:
+                    created = datetime.datetime.fromtimestamp(target_p.stat().st_mtime).isoformat()
+                except Exception:
+                    created = ""
+            author = meta.get("author") or "unknown"
+            custom_data = meta.get("custom")
+            job_id = meta.get("job_id") or (custom_data.get("job_id") if isinstance(custom_data, dict) else None)
+
+            time_display = ""
+            if created:
+                try:
+                    dt = datetime.datetime.fromisoformat(created)
+                    time_display = dt.strftime("%H:%M:%S")
+                except Exception:
+                    time_display = str(created)[:19]
+
+            detailed.append({
+                "path": rel,
+                "name": rel,
+                "created_at": created or "",
+                "time_str": time_display,
+                "author": author,
+                "job_id": job_id,
+                "size_bytes": size or 0,
+            })
+
+        if newest_first:
+            detailed.sort(key=lambda x: x["created_at"] or "", reverse=True)
+        else:
+            detailed.sort(key=lambda x: x["created_at"] or "")
+        return detailed
 
     def read_artifact(self, relative_path: str) -> str:
         """Read artifact file content as a string."""

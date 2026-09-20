@@ -4,6 +4,7 @@ Provides a unified programmatic interface for both Web (NiceGUI) and Terminal (T
 interfaces to interact with the underlying InteractiveSession, Blackboard, and AI agents.
 """
 
+import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -206,7 +207,7 @@ class UIController:
         return "config/agents.yaml"
 
     def get_artifacts(self) -> List[Dict[str, Any]]:
-        """List artifacts available for the current project on blackboard or project directory."""
+        """List artifacts available for the current project on blackboard or project directory, sorted newest first."""
         if not self.session.project_name:
             return []
         try:
@@ -224,21 +225,52 @@ class UIController:
                         p = self.session.blackboard.resolve_artifact_path(name)
                         size = p.stat().st_size if p.exists() else 0
                         mtime = p.stat().st_mtime if p.exists() else 0
-                        item = {
-                            "name": name,
-                            "size_bytes": size,
-                            "modified_at": mtime,
-                            "path": str(p),
-                        }
+                        meta = self.session.blackboard.read_artifact_metadata(name) or {}
 
-                        meta = self.session.blackboard.read_artifact_metadata(name)
                         proj_meta = None
-                        if meta:
-                            custom = meta.get("custom", {})
-                            proj_meta = custom.get("project") if isinstance(custom, dict) else meta.get("project")
+                        custom = meta.get("custom", {})
+                        if isinstance(custom, dict):
+                            proj_meta = custom.get("project")
+                        if not proj_meta:
+                            proj_meta = meta.get("project")
 
                         if proj_meta and proj_meta != current_project:
                             continue
+
+                        created = meta.get("created_at")
+                        if not created and mtime > 0:
+                            created = datetime.datetime.fromtimestamp(mtime).isoformat()
+
+                        time_display = ""
+                        if created:
+                            try:
+                                dt = datetime.datetime.fromisoformat(created)
+                                time_display = dt.strftime("%H:%M:%S")
+                            except Exception:
+                                time_display = str(created)[:19]
+
+                        author = meta.get("author") or "unknown"
+                        job_id = meta.get("job_id") or (custom.get("job_id") if isinstance(custom, dict) else None)
+
+                        # Format file size
+                        if size < 1024:
+                            size_str = f"{size} B"
+                        elif size < 1024 * 1024:
+                            size_str = f"{size / 1024:.1f} KB"
+                        else:
+                            size_str = f"{size / (1024 * 1024):.1f} MB"
+
+                        item = {
+                            "name": name,
+                            "size_bytes": size,
+                            "size_str": size_str,
+                            "modified_at": mtime,
+                            "created_at": created or "",
+                            "time_str": time_display,
+                            "author": author,
+                            "job_id": job_id,
+                            "path": str(p),
+                        }
                         matched.append(item)
                     except Exception:
                         continue
@@ -253,10 +285,18 @@ class UIController:
                                 if p.is_file() and not p.name.startswith("."):
                                     rel = p.relative_to(proj_art_dir).as_posix()
                                     if not any(r["name"] == rel for r in matched):
+                                        sz = p.stat().st_size
+                                        mt = p.stat().st_mtime
+                                        cr = datetime.datetime.fromtimestamp(mt).isoformat()
                                         matched.append({
                                             "name": rel,
-                                            "size_bytes": p.stat().st_size,
-                                            "modified_at": p.stat().st_mtime,
+                                            "size_bytes": sz,
+                                            "size_str": f"{sz} B" if sz < 1024 else f"{sz / 1024:.1f} KB",
+                                            "modified_at": mt,
+                                            "created_at": cr,
+                                            "time_str": datetime.datetime.fromtimestamp(mt).strftime("%H:%M:%S"),
+                                            "author": "project",
+                                            "job_id": None,
                                             "path": str(p),
                                         })
                             except Exception:
@@ -264,6 +304,7 @@ class UIController:
                 except Exception:
                     pass
 
+            matched.sort(key=lambda x: (x.get("created_at") or "", x.get("modified_at") or 0), reverse=True)
             return matched
         except Exception:
             return []

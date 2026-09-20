@@ -119,3 +119,40 @@ def test_blackboard_artifact_metadata(tmp_path: Path):
     produced_events = bus.get_history(EventType.ARTIFACT_PRODUCED)
     assert len(produced_events) == 1
     assert produced_events[0].payload["artifact_path"] == "report.txt"
+
+
+def test_blackboard_artifact_history_and_detailed(temp_board: Blackboard):
+    """Verify artifact overwrites archive to .history/ and detailed list includes job_id."""
+    temp_board.write_artifact(
+        "summary.md",
+        "Version 1 content",
+        author_agent="conductor",
+        job_id="job_001",
+    )
+    detailed = temp_board.list_artifacts_detailed(newest_first=True)
+    assert len(detailed) == 1
+    assert detailed[0]["name"] == "summary.md"
+    assert detailed[0]["author"] == "conductor"
+    assert detailed[0]["job_id"] == "job_001"
+    assert detailed[0]["time_str"] != ""
+
+    # Overwrite with different content
+    temp_board.write_artifact(
+        "summary.md",
+        "Version 2 content updated",
+        author_agent="conductor",
+        job_id="job_002",
+    )
+    assert temp_board.read_artifact("summary.md") == "Version 2 content updated"
+
+    # Check history archiving
+    history_dir = temp_board.artifacts_dir / ".history"
+    assert history_dir.exists()
+    archived_files = list(history_dir.glob("summary_*.md"))
+    assert len(archived_files) >= 1
+    assert "Version 1 content" in archived_files[0].read_text(encoding="utf-8")
+
+    # Check updated detailed list
+    detailed_updated = temp_board.list_artifacts_detailed(newest_first=True)
+    assert detailed_updated[0]["job_id"] == "job_002"
+

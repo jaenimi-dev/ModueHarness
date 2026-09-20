@@ -961,40 +961,83 @@ def run_app(
                         # Tab 1: Artifacts (Project-isolated)
                         with ui.tab_panel(tab_artifacts).classes("p-0 h-full flex flex-col gap-2 overflow-hidden"):
                             with ui.row().classes("w-full items-center gap-1.5 flex-shrink-0"):
-                                art_select = ui.select(options=[], label=i18n("select_artifact")).props("dense outlined").classes("flex-1 min-w-0 text-xs")
+                                art_select = ui.select(options={}, label=i18n("select_artifact")).props("dense outlined").classes("flex-1 min-w-0 text-xs")
                                 ui.button(icon="refresh", on_click=lambda: on_refresh_artifacts_click())\
                                     .props("dense outline size=sm text-color=blue-300")\
                                     .tooltip(i18n("tooltip_refresh_artifacts"))\
                                     .classes("border-blue-500/40 hover:bg-blue-900/30")
 
+                            art_meta_row = ui.row().classes("w-full items-center gap-1.5 px-2 py-1 text-[11px] bg-slate-900/70 rounded border border-slate-800/80 flex-shrink-0")
+                            art_time_badge = ui.label("").classes("px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono")
+                            art_author_badge = ui.label("").classes("px-1.5 py-0.5 rounded bg-blue-950/70 text-blue-300 border border-blue-500/30")
+                            art_job_badge = ui.label("").classes("px-1.5 py-0.5 rounded bg-purple-950/70 text-purple-300 border border-purple-500/30")
+                            art_size_badge = ui.label("").classes("px-1.5 py-0.5 rounded bg-slate-800 text-slate-400")
+                            art_meta_row.set_visibility(False)
+
                             art_markdown = ui.markdown(i18n("no_artifact_selected")).classes(
                                 "text-xs text-slate-300 overflow-auto flex-1 min-h-0 p-2 bg-slate-900/50 rounded border border-slate-700/50"
                             )
 
+                            def update_art_meta(item_meta: Optional[Dict[str, Any]]):
+                                if not item_meta:
+                                    art_meta_row.set_visibility(False)
+                                    return
+                                art_time_badge.text = f"🕒 {item_meta.get('time_str') or '시간미상'}"
+                                art_author_badge.text = f"👤 {item_meta.get('author') or 'unknown'}"
+                                job_id = item_meta.get("job_id")
+                                if job_id:
+                                    art_job_badge.text = f"🏷️ {job_id}"
+                                    art_job_badge.set_visibility(True)
+                                else:
+                                    art_job_badge.set_visibility(False)
+                                art_size_badge.text = f"📦 {item_meta.get('size_str') or ''}"
+                                art_meta_row.set_visibility(True)
+
                             def refresh_artifacts():
                                 try:
-                                    arts = [a["name"] for a in ctrl.get_artifacts()]
-                                    art_select.options = arts
-                                    if arts:
-                                        chosen = art_select.value if art_select.value in arts else arts[0]
+                                    raw_arts = ctrl.get_artifacts()
+                                    options_dict = {}
+                                    for a in raw_arts:
+                                        t_str = a.get("time_str")
+                                        auth = a.get("author") or "unknown"
+                                        job = a.get("job_id")
+                                        meta_str = f"{t_str} • {auth}" if t_str else auth
+                                        if job:
+                                            meta_str += f" • {job}"
+                                        options_dict[a["name"]] = f"📄 {a['name']} ({meta_str})"
+
+                                    art_select.options = options_dict
+                                    if raw_arts:
+                                        names = [a["name"] for a in raw_arts]
+                                        chosen = art_select.value if art_select.value in names else names[0]
                                         art_select.value = chosen
                                         content = ctrl.get_artifact_content(chosen)
                                         art_markdown.set_content(content if content else i18n("empty_content"))
+                                        chosen_meta = next((a for a in raw_arts if a["name"] == chosen), None)
+                                        update_art_meta(chosen_meta)
                                     else:
                                         art_select.value = None
                                         art_markdown.set_content(i18n("no_artifact_selected"))
+                                        update_art_meta(None)
                                     art_select.update()
-                                except Exception as ex:
-                                    art_select.options = []
+                                except Exception:
+                                    art_select.options = {}
                                     art_select.value = None
                                     art_markdown.set_content(i18n("no_artifact_selected"))
+                                    update_art_meta(None)
                                     art_select.update()
 
-                            art_select.on_value_change(
-                                lambda e: art_markdown.set_content(
-                                    ctrl.get_artifact_content(e.value) if e.value else i18n("no_artifact_selected")
-                                )
-                            )
+                            def on_art_change(e):
+                                if not e.value:
+                                    art_markdown.set_content(i18n("no_artifact_selected"))
+                                    update_art_meta(None)
+                                    return
+                                art_markdown.set_content(ctrl.get_artifact_content(e.value) or i18n("no_artifact_selected"))
+                                arts = ctrl.get_artifacts()
+                                curr = next((a for a in arts if a["name"] == e.value), None)
+                                update_art_meta(curr)
+
+                            art_select.on_value_change(on_art_change)
 
                         # Tab 2: Project Files
                         with ui.tab_panel(tab_files).classes("p-0 h-full flex flex-col gap-2 overflow-hidden"):

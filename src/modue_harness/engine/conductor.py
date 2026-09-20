@@ -28,6 +28,7 @@ class ConductorRunner:
         max_subtasks: int = 10,
         progress_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         timeout: Optional[float] = None,
+        job_id: Optional[str] = None,
     ) -> None:
         self.goal = goal
         self.conductor_name = conductor_agent_name
@@ -39,6 +40,7 @@ class ConductorRunner:
         self.max_subtasks = max_subtasks
         self.progress_callback = progress_callback
         self.timeout = timeout
+        self.job_id = job_id
         self._is_cancelled: bool = False
         self._active_adapter: Optional[Any] = None
 
@@ -178,7 +180,8 @@ class ConductorRunner:
             "plan.json",
             plan_result.stdout.strip(),
             author_agent=self.conductor_name,
-            metadata={"project": self.workspace_dir.name},
+            metadata={"project": self.workspace_dir.name, "job_id": self.job_id},
+            job_id=self.job_id,
         )
         subtasks_data = self._extract_tasks_json(plan_result.stdout)
 
@@ -188,7 +191,8 @@ class ConductorRunner:
                 "plan.md",
                 plan_result.stdout.strip(),
                 author_agent=self.conductor_name,
-                metadata={"project": self.workspace_dir.name},
+                metadata={"project": self.workspace_dir.name, "job_id": self.job_id},
+                job_id=self.job_id,
             )
             subtasks_data = [
                 {
@@ -357,7 +361,8 @@ class ConductorRunner:
                     "synthesis_report.md",
                     synth_res.stdout.strip(),
                     author_agent=self.conductor_name,
-                    metadata={"project": self.workspace_dir.name},
+                    metadata={"project": self.workspace_dir.name, "job_id": self.job_id},
+                    job_id=self.job_id,
                 )
             else:
                 overall_success = False

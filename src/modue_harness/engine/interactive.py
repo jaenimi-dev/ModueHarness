@@ -823,6 +823,7 @@ class InteractiveSession:
             event_bus=self.event_bus,
             progress_callback=_console_progress,
             timeout=self.timeout,
+            job_id=job_id,
         )
         self._active_foreground_runner = runner
         job.runner = runner
@@ -969,6 +970,7 @@ class InteractiveSession:
                 event_bus=self.event_bus,
                 progress_callback=_bg_progress,
                 timeout=self.timeout,
+                job_id=job_id,
             )
             job.runner = runner
 
@@ -1168,7 +1170,11 @@ class InteractiveSession:
                 if summary.get("artifacts"):
                     print(f"\n[블랙보드 교환 산출물]")
                     for af in summary["artifacts"]:
-                        print(f"  📌 {af}")
+                        meta = self.blackboard.read_artifact_metadata(af) or {}
+                        auth = meta.get("author") or "unknown"
+                        jb = meta.get("job_id") or ((meta.get("custom") or {}).get("job_id") if isinstance(meta.get("custom"), dict) else None)
+                        jb_str = f" [{jb}]" if jb else ""
+                        print(f"  📌 {af} (작성: {auth}{jb_str})")
 
                 print("-" * 64 + "\n")
 
@@ -1384,6 +1390,21 @@ class InteractiveSession:
                     print(f"      {item.get('command')}")
                 print()
 
+        elif cmd in ["/artifacts", "/art"]:
+            detailed = self.blackboard.list_artifacts_detailed(newest_first=True)
+            if not detailed:
+                print("\n📦 현재 저장된 블랙보드 산출물(Artifact)이 없습니다.\n")
+            else:
+                print(f"\n📦 블랙보드 산출물 목록 (최신순, 총 {len(detailed)}개):")
+                for item in detailed:
+                    time_part = f"[{item['time_str']}] " if item.get("time_str") else ""
+                    author_part = f"작성: {item['author']}"
+                    job_part = f", 작업: {item['job_id']}" if item.get("job_id") else ""
+                    size_bytes = item['size_bytes']
+                    size_part = f"{size_bytes}B" if size_bytes < 1024 else f"{size_bytes / 1024:.1f}KB"
+                    print(f"  • {time_part}{item['name']} ({author_part}{job_part}, {size_part})")
+                print()
+
         elif cmd in ["/help", "/?"]:
             print("\n=== 사용 가능한 명령어 ===")
             print("  자연어 명령 입력        : 동기 방식으로 즉시 실행 (실시간 단계 및 CLI 명령 표시)")
@@ -1399,6 +1420,7 @@ class InteractiveSession:
             print("  /project <이름>        : 대상 프로젝트 전환 (폴더 자동 생성)")
             print("  /projects             : 전체 프로젝트 목록 조회")
             print("  /files (또는 /ls)     : 현재 프로젝트 내 구현 파일 목록")
+            print("  /artifacts (또는 /art) : 블랙보드 산출물 목록 조회 (최신순, 작성자, 시간)")
             print("  /status               : 칠판 상태 및 백그라운드 작업 현황")
             print("  /help                 : 도움말 출력")
             print("  exit, quit, q         : 종료\n")

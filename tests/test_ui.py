@@ -1105,4 +1105,48 @@ def test_sync_execution_records_job_in_controller(tmp_path: Path):
     assert jobs[0]["status"] in ("completed", "failed")
 
 
+def test_ui_controller_artifact_metadata_and_chronology(tmp_path: Path):
+    """Test that UIController.get_artifacts returns newest first with metadata fields."""
+    import time
+
+    projects_root = tmp_path / "projects"
+    board_root = tmp_path / "blackboard"
+
+    ctrl = UIController(
+        project_name="art_demo",
+        projects_root=projects_root,
+        blackboard_dir=board_root,
+    )
+    ctrl.session.project_dir.mkdir(parents=True, exist_ok=True)
+    ctrl.session.blackboard.initialize()
+
+    ctrl.session.blackboard.write_artifact(
+        "older.md",
+        "Older content",
+        author_agent="coder",
+        job_id="job_1",
+    )
+    time.sleep(0.05)
+    ctrl.session.blackboard.write_artifact(
+        "newer.md",
+        "Newer content",
+        author_agent="conductor",
+        job_id="job_2",
+    )
+
+    artifacts = ctrl.get_artifacts()
+    assert len(artifacts) == 2
+    # Newest first
+    assert artifacts[0]["name"] == "newer.md"
+    assert artifacts[0]["author"] == "conductor"
+    assert artifacts[0]["job_id"] == "job_2"
+    assert "size_str" in artifacts[0]
+    assert artifacts[0]["time_str"] != ""
+
+    assert artifacts[1]["name"] == "older.md"
+    assert artifacts[1]["author"] == "coder"
+    assert artifacts[1]["job_id"] == "job_1"
+
+
+
 
