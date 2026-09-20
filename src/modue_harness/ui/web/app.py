@@ -157,7 +157,7 @@ def run_app(
                         project_select = ui.select(
                             options=projects,
                             value=current_p or projects[0],
-                        ).classes("w-36 sm:w-44 bg-slate-800 text-white rounded text-xs")
+                        ).props("dense outlined").classes("w-36 sm:w-44 bg-slate-800 text-white rounded text-xs")
 
                         def on_project_change(e):
                             if e.value and e.value != i18n("no_projects_yet"):
@@ -175,7 +175,7 @@ def run_app(
                         project_select = ui.select(
                             options=[i18n("no_projects_yet")],
                             value=i18n("no_projects_yet"),
-                        ).props("disable").classes("w-36 sm:w-44 bg-slate-800 text-slate-400 rounded text-xs")
+                        ).props("dense outlined disable").classes("w-36 sm:w-44 bg-slate-800 text-slate-400 rounded text-xs")
 
                     def refresh_projects_impl():
                         try:
