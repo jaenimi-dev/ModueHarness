@@ -709,7 +709,7 @@ class InteractiveSession:
                     tasks = data.get("tasks", [])
                     lines.append(f"  ✓ 기획 완료: {len(tasks)}개 서브태스크 생성 (blackboard/tasks)")
                     for t in tasks:
-                        desc = (t.get("instruction") or "")[:50]
+                        desc = (t.get("instruction") or "")[:200]
                         lines.append(f"    • [{t.get('id')}] {t.get('assigned_agent')}: {desc}")
                 else:
                     job.stage = "기획 실패"
@@ -718,7 +718,7 @@ class InteractiveSession:
             elif event == "task_start":
                 idx = data.get("index", 1)
                 tot = data.get("total", 1)
-                desc = (data.get("instruction") or "")[:60]
+                desc = (data.get("instruction") or "")[:200]
                 job.stage = f"태스크 [{idx}/{tot}] {data.get('agent')} ({data.get('task_id')})"
                 lines.append(f"  [2/3] 🛠️ [{idx}/{tot}] {data.get('agent')} 실행 중 ({data.get('task_id')})...")
                 lines.append(f"        지시: {desc}")
