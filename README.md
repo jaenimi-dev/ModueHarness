@@ -48,24 +48,9 @@ python run.py --ui -P my-project  # 🌐 Web UI 대시보드 (브라우저 화�
 
 ## 📚 상세 문서 (Documentation)
 
-자세한 설정 방법 및 아키텍처는 `docs/` 디렉터리에서 확인하실 수 있습니다:
+ModueHarness의 상세 설정 방법, 지원 AI CLI 연동 가이드(Claude, AGY, Codex), 시스템 아키텍처 및 CLI 명령어 레퍼런스는 **[docs 디렉터리 문서 인덱스 (docs/README.md)](docs/README.md)**에서 체계적으로 확인하실 수 있습니다.
 
-- 📦 **[설치 및 환경 구성 가이드 (Installation Guide)](docs/installation.md)**  
-  원클릭 자동 설치 스크립트, Git/gh 수동 설치, 단계별 의존성 패키지 옵션 및 트러블슈팅
-- 📖 **[설정 및 실전 사용 매뉴얼 (Configuration & Setup Guide)](docs/configuration_guide.md)**  
-  설치 후 실제 AI CLI(Claude, AGY, Codex) 연결, `.env` 환경 변수 설정, 팀 구성 및 트러블슈팅 단계별 가이드
-- 🤖 **[Claude Code 연동 및 퀵스타트 가이드 (Claude Code Guide)](docs/claude_guide.md)**  
-  Anthropic 공식 퀵스타트 기반 설치, 인증, 권한 모드(`auto`), 모델/노력 설정, `CLAUDE.md` 및 ModueHarness 연동 가이드
-- 🚀 **[Google Antigravity 연동 가이드 (Antigravity Guide)](docs/antigravity_guide.md)**  
-  Google Deepmind 공식 가이드 기반 `agy` CLI 설치, 인증, 모델(`gemini-3.8-flash-high` 등), 권한 자동화 및 하이브리드 팀 구성
-- 🧠 **[OpenAI ChatGPT Codex CLI 연동 가이드 (Codex Guide)](docs/codex_guide.md)**  
-  OpenAI 공식 가이드 기반 `codex` CLI 설치, `codex login` 인증, 모델(`gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`), 샌드박스 쓰기 권한 설정 및 연동 가이드
-- 🏛️ **[시스템 아키텍처 및 상세 기능 (Architecture & Features)](docs/architecture.md)**  
-  전체 아키텍처 다이어그램, 3대 협업 토폴로지, 어댑터 계층, 블랙보드, 안전 감시자 및 로드맵
-- 📝 **[명세 파일 작성 가이드 (Specifications Guide)](docs/specifications.md)**  
-  AI 팀 명세(`agents.yaml`)와 작업 명세(`workflow.yaml`)의 분리 구성, Claude/Antigravity/Codex 혼합 구성 및 템플릿 변수 활용법
-- 🛠️ **[CLI 명령어 레퍼런스 (CLI Reference)](docs/cli_reference.md)**  
-  대화형 REPL(`/model`, `/effort`, `/timeout`, `/cmd`, `/jobs`, `/cancel`), `projects`(--delete), `init`, `status`, `run`, `debate` 명령어 및 전체 옵션 가이드
+👉 **[전체 문서 인덱스 둘러보기 (docs/README.md)](docs/README.md)**
 
 ---
 
