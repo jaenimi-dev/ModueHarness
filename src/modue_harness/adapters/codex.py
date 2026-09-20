@@ -1,11 +1,115 @@
-"""OpenAI ChatGPT Codex CLI adapter."""
-
+import json
 import os
 from pathlib import Path
 import shutil
-from typing import List, Optional
+import time
+from typing import Any, Dict, List, Optional
+import urllib.request
 
 from modue_harness.adapters.base import BaseCLIAdapter
+
+
+DEFAULT_CODEX_MODELS: List[Dict[str, str]] = [
+    {"id": "gpt-5.6-terra", "name": "GPT-5.6 Terra (Thinking / 추천)"},
+    {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna"},
+    {"id": "gpt-5.5", "name": "GPT-5.5 (Fast)"},
+    {"id": "o3-mini", "name": "OpenAI o3-mini (Reasoning)"},
+    {"id": "gpt-4o", "name": "GPT-4o (Omni)"},
+]
+
+_CODEX_MODELS_CACHE: Dict[str, Any] = {
+    "timestamp": 0.0,
+    "models": [],
+}
+
+CACHE_TTL_SECONDS = 300.0
+
+
+def _read_local_codex_config() -> Optional[str]:
+    """Read configured default model from ~/.codex/config.toml if present."""
+    config_paths = [
+        Path.home() / ".codex" / "config.toml",
+    ]
+    codex_home = os.environ.get("CODEX_HOME")
+    if codex_home:
+        config_paths.insert(0, Path(codex_home) / "config.toml")
+
+    for p in config_paths:
+        if p.is_file():
+            try:
+                for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    clean = line.strip()
+                    if clean.startswith("model") and "=" in clean:
+                        val = clean.split("=", 1)[1].strip().strip('"').strip("'")
+                        if val:
+                            return val
+            except Exception:
+                pass
+    return None
+
+
+def get_available_codex_models(force_refresh: bool = False, timeout: float = 3.0) -> List[Dict[str, str]]:
+    """Query available Codex models from config/API or return default models."""
+    global _CODEX_MODELS_CACHE
+    now = time.time()
+
+    if not force_refresh and _CODEX_MODELS_CACHE["models"] and (now - _CODEX_MODELS_CACHE["timestamp"] < CACHE_TTL_SECONDS):
+        return list(_CODEX_MODELS_CACHE["models"])
+
+    models: List[Dict[str, str]] = list(DEFAULT_CODEX_MODELS)
+    seen_ids = {m["id"] for m in models}
+
+    # 1. Check local config.toml
+    local_cfg_model = _read_local_codex_config()
+    if local_cfg_model and local_cfg_model not in seen_ids:
+        models.insert(0, {"id": local_cfg_model, "name": f"{local_cfg_model} (로컬 config.toml)"})
+        seen_ids.add(local_cfg_model)
+
+    # 2. Check OpenAI API if OPENAI_API_KEY is available
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        for env_path in [Path.cwd() / ".env", Path.home() / ".env"]:
+            if env_path.is_file():
+                try:
+                    for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                        if line.startswith("OPENAI_API_KEY="):
+                            api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                            break
+                except Exception:
+                    pass
+            if api_key:
+                break
+
+    if api_key:
+        try:
+            req = urllib.request.Request(
+                "https://api.openai.com/v1/models",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "User-Agent": "ModueHarness/0.8.0",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    raw_models = data.get("data", [])
+                    for item in raw_models:
+                        m_id = item.get("id", "")
+                        if any(m_id.startswith(p) for p in ("gpt-5", "o3", "o4", "o1", "gpt-4o")):
+                            if m_id not in seen_ids:
+                                seen_ids.add(m_id)
+                                models.append({"id": m_id, "name": m_id})
+        except Exception:
+            pass
+
+    _CODEX_MODELS_CACHE["timestamp"] = now
+    _CODEX_MODELS_CACHE["models"] = models
+    return list(models)
+
+
+def get_codex_model_ids(force_refresh: bool = False) -> List[str]:
+    """Return list of model IDs available for Codex."""
+    return [m["id"] for m in get_available_codex_models(force_refresh=force_refresh)]
 
 
 def resolve_codex_binary(command: str = "codex") -> str:

@@ -109,11 +109,11 @@ def run_app(
 
         # Containers for layout
         header_container = ui.header().classes(
-            "h-[52px] items-center justify-between bg-slate-900 text-white px-4 py-1 border-b border-slate-700"
+            "h-[58px] items-center justify-between bg-slate-900 text-white px-4 py-1.5 border-b border-slate-700"
         )
         main_container = ui.row().classes(
             "w-full min-h-0 p-2.5 gap-2.5 no-wrap box-border overflow-hidden"
-        ).style("height: calc(100vh - 52px); max-height: calc(100vh - 52px); min-height: 0;")
+        ).style("height: calc(100vh - 58px); max-height: calc(100vh - 58px); min-height: 0;")
         dialogs_container = ui.column().classes("hidden")
 
         try:
@@ -202,16 +202,16 @@ def run_app(
 
                     refresh_projects = refresh_projects_impl
 
-                    # + New Project button
+                    # + New Project button (enlarged)
                     ui.button(
                         i18n("btn_new_project"),
-                        icon="add",
+                        icon="add_circle",
                         on_click=lambda: new_project_dialog.open() if new_project_dialog else None,
-                    ).props("dense outline size=sm text-color=blue-300")\
+                    ).props("unelevated size=md text-color=white")\
                      .tooltip(i18n("tooltip_new_project"))\
-                     .classes("h-8 px-2.5 text-xs font-medium border-blue-500/50 hover:bg-blue-900/30")
+                     .classes("h-9 px-3.5 text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-500 rounded-md shadow-sm")
 
-                    # Delete Project button
+                    # Delete Project button (enlarged)
                     def open_delete_project_dialog():
                         if not delete_project_dialog:
                             return
@@ -225,20 +225,20 @@ def run_app(
 
                     ui.button(
                         i18n("btn_delete_project"),
-                        icon="delete",
+                        icon="delete_forever",
                         on_click=open_delete_project_dialog,
-                    ).props("dense outline size=sm text-color=red-400")\
+                    ).props("outline size=md text-color=red-200")\
                      .tooltip(i18n("tooltip_delete_project"))\
-                     .classes("h-8 px-2.5 text-xs font-medium border-red-500/50 hover:bg-red-900/30")
+                     .classes("h-9 px-3.5 text-xs sm:text-sm font-semibold bg-red-950/70 border border-red-500/80 hover:bg-red-900 rounded-md shadow-sm")
 
-                    # Refresh all button in header
+                    # Refresh all button in header (enlarged)
                     ui.button(
                         i18n("btn_refresh"),
                         icon="refresh",
                         on_click=lambda: on_refresh_all_click(),
-                    ).props("dense outline size=sm text-color=slate-200")\
+                    ).props("outline size=md text-color=slate-100")\
                      .tooltip(i18n("tooltip_refresh_all"))\
-                     .classes("h-8 px-2.5 text-xs font-medium border-slate-600 hover:bg-slate-800")
+                     .classes("h-9 px-3.5 text-xs sm:text-sm font-semibold bg-slate-800 border border-slate-600 hover:bg-slate-700 rounded-md shadow-sm")
 
                     bb_text = f"blackboard/{current_p}" if current_p else "blackboard"
                     bb_badge = ui.badge(bb_text, color="slate-700").classes("text-[10px] font-mono text-slate-400 hidden sm:inline-flex")
@@ -356,18 +356,30 @@ def run_app(
 
                                 ui.button("🔄", on_click=refresh_agy).props("dense flat size=xs text-color=sky-400").tooltip("agy models로 최신 모델 새로고침")
                             elif adp in ("codex", "chatgpt"):
-                                for m in models:
+                                for m in models[:6]:
                                     short_label = m["id"].replace("gpt-", "")
                                     ui.button(
                                         short_label,
                                         on_click=lambda mid=m["id"]: target_input.set_value(mid),
                                     ).props("dense outline size=xs text-color=emerald-300").tooltip(f"{m['id']} ({m['name']})")
+
+                                def refresh_codex():
+                                    render_presets(row, target_input, "codex", force_refresh=True)
+                                    ui.notify("Codex 모델 목록 갱신 완료", type="positive")
+
+                                ui.button("🔄", on_click=refresh_codex).props("dense flat size=xs text-color=emerald-400").tooltip("Codex 모델 새로고침")
                             elif adp in ("claude", "claude-code"):
-                                for m in models:
+                                for m in models[:6]:
                                     ui.button(
                                         m["id"],
                                         on_click=lambda mid=m["id"]: target_input.set_value(mid),
                                     ).props("dense outline size=xs text-color=amber-300").tooltip(m["name"])
+
+                                def refresh_claude():
+                                    render_presets(row, target_input, "claude", force_refresh=True)
+                                    ui.notify("Claude 모델 목록 갱신 완료", type="positive")
+
+                                ui.button("🔄", on_click=refresh_claude).props("dense flat size=xs text-color=amber-400").tooltip("Claude 모델 새로고침")
                             else:
                                 ui.button("sonnet", on_click=lambda: target_input.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
                                 ui.button("flash-high", on_click=lambda: target_input.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")

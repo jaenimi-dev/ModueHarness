@@ -9,8 +9,16 @@ from modue_harness.adapters.agy import (
 )
 from modue_harness.adapters.aider import AiderCLIAdapter
 from modue_harness.adapters.base import BaseCLIAdapter, strip_ansi
-from modue_harness.adapters.claude import ClaudeCLIAdapter
-from modue_harness.adapters.codex import CodexCLIAdapter
+from modue_harness.adapters.claude import (
+    ClaudeCLIAdapter,
+    get_available_claude_models,
+    get_claude_model_ids,
+)
+from modue_harness.adapters.codex import (
+    CodexCLIAdapter,
+    get_available_codex_models,
+    get_codex_model_ids,
+)
 from modue_harness.adapters.generic import GenericCLIAdapter
 
 ADAPTER_REGISTRY: Dict[str, Type[BaseCLIAdapter]] = {
@@ -46,4 +54,8 @@ __all__ = [
     "ADAPTER_REGISTRY",
     "get_available_agy_models",
     "get_agy_model_ids",
+    "get_available_claude_models",
+    "get_claude_model_ids",
+    "get_available_codex_models",
+    "get_codex_model_ids",
 ]

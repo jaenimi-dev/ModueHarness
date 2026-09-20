@@ -1284,24 +1284,18 @@ class InteractiveSession:
                     print(f"  • {m['id']:<26} - {m['name']}")
                 print("  👉 적용 예: /model agy gemini-3.8-flash-high")
             if show_all or target_adp in ("codex", "chatgpt"):
-                print("\n🧠 OpenAI ChatGPT Codex 지원 모델:")
-                codex_models = [
-                    ("gpt-5.6-terra", "GPT-5.6 Terra (Thinking, 권장)"),
-                    ("gpt-5.6-luna", "GPT-5.6 Luna"),
-                    ("gpt-5.5", "GPT-5.5 (Fast)"),
-                ]
-                for mid, mdesc in codex_models:
-                    print(f"  • {mid:<26} - {mdesc}")
+                from modue_harness.adapters.codex import get_available_codex_models
+                codex_models = get_available_codex_models(force_refresh=True)
+                print(f"\n🧠 OpenAI ChatGPT Codex 지원 모델 ({len(codex_models)}개):")
+                for m in codex_models:
+                    print(f"  • {m['id']:<26} - {m['name']}")
                 print("  👉 적용 예: /model codex gpt-5.6-terra")
             if show_all or target_adp in ("claude", "claude-code"):
-                print("\n🎭 Claude Code 지원 모델 (별칭 및 최신 모델):")
-                claude_models = [
-                    ("sonnet", "Claude Sonnet (기본 권장, Latest)"),
-                    ("opus", "Claude Opus (심층 사고/설계)"),
-                    ("haiku", "Claude Haiku (경량/고속)"),
-                ]
-                for mid, mdesc in claude_models:
-                    print(f"  • {mid:<26} - {mdesc}")
+                from modue_harness.adapters.claude import get_available_claude_models
+                claude_models = get_available_claude_models(force_refresh=True)
+                print(f"\n🎭 Claude Code 지원 모델 ({len(claude_models)}개):")
+                for m in claude_models:
+                    print(f"  • {m['id']:<26} - {m['name']}")
                 print("  👉 적용 예: /model sonnet (또는 /model claude-3-7-sonnet-latest)")
             print()
 

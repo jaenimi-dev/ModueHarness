@@ -107,17 +107,11 @@ class UIController:
             from modue_harness.adapters.agy import get_available_agy_models
             return get_available_agy_models(force_refresh=force_refresh)
         elif adp in ("codex", "chatgpt"):
-            return [
-                {"id": "gpt-5.6-terra", "name": "GPT-5.6 Terra (Thinking)"},
-                {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna"},
-                {"id": "gpt-5.5", "name": "GPT-5.5 (Fast)"},
-            ]
+            from modue_harness.adapters.codex import get_available_codex_models
+            return get_available_codex_models(force_refresh=force_refresh)
         elif adp in ("claude", "claude-code"):
-            return [
-                {"id": "sonnet", "name": "Claude Sonnet (Latest)"},
-                {"id": "opus", "name": "Claude Opus (Latest)"},
-                {"id": "haiku", "name": "Claude Haiku (Latest)"},
-            ]
+            from modue_harness.adapters.claude import get_available_claude_models
+            return get_available_claude_models(force_refresh=force_refresh)
         return []
 
     def set_model(self, model: Optional[str], agent_name: Optional[str] = None) -> List[str]:

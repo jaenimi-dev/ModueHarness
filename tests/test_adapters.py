@@ -323,4 +323,41 @@ def test_ui_controller_get_adapter_models():
     assert claude_models[0]["id"] == "sonnet"
 
 
+def test_claude_get_available_models(monkeypatch):
+    """Verify get_available_claude_models fallback and API query."""
+    from modue_harness.adapters.claude import get_available_claude_models, get_claude_model_ids
+
+    # Without API key, should return default fallback models
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    models = get_available_claude_models(force_refresh=True)
+    assert len(models) >= 3
+    assert any(m["id"] == "sonnet" for m in models)
+
+    ids = get_claude_model_ids()
+    assert "sonnet" in ids
+
+
+def test_codex_get_available_models(monkeypatch, tmp_path):
+    """Verify get_available_codex_models local config parsing and defaults."""
+    from modue_harness.adapters.codex import get_available_codex_models, get_codex_model_ids
+
+    # Without custom config, should return default models
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    models = get_available_codex_models(force_refresh=True)
+    assert len(models) >= 3
+    assert any(m["id"] == "gpt-5.6-terra" for m in models)
+
+    # With local config.toml
+    codex_home = tmp_path / ".codex"
+    codex_home.mkdir()
+    cfg_file = codex_home / "config.toml"
+    cfg_file.write_text('model = "custom-codex-v1"\nmodel_reasoning_effort = "high"\n', encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+
+    models_with_cfg = get_available_codex_models(force_refresh=True)
+    assert models_with_cfg[0]["id"] == "custom-codex-v1"
+    ids = get_codex_model_ids()
+    assert "custom-codex-v1" in ids
+
+
 
