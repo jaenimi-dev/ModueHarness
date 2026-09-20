@@ -160,6 +160,12 @@ def create_parser() -> argparse.ArgumentParser:
         default="projects",
         help="Path to projects directory (default: projects)",
     )
+    status_parser.add_argument(
+        "-P", "--project",
+        type=str,
+        default=None,
+        help="Specific project to inspect in blackboard",
+    )
 
     # Command: projects
     projects_parser = subparsers.add_parser("projects", help="List existing projects in projects directory")
@@ -168,6 +174,12 @@ def create_parser() -> argparse.ArgumentParser:
         type=str,
         default="projects",
         help="Path to projects directory (default: projects)",
+    )
+    projects_parser.add_argument(
+        "--dir", "-d",
+        type=str,
+        default="blackboard",
+        help="Path to blackboard directory (default: blackboard)",
     )
 
     # Command: run (legacy workflow support)
@@ -451,33 +463,40 @@ def handle_init(args: argparse.Namespace) -> int:
 def handle_status(args: argparse.Namespace) -> int:
     """Handle 'status' command: Display blackboard status, projects, tasks, and artifacts."""
     board_dir = Path(getattr(args, "dir", "blackboard")).resolve()
-    board = Blackboard(root_dir=board_dir)
+    target_project = getattr(args, "project", None)
+    board = Blackboard(root_dir=board_dir, project=target_project)
     if not board.is_initialized():
         print(f"Blackboard at '{board_dir}' is not initialized. Run 'modue-harness init' first.")
         return 1
 
     state = board.load_state()
     projects_dir = Path(getattr(args, "projects_dir", "projects")).resolve()
-    existing_projects = (
-        sorted([p.name for p in projects_dir.iterdir() if p.is_dir() and not p.name.startswith(".")])
-        if projects_dir.exists()
-        else []
-    )
+    projects_set = set()
+    if projects_dir.exists():
+        for p in projects_dir.iterdir():
+            if p.is_dir() and not p.name.startswith("."):
+                projects_set.add(p.name)
+    if board_dir.exists():
+        for p in board_dir.iterdir():
+            if p.is_dir() and not p.name.startswith(".") and p.name not in {"tasks", "artifacts", "logs"}:
+                projects_set.add(p.name)
+    existing_projects = sorted(list(projects_set))
 
+    active_p = target_project or state.get("current_project")
     print(f"=== ModueHarness Blackboard Status ===")
     print(f"Location: {board.root_dir}")
     print(f"Projects Directory: {projects_dir}")
     print(f"Session ID: {state.get('session_id', 'N/A')}")
     print(f"Workflow Status: {state.get('status', 'unknown')}")
     print(f"Current Step: {state.get('current_step', 'None')}")
-    if state.get("current_project"):
-        print(f"Active Project: {state.get('current_project')}")
+    if active_p:
+        print(f"Active Project: {active_p}")
 
     print(f"\n--- Projects ({len(existing_projects)}) ---")
     if not existing_projects:
         print("  (No project directories yet)")
     for p in existing_projects:
-        active = " [ACTIVE]" if p == state.get("current_project") else ""
+        active = " [ACTIVE]" if p == active_p else ""
         print(f"  • {p}{active}")
 
     tasks = board.list_tasks()
@@ -504,17 +523,25 @@ def handle_status(args: argparse.Namespace) -> int:
 
 
 def handle_projects(args: argparse.Namespace) -> int:
-    """Handle 'projects' command: List projects in projects directory."""
+    """Handle 'projects' command: List projects in projects directory and blackboard."""
     projects_dir = Path(getattr(args, "projects_dir", "projects")).resolve()
-    if not projects_dir.exists():
-        print(f"Projects directory at '{projects_dir}' does not exist.")
-        return 0
-    projects = sorted([p.name for p in projects_dir.iterdir() if p.is_dir() and not p.name.startswith(".")])
-    print(f"=== ModueHarness Projects ({len(projects)}) ===")
+    board_dir = Path(getattr(args, "dir", "blackboard")).resolve()
+    projects = set()
+    if projects_dir.exists():
+        for p in projects_dir.iterdir():
+            if p.is_dir() and not p.name.startswith("."):
+                projects.add(p.name)
+    if board_dir.exists():
+        for p in board_dir.iterdir():
+            if p.is_dir() and not p.name.startswith(".") and p.name not in {"tasks", "artifacts", "logs"}:
+                projects.add(p.name)
+
+    sorted_projects = sorted(list(projects))
+    print(f"=== ModueHarness Projects ({len(sorted_projects)}) ===")
     print(f"Base Directory: {projects_dir}")
-    if not projects:
+    if not sorted_projects:
         print("  (No projects created yet. Run with '-P <project_name>' to create one.)")
-    for p in projects:
+    for p in sorted_projects:
         print(f"  • {p}")
     return 0
 

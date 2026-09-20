@@ -16,13 +16,57 @@ class Blackboard:
         self,
         root_dir: Optional[Path] = None,
         event_bus: Optional[EventBus] = None,
+        project: Optional[str] = None,
     ) -> None:
-        self.root_dir = (root_dir or Path.cwd() / "blackboard").resolve()
+        base = (root_dir or Path.cwd() / "blackboard").resolve()
+        self.project = project
+        if project:
+            if base.name == project:
+                self.base_root_dir = base.parent
+                self.root_dir = base
+            else:
+                self.base_root_dir = base
+                self.root_dir = base / project
+        else:
+            self.base_root_dir = base
+            self.root_dir = base
+
         self.state_file = self.root_dir / "state.json"
         self.tasks_dir = self.root_dir / "tasks"
         self.artifacts_dir = self.root_dir / "artifacts"
         self.logs_dir = self.root_dir / "logs"
         self.event_bus = event_bus
+
+    def for_project(self, project_name: str) -> "Blackboard":
+        """Return a Blackboard instance isolated to a specific project subfolder."""
+        clean_name = project_name.strip()
+        return Blackboard(
+            root_dir=self.base_root_dir,
+            event_bus=self.event_bus,
+            project=clean_name,
+        )
+
+    def _get_subproject_dirs(self) -> List[Path]:
+        """Find any project blackboard subdirectories under root_dir."""
+        if not self.root_dir.exists() or not self.root_dir.is_dir():
+            return []
+        subdirs = []
+        try:
+            for d in self.root_dir.iterdir():
+                if d.is_dir() and not d.name.startswith(".") and d.name not in {"tasks", "artifacts", "logs"}:
+                    if (d / "state.json").exists() or (d / "artifacts").exists() or (d / "tasks").exists():
+                        subdirs.append(d)
+        except Exception:
+            pass
+        return subdirs
+
+    @staticmethod
+    def _clean_relative_path(relative_path: str) -> str:
+        return (
+            relative_path.replace("\\", "/")
+            .replace("blackboard/artifacts/", "")
+            .lstrip("/")
+        )
 
     def initialize(self) -> None:
         """Create the blackboard folder hierarchy and initial state if not present."""
@@ -44,21 +88,49 @@ class Blackboard:
 
     def is_initialized(self) -> bool:
         """Check whether the blackboard directory and state file exist."""
-        return (
+        if (
             self.root_dir.exists()
             and self.state_file.exists()
             and self.tasks_dir.exists()
             and self.artifacts_dir.exists()
-        )
+        ):
+            return True
+        if self.project and self.root_dir != self.base_root_dir:
+            if (
+                self.base_root_dir.exists()
+                and (
+                    (self.base_root_dir / "state.json").exists()
+                    or (self.base_root_dir / "artifacts").exists()
+                    or (self.base_root_dir / "tasks").exists()
+                )
+            ):
+                return True
+        if not self.project:
+            for sub in self._get_subproject_dirs():
+                if (sub / "state.json").exists() and (sub / "tasks").exists():
+                    return True
+        return False
 
     # ---------------- State Management ---------------- #
 
     def load_state(self) -> Dict[str, Any]:
         """Load state.json contents."""
-        if not self.state_file.exists():
-            return {}
-        with open(self.state_file, "r", encoding="utf-8-sig") as f:
-            return json.load(f)
+        if self.state_file.exists():
+            try:
+                with open(self.state_file, "r", encoding="utf-8-sig") as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        if not self.project:
+            for sub in self._get_subproject_dirs():
+                sub_state = sub / "state.json"
+                if sub_state.exists():
+                    try:
+                        with open(sub_state, "r", encoding="utf-8-sig") as f:
+                            return json.load(f)
+                    except Exception:
+                        pass
+        return {}
 
     def save_state(self, state: Dict[str, Any]) -> None:
         """Save dictionary to state.json atomically."""
@@ -99,10 +171,30 @@ class Blackboard:
     def get_task(self, task_id: str) -> Optional[Task]:
         """Fetch a task by ID."""
         task_path = self.tasks_dir / f"{task_id}.json"
-        if not task_path.exists():
-            return None
-        with open(task_path, "r", encoding="utf-8-sig") as f:
-            return Task.from_dict(json.load(f))
+        if task_path.exists():
+            try:
+                with open(task_path, "r", encoding="utf-8-sig") as f:
+                    return Task.from_dict(json.load(f))
+            except Exception:
+                return None
+        if self.project and self.root_dir != self.base_root_dir:
+            base_task = self.base_root_dir / "tasks" / f"{task_id}.json"
+            if base_task.exists():
+                try:
+                    with open(base_task, "r", encoding="utf-8-sig") as f:
+                        return Task.from_dict(json.load(f))
+                except Exception:
+                    pass
+        elif not self.project:
+            for sub in self._get_subproject_dirs():
+                sub_task = sub / "tasks" / f"{task_id}.json"
+                if sub_task.exists():
+                    try:
+                        with open(sub_task, "r", encoding="utf-8-sig") as f:
+                            return Task.from_dict(json.load(f))
+                    except Exception:
+                        pass
+        return None
 
     def update_task_status(
         self,
@@ -123,27 +215,63 @@ class Blackboard:
 
     def list_tasks(self) -> List[Task]:
         """List all tasks sorted by task ID."""
-        if not self.tasks_dir.exists():
-            return []
         tasks: List[Task] = []
-        for file in sorted(self.tasks_dir.glob("*.json")):
-            try:
-                with open(file, "r", encoding="utf-8-sig") as f:
-                    tasks.append(Task.from_dict(json.load(f)))
-            except Exception:
-                continue
-        return tasks
+        task_ids = set()
+        if self.tasks_dir.exists():
+            for file in sorted(self.tasks_dir.glob("*.json")):
+                try:
+                    with open(file, "r", encoding="utf-8-sig") as f:
+                        t = Task.from_dict(json.load(f))
+                        tasks.append(t)
+                        task_ids.add(t.id)
+                except Exception:
+                    continue
+        if self.project and self.root_dir != self.base_root_dir:
+            base_tasks_dir = self.base_root_dir / "tasks"
+            if base_tasks_dir.exists():
+                for file in sorted(base_tasks_dir.glob("*.json")):
+                    try:
+                        with open(file, "r", encoding="utf-8-sig") as f:
+                            t = Task.from_dict(json.load(f))
+                            if t.id not in task_ids:
+                                tasks.append(t)
+                                task_ids.add(t.id)
+                    except Exception:
+                        continue
+        elif not self.project:
+            for sub in self._get_subproject_dirs():
+                sub_tasks_dir = sub / "tasks"
+                if sub_tasks_dir.exists():
+                    for file in sorted(sub_tasks_dir.glob("*.json")):
+                        try:
+                            with open(file, "r", encoding="utf-8-sig") as f:
+                                t = Task.from_dict(json.load(f))
+                                if t.id not in task_ids:
+                                    tasks.append(t)
+                                    task_ids.add(t.id)
+                        except Exception:
+                            continue
+        return sorted(tasks, key=lambda x: x.id)
 
     # ---------------- Artifact Management ---------------- #
 
     def resolve_artifact_path(self, relative_path: str) -> Path:
         """Resolve a relative artifact path under blackboard/artifacts/."""
-        clean_path = (
-            relative_path.replace("\\", "/")
-            .replace("blackboard/artifacts/", "")
-            .lstrip("/")
-        )
-        return self.artifacts_dir / clean_path
+        clean_path = self._clean_relative_path(relative_path)
+        direct = self.artifacts_dir / clean_path
+        if direct.exists():
+            return direct
+        if self.project:
+            if self.root_dir != self.base_root_dir:
+                base_art = self.base_root_dir / "artifacts" / clean_path
+                if base_art.exists():
+                    return base_art
+            return direct
+        for sub_dir in self._get_subproject_dirs():
+            sub_art = sub_dir / "artifacts" / clean_path
+            if sub_art.exists():
+                return sub_art
+        return direct
 
     def write_artifact(
         self,
@@ -193,29 +321,80 @@ class Blackboard:
         try:
             target_path = self.resolve_artifact_path(relative_path)
             meta_file = target_path.with_name(f".{target_path.name}.meta.json")
-            if not meta_file.exists():
-                return None
-            with open(meta_file, "r", encoding="utf-8-sig") as f:
-                return json.load(f)
+            if meta_file.exists():
+                with open(meta_file, "r", encoding="utf-8-sig") as f:
+                    return json.load(f)
+            if not self.project:
+                clean_path = self._clean_relative_path(relative_path)
+                for sub in self._get_subproject_dirs():
+                    sub_meta = sub / "artifacts" / Path(clean_path).parent / f".{Path(clean_path).name}.meta.json"
+                    if sub_meta.exists():
+                        with open(sub_meta, "r", encoding="utf-8-sig") as f:
+                            return json.load(f)
         except Exception:
             return None
+        return None
 
     def has_artifact(self, relative_path: str) -> bool:
         """Check if an artifact exists."""
-        return self.resolve_artifact_path(relative_path).exists()
+        clean_path = self._clean_relative_path(relative_path)
+        if (self.artifacts_dir / clean_path).exists():
+            return True
+        if self.project:
+            if self.root_dir != self.base_root_dir:
+                if (self.base_root_dir / "artifacts" / clean_path).exists():
+                    return True
+        else:
+            for sub_dir in self._get_subproject_dirs():
+                if (sub_dir / "artifacts" / clean_path).exists():
+                    return True
+        return False
 
     def list_artifacts(self) -> List[str]:
         """List all artifact paths relative to artifacts/ (excluding meta files)."""
-        if not self.artifacts_dir.exists():
-            return []
-        try:
-            return [
-                p.relative_to(self.artifacts_dir).as_posix()
-                for p in sorted(self.artifacts_dir.rglob("*"))
-                if p.is_file() and not p.name.startswith(".")
-            ]
-        except Exception:
-            return []
+        artifacts = set()
+        if self.artifacts_dir.exists():
+            try:
+                for p in sorted(self.artifacts_dir.rglob("*")):
+                    if p.is_file() and not p.name.startswith("."):
+                        artifacts.add(p.relative_to(self.artifacts_dir).as_posix())
+            except Exception:
+                pass
+        if self.project and self.root_dir != self.base_root_dir:
+            base_art_dir = self.base_root_dir / "artifacts"
+            if base_art_dir.exists():
+                try:
+                    for p in sorted(base_art_dir.rglob("*")):
+                        if p.is_file() and not p.name.startswith("."):
+                            rel = p.relative_to(base_art_dir).as_posix()
+                            meta_file = p.with_name(f".{p.name}.meta.json")
+                            if meta_file.exists():
+                                try:
+                                    with open(meta_file, "r", encoding="utf-8-sig") as f:
+                                        m = json.load(f)
+                                    proj_meta = (
+                                        m.get("custom", {}).get("project")
+                                        if isinstance(m.get("custom"), dict)
+                                        else m.get("project")
+                                    )
+                                    if proj_meta and proj_meta != self.project:
+                                        continue
+                                except Exception:
+                                    pass
+                            artifacts.add(rel)
+                except Exception:
+                    pass
+        elif not self.project:
+            for sub_dir in self._get_subproject_dirs():
+                sub_art_dir = sub_dir / "artifacts"
+                if sub_art_dir.exists():
+                    try:
+                        for p in sorted(sub_art_dir.rglob("*")):
+                            if p.is_file() and not p.name.startswith("."):
+                                artifacts.add(p.relative_to(sub_art_dir).as_posix())
+                    except Exception:
+                        pass
+        return sorted(list(artifacts))
 
     # ---------------- Logs Management ---------------- #
 

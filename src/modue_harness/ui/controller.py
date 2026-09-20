@@ -50,6 +50,10 @@ class UIController:
         return self.session.blackboard_dir
 
     @property
+    def blackboard_root(self) -> Path:
+        return getattr(self.session, "blackboard_root", self.session.blackboard_dir)
+
+    @property
     def timeout(self) -> Optional[float]:
         return self.session.timeout
 
@@ -180,46 +184,38 @@ class UIController:
     def get_artifacts(self) -> List[Dict[str, Any]]:
         """List artifacts available for the current project on blackboard or project directory."""
         try:
-            if not self.session.blackboard.is_initialized():
-                return []
-
-            try:
-                all_artifacts = self.session.blackboard.list_artifacts()
-            except Exception:
-                all_artifacts = []
-
-            current_project = self.session.project_name
-
-            has_tagged = False
             matched = []
-            untagged = []
-
-            for name in all_artifacts:
+            if self.session.blackboard.is_initialized():
                 try:
-                    meta = self.session.blackboard.read_artifact_metadata(name)
-                    p = self.session.blackboard.artifacts_dir / name
-                    size = p.stat().st_size if p.exists() else 0
-                    mtime = p.stat().st_mtime if p.exists() else 0
-                    item = {
-                        "name": name,
-                        "size_bytes": size,
-                        "modified_at": mtime,
-                        "path": str(p),
-                    }
-
-                    proj_meta = None
-                    if meta:
-                        custom = meta.get("custom", {})
-                        proj_meta = custom.get("project") if isinstance(custom, dict) else meta.get("project")
-
-                    if proj_meta:
-                        has_tagged = True
-                        if proj_meta == current_project:
-                            matched.append(item)
-                    else:
-                        untagged.append(item)
+                    all_artifacts = self.session.blackboard.list_artifacts()
                 except Exception:
-                    continue
+                    all_artifacts = []
+
+                current_project = self.session.project_name
+
+                for name in all_artifacts:
+                    try:
+                        p = self.session.blackboard.resolve_artifact_path(name)
+                        size = p.stat().st_size if p.exists() else 0
+                        mtime = p.stat().st_mtime if p.exists() else 0
+                        item = {
+                            "name": name,
+                            "size_bytes": size,
+                            "modified_at": mtime,
+                            "path": str(p),
+                        }
+
+                        meta = self.session.blackboard.read_artifact_metadata(name)
+                        proj_meta = None
+                        if meta:
+                            custom = meta.get("custom", {})
+                            proj_meta = custom.get("project") if isinstance(custom, dict) else meta.get("project")
+
+                        if proj_meta and proj_meta != current_project:
+                            continue
+                        matched.append(item)
+                    except Exception:
+                        continue
 
             # Also inspect project_dir / "artifacts"
             try:
@@ -241,12 +237,7 @@ class UIController:
             except Exception:
                 pass
 
-            if matched:
-                return matched
-            elif not has_tagged:
-                return untagged
-            else:
-                return []
+            return matched
         except Exception:
             return []
 

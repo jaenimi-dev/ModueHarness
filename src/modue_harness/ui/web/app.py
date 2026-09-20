@@ -118,10 +118,12 @@ def run_app(
                         options=projects,
                         value=current_p,
                     ).classes("w-44 bg-slate-800 text-white rounded text-xs")
+                    bb_badge = ui.badge(f"blackboard/{current_p}", color="slate-700").classes("text-[10px] font-mono text-slate-400 hidden sm:inline-flex")
 
                     def on_project_change(e):
                         if e.value:
                             ctrl.switch_project(e.value)
+                            bb_badge.set_text(f"blackboard/{e.value}")
                             ui.notify(i18n("switch_project_notify", name=e.value), type="info")
                             refresh_file_list()
                             refresh_artifacts()

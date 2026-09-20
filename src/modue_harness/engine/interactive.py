@@ -232,9 +232,20 @@ class InteractiveSession:
         self.project_name = project_name
         self.project_dir = self.projects_root / self.project_name
 
-        self.blackboard_dir = (blackboard_dir or (Path.cwd() / "blackboard")).resolve()
+        raw_board_dir = (blackboard_dir or (Path.cwd() / "blackboard")).resolve()
+        if raw_board_dir.name == self.project_name:
+            self.blackboard_root = raw_board_dir.parent
+            self.blackboard_dir = raw_board_dir
+        else:
+            self.blackboard_root = raw_board_dir
+            self.blackboard_dir = self.blackboard_root / self.project_name
+
         self.event_bus = event_bus or EventBus()
-        self.blackboard = Blackboard(root_dir=self.blackboard_dir, event_bus=self.event_bus)
+        self.blackboard = Blackboard(
+            root_dir=self.blackboard_root,
+            event_bus=self.event_bus,
+            project=self.project_name,
+        )
 
         self.model = model
         self.effort = effort
@@ -471,7 +482,7 @@ class InteractiveSession:
         return True
 
     def switch_project(self, project_name: str) -> Path:
-        """Switch current target project to a new or existing project folder."""
+        """Switch current target project to a new or existing project folder and isolated blackboard."""
         clean_name = project_name.strip()
         if not clean_name:
             raise ValueError("Project name cannot be empty.")
@@ -480,24 +491,41 @@ class InteractiveSession:
         self.project_dir = self.projects_root / self.project_name
         self.project_dir.mkdir(parents=True, exist_ok=True)
 
-        if self.blackboard.is_initialized():
-            self.blackboard.update_state({
-                "current_project": self.project_name,
-                "project_dir": str(self.project_dir),
-            })
+        self.blackboard_dir = self.blackboard_root / self.project_name
+        self.blackboard = Blackboard(
+            root_dir=self.blackboard_root,
+            event_bus=self.event_bus,
+            project=self.project_name,
+        )
+        self.blackboard.initialize()
+        self.blackboard.update_state({
+            "current_project": self.project_name,
+            "project_dir": str(self.project_dir),
+        })
         return self.project_dir
 
     def list_projects(self) -> List[str]:
-        """List all existing project names under projects_root."""
-        if not self.projects_root.exists():
-            return []
-        try:
-            return sorted([
-                p.name for p in self.projects_root.iterdir()
-                if p.is_dir() and not p.name.startswith(".")
-            ])
-        except Exception:
-            return []
+        """List all existing project names under projects_root and blackboard_root."""
+        projects = set()
+        if self.projects_root.exists():
+            try:
+                for p in self.projects_root.iterdir():
+                    if p.is_dir() and not p.name.startswith("."):
+                        projects.add(p.name)
+            except Exception:
+                pass
+        if hasattr(self, "blackboard_root") and self.blackboard_root.exists():
+            try:
+                for p in self.blackboard_root.iterdir():
+                    if (
+                        p.is_dir()
+                        and not p.name.startswith(".")
+                        and p.name not in {"tasks", "artifacts", "logs"}
+                    ):
+                        projects.add(p.name)
+            except Exception:
+                pass
+        return sorted(list(projects))
 
     def list_project_files(self) -> List[str]:
         """List all implementation files inside the active project folder."""

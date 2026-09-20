@@ -124,3 +124,21 @@ def test_cli_timeout_option():
     args_default = parse_cli_args([])
     assert args_default.timeout is None
 
+
+def test_cli_status_project_isolated_blackboard(tmp_path: Path, capsys):
+    """Test modue-harness status -P <project> with project-isolated blackboard."""
+    from modue_harness.core.blackboard import Blackboard
+
+    board_dir = tmp_path / "blackboard"
+    proj_a_board = Blackboard(root_dir=board_dir, project="alpha_corp")
+    proj_a_board.initialize()
+    proj_a_board.write_artifact("report.md", "# Alpha Report")
+
+    # Run status with -P alpha_corp
+    exit_code = main(["status", "--dir", str(board_dir), "-P", "alpha_corp"])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "Active Project: alpha_corp" in captured.out
+    assert "report.md" in captured.out
+    assert "alpha_corp" in captured.out
+

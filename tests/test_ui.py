@@ -26,7 +26,8 @@ def test_ui_controller_basic(tmp_path: Path):
 
     assert ctrl.project_name == "alpha"
     assert ctrl.project_dir == projects_dir / "alpha"
-    assert ctrl.blackboard_dir == board_dir
+    assert ctrl.blackboard_dir == board_dir / "alpha"
+    assert ctrl.blackboard_root == board_dir
     assert ctrl.timeout == 30.0
 
     # Status check
@@ -543,6 +544,106 @@ def test_web_app_error_boundary(monkeypatch):
         registered_page_func()
     except Exception as e:
         pytest.fail(f"build_dashboard raised an unhandled exception: {e}")
+
+
+def test_project_isolated_blackboards(tmp_path: Path):
+    """Verify that multiple projects maintain isolated subfolders under blackboard/."""
+    projects_dir = tmp_path / "projects"
+    board_dir = tmp_path / "blackboard"
+
+    ctrl = UIController(
+        project_name="project_alpha",
+        projects_root=projects_dir,
+        blackboard_dir=board_dir,
+    )
+
+    # Initial state: project_alpha isolated blackboard folder
+    assert ctrl.blackboard_dir == board_dir / "project_alpha"
+    assert ctrl.blackboard_root == board_dir
+
+    # Project Alpha writes artifact and task
+    ctrl.session.blackboard.initialize()
+    ctrl.session.blackboard.write_artifact("spec.md", "# Alpha Specification")
+    t_a = Task(
+        id="task_alpha_1",
+        title="Alpha Task",
+        assigned_agent="developer",
+        status=TaskStatus.COMPLETED,
+        description="Build Alpha",
+    )
+    ctrl.session.blackboard.create_task(t_a)
+
+    # Verify Project Alpha files on disk
+    assert (board_dir / "project_alpha" / "artifacts" / "spec.md").exists()
+    assert (board_dir / "project_alpha" / "tasks" / "task_alpha_1.json").exists()
+
+    # Query via UIController in project_alpha
+    arts_a = ctrl.get_artifacts()
+    assert len(arts_a) == 1
+    assert arts_a[0]["name"] == "spec.md"
+    assert ctrl.get_artifact_content("spec.md") == "# Alpha Specification"
+    tasks_a = ctrl.get_tasks()
+    assert len(tasks_a) == 1
+    assert tasks_a[0]["id"] == "task_alpha_1"
+
+    # Switch to Project Beta
+    ctrl.switch_project("project_beta")
+    assert ctrl.project_name == "project_beta"
+    assert ctrl.blackboard_dir == board_dir / "project_beta"
+
+    # In Project Beta: Alpha's artifacts and tasks must NOT be visible
+    arts_b = ctrl.get_artifacts()
+    assert len(arts_b) == 0
+    tasks_b = ctrl.get_tasks()
+    assert len(tasks_b) == 0
+
+    # Project Beta writes its own artifact and task
+    ctrl.session.blackboard.write_artifact("spec.md", "# Beta Specification")
+    t_b = Task(
+        id="task_beta_1",
+        title="Beta Task",
+        assigned_agent="developer",
+        status=TaskStatus.IN_PROGRESS,
+        description="Build Beta",
+    )
+    ctrl.session.blackboard.create_task(t_b)
+
+    # Verify Project Beta files on disk
+    assert (board_dir / "project_beta" / "artifacts" / "spec.md").exists()
+    assert (board_dir / "project_beta" / "tasks" / "task_beta_1.json").exists()
+
+    # Verify query in project_beta
+    arts_b_after = ctrl.get_artifacts()
+    assert len(arts_b_after) == 1
+    assert arts_b_after[0]["name"] == "spec.md"
+    assert ctrl.get_artifact_content("spec.md") == "# Beta Specification"
+    tasks_b_after = ctrl.get_tasks()
+    assert len(tasks_b_after) == 1
+    assert tasks_b_after[0]["id"] == "task_beta_1"
+
+    # Switch back to Project Alpha: must see only Alpha's contents
+    ctrl.switch_project("project_alpha")
+    arts_a_again = ctrl.get_artifacts()
+    assert len(arts_a_again) == 1
+    assert ctrl.get_artifact_content("spec.md") == "# Alpha Specification"
+    tasks_a_again = ctrl.get_tasks()
+    assert len(tasks_a_again) == 1
+    assert tasks_a_again[0]["id"] == "task_alpha_1"
+
+    # Root blackboard inspection should discover both subprojects without collisions
+    root_board = Blackboard(root_dir=board_dir)
+    assert root_board.has_artifact("spec.md")
+    all_tasks = root_board.list_tasks()
+    assert len(all_tasks) == 2
+    task_ids = {t.id for t in all_tasks}
+    assert "task_alpha_1" in task_ids
+    assert "task_beta_1" in task_ids
+
+    # Projects discovery lists both projects
+    all_projects = ctrl.get_projects()
+    assert "project_alpha" in all_projects
+    assert "project_beta" in all_projects
+
 
 
 
