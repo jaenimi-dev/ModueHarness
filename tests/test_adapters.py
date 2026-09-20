@@ -240,7 +240,7 @@ def test_codex_adapter_command_building():
     codex = CodexCLIAdapter(
         name="codex-worker",
         command="codex",
-        model="o3-mini",
+        model="gpt-5.6-terra",
         effort="high",
         sandbox="workspace-write",
     )
@@ -250,14 +250,14 @@ def test_codex_adapter_command_building():
     assert "--sandbox" in cmd
     assert "workspace-write" in cmd
     assert "-m" in cmd
-    assert "o3-mini" in cmd
+    assert "gpt-5.6-terra" in cmd
     assert cmd[-1] == "Analyze and implement feature"
 
     # Test dynamic model update
-    codex.set_model("gpt-4o")
+    codex.set_model("gpt-5.6-luna")
     cmd2 = codex.build_command("Build test app")
-    assert "gpt-4o" in cmd2
-    assert "o3-mini" not in cmd2
+    assert "gpt-5.6-luna" in cmd2
+    assert "gpt-5.6-terra" not in cmd2
 
 
 def test_resolve_codex_binary(monkeypatch, tmp_path: Path):

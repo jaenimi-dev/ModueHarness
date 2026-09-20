@@ -23,6 +23,9 @@ curl -fsSL https://chatgpt.com/codex/install.sh | sh
 powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"
 ```
 
+> ⚠️ **중요 (Windows 환경변수 반영)**:  
+> 설치가 완료된 후 등록된 환경변수(PATH)를 정상 인식하기 위해 **열려 있는 PowerShell 창을 닫고 새로운 PowerShell 창을 열거나 재기동**해야 `codex` 명령어가 정상 실행됩니다. (기존 터미널 창이나 VS Code 내장 터미널 포함)
+
 ### 📦 npm (Node.js 환경)
 ```bash
 # 글로벌 설치
@@ -140,8 +143,8 @@ codex exec --sandbox workspace-write "FastAPI health check 엔드포인트를 �
 전역 기본값은 `~/.codex/config.toml` (또는 `$CODEX_HOME/config.toml`) 파일에서 설정할 수 있습니다.
 
 ```toml
-# 기본 모델 및 추론 강도 설정
-model = "o3-mini"
+# 기본 모델 및 추론 강도 설정 (지원 모델: gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 등)
+model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 
 # 기본 권한 설정 (작업 디렉터리 쓰기 허용)
@@ -160,22 +163,27 @@ web_search = true
 ### 방법 1: 웹 대시보드 UI에서 등록
 1. ModueHarness 웹 UI 좌측 `⚙️ AI 팀 및 환경 설정` ➔ `+ AI 추가`
 2. **이름**: `codex`
-3. **어댑터**: `generic`
-4. **실행 명령 (Command)**: `codex`
-5. **기본 인자 (Args)**: `exec --sandbox workspace-write`
+3. **어댑터**: `codex` (공식 Codex 전용 어댑터)
+4. **모델**: `gpt-5.6-terra` (또는 `gpt-5.6-luna`, `gpt-5.5`)
+5. **추론 강도 (Effort)**: `high` (또는 `medium`, `low`)
 
 ### 방법 2: `config/agents.yaml` 파일로 등록
 ```yaml
 agents:
   architect:
-    adapter: generic
-    command: codex
-    args: ["exec", "--sandbox", "workspace-write"]
+    adapter: codex
+    model: gpt-5.6-terra
+    effort: high
     system_instruction: "You are the software architect. Plan and coordinate tasks."
 
   developer:
-    adapter: generic
-    command: codex
-    args: ["exec", "--sandbox", "workspace-write"]
+    adapter: codex
+    model: gpt-5.6-terra
+    effort: medium
     system_instruction: "You are the developer. Implement clean, robust code."
+
+  reviewer:
+    adapter: codex
+    model: gpt-5.6-luna
+    system_instruction: "You verify and review implementation code and write test validations."
 ```

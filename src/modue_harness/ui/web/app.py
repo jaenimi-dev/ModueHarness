@@ -335,9 +335,9 @@ def run_app(
                         ui.label(i18n("presets")).classes("text-[11px] text-slate-400")
                         ui.button("sonnet", on_click=lambda: edit_model.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
                         ui.button("flash-high", on_click=lambda: edit_model.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")
-                        ui.button("o3-mini", on_click=lambda: edit_model.set_value("o3-mini")).props("dense outline size=xs text-color=emerald-300")
-                        ui.button("o1", on_click=lambda: edit_model.set_value("o1")).props("dense outline size=xs text-color=emerald-300")
-                        ui.button("gpt-4o", on_click=lambda: edit_model.set_value("gpt-4o")).props("dense outline size=xs text-color=emerald-300")
+                        ui.button("5.6-terra", on_click=lambda: edit_model.set_value("gpt-5.6-terra")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.6-terra")
+                        ui.button("5.6-luna", on_click=lambda: edit_model.set_value("gpt-5.6-luna")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.6-luna")
+                        ui.button("gpt-5.5", on_click=lambda: edit_model.set_value("gpt-5.5")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.5")
                         ui.button("pro", on_click=lambda: edit_model.set_value("gemini-3.5-pro")).props("dense outline size=xs text-color=slate-300")
                         ui.button("opus", on_click=lambda: edit_model.set_value("opus")).props("dense outline size=xs text-color=slate-300")
 
@@ -412,9 +412,9 @@ def run_app(
                         ui.label(i18n("presets")).classes("text-[11px] text-slate-400")
                         ui.button("sonnet", on_click=lambda: add_model.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
                         ui.button("flash-high", on_click=lambda: add_model.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")
-                        ui.button("o3-mini", on_click=lambda: add_model.set_value("o3-mini")).props("dense outline size=xs text-color=emerald-300")
-                        ui.button("o1", on_click=lambda: add_model.set_value("o1")).props("dense outline size=xs text-color=emerald-300")
-                        ui.button("gpt-4o", on_click=lambda: add_model.set_value("gpt-4o")).props("dense outline size=xs text-color=emerald-300")
+                        ui.button("5.6-terra", on_click=lambda: add_model.set_value("gpt-5.6-terra")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.6-terra")
+                        ui.button("5.6-luna", on_click=lambda: add_model.set_value("gpt-5.6-luna")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.6-luna")
+                        ui.button("gpt-5.5", on_click=lambda: add_model.set_value("gpt-5.5")).props("dense outline size=xs text-color=emerald-300").tooltip("gpt-5.5")
                         ui.button("pro", on_click=lambda: add_model.set_value("gemini-3.5-pro")).props("dense outline size=xs text-color=slate-300")
 
                     add_effort = ui.select(

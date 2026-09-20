@@ -322,12 +322,12 @@ def test_ui_controller_agent_crud_and_conductor(tmp_path: Path):
     assert qa_after["model"] == "gemini-3.8-flash-high"
     assert qa_after["is_leader"] is True
 
-    # 2b. Switch adapter to codex with o3-mini
-    updated_codex = ctrl.update_agent("qa_tester", adapter_type="codex", model="o3-mini")
+    # 2b. Switch adapter to codex with gpt-5.6-terra
+    updated_codex = ctrl.update_agent("qa_tester", adapter_type="codex", model="gpt-5.6-terra")
     assert updated_codex is True
     qa_codex = next(a for a in ctrl.get_agents_info() if a["name"] == "qa_tester")
     assert qa_codex["adapter"] == "codex"
-    assert qa_codex["model"] == "o3-mini"
+    assert qa_codex["model"] == "gpt-5.6-terra"
 
     # 3. Set conductor explicitly
     first_agent = agents_after[0]["name"]
