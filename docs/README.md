@@ -32,3 +32,6 @@ ModueHarness의 전체 기능, 환경 설정, 지원 AI CLI 도구 연동 및 �
   AI 팀 명세(`agents.yaml`)와 작업 명세(`workflow.yaml`)의 분리 구성, Claude/Antigravity/Codex 혼합 구성 및 템플릿 변수 활용법.
 - 🛠️ **[CLI 명령어 레퍼런스 (cli_reference.md)](cli_reference.md)**  
   대화형 REPL 모드(`/model`, `/effort`, `/timeout`, `/cmd`, `/jobs`, `/cancel`), 프로젝트 관리(`projects --delete`), `init`, `status`, `run`, `debate` 명령어 및 전체 옵션 레퍼런스.
+- 🔮 **[향후 발전 방향 및 로드맵 (FUTURE.md)](../FUTURE.md)**  
+  더 많은 AI CLI 어댑터 확장, 원격지 분산 AI 노드 연결 및 엔터프라이즈 보안 향상 분석/가드레일 적용 로드맵.
+

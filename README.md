@@ -54,6 +54,12 @@ ModueHarness의 상세 설정 방법, 지원 AI CLI 연동 가이드(Claude, AGY
 
 ---
 
+## 🔮 향후 발전 방향 (Future Roadmap)
+
+ModueHarness의 3대 핵심 발전 축(어댑터 생태계 확장, 원격지 분산 노드 연결, 엔터프라이즈 보안 분석 및 가드레일)과 세부 추진 과제는 **[FUTURE.md](FUTURE.md)**에서 확인하실 수 있습니다.
+
+---
+
 ## 📄 라이선스 (License)
 
 [Apache License 2.0](LICENSE)
