@@ -734,3 +734,137 @@ def test_ui_controller_dynamic_refresh_on_new_files(tmp_path: Path):
     art_file.write_text("# Spec Document v2", encoding="utf-8")
     assert "# Spec Document v2" in ctrl.get_artifact_content("spec.md")
 
+
+def test_ui_controller_execute_command_streaming_progress(tmp_path: Path):
+    """Test that UIController.execute_command delivers real-time formatted log lines via on_progress."""
+    import json
+    from modue_harness.adapters.generic import GenericCLIAdapter
+
+    proj_root = tmp_path / "projects"
+    board_root = tmp_path / "blackboard"
+
+    tasks_json = json.dumps([
+        {
+            "id": "task-ui-1",
+            "assigned_agent": "developer",
+            "instruction": "Create main UI script",
+            "output_artifact": "app.py",
+        }
+    ])
+
+    conductor = GenericCLIAdapter(
+        name="conductor",
+        command=sys.executable,
+        default_args=["-c", f"import sys; content = sys.stdin.read(); print('{tasks_json}' if 'decompose' in content else 'REPORT: DONE')"],
+    )
+    dev = GenericCLIAdapter(
+        name="developer",
+        command=sys.executable,
+        default_args=["-c", "print('hello from dev')"],
+    )
+
+    ctrl = UIController(
+        project_name="stream_proj",
+        projects_root=proj_root,
+        blackboard_dir=board_root,
+        agents={"conductor": conductor, "developer": dev},
+    )
+
+    received_events = []
+    received_lines = []
+
+    def on_progress(event: str, data: dict):
+        received_events.append(event)
+        if "lines" in data:
+            received_lines.extend(data["lines"])
+
+    res = ctrl.execute_command("Create app", on_progress=on_progress)
+    assert res["success"] is True
+
+    # Check that key phases were reported
+    assert "planning_start" in received_events
+    assert "planning_end" in received_events
+    assert "task_start" in received_events
+    assert "task_end" in received_events
+    assert "synthesis_start" in received_events
+    assert "synthesis_end" in received_events
+
+    # Check formatted lines
+    combined_log = "\n".join(received_lines)
+    assert "[1/3] 🧠 Conductor" in combined_log
+    assert "기획 완료" in combined_log
+    assert "[2/3] 🛠️" in combined_log
+    assert "[task-ui-1]" in combined_log
+    assert "[3/3] 📝 Conductor" in combined_log
+
+    # Tasks should now be available via ctrl.get_tasks()
+    tasks = ctrl.get_tasks()
+    assert len(tasks) == 1
+    assert tasks[0]["id"] == "task-ui-1"
+    assert tasks[0]["status"] == "completed"
+    assert tasks[0]["assigned_agent"] == "developer"
+    assert tasks[0]["instruction"] == "Create main UI script"
+
+
+def test_ui_controller_execute_command_async_logs(tmp_path: Path):
+    """Test that UIController.execute_command_async records live progress in job.logs and get_jobs()."""
+    import json
+    import time
+    from modue_harness.adapters.generic import GenericCLIAdapter
+
+    proj_root = tmp_path / "projects"
+    board_root = tmp_path / "blackboard"
+
+    tasks_json = json.dumps([
+        {
+            "id": "task-bg-1",
+            "assigned_agent": "developer",
+            "instruction": "Run background task",
+            "output_artifact": "result.txt",
+        }
+    ])
+
+    conductor = GenericCLIAdapter(
+        name="conductor",
+        command=sys.executable,
+        default_args=["-c", f"import sys; content = sys.stdin.read(); print('{tasks_json}' if 'decompose' in content else 'REPORT: DONE')"],
+    )
+    dev = GenericCLIAdapter(
+        name="developer",
+        command=sys.executable,
+        default_args=["-c", "print('bg executed')"],
+    )
+
+    ctrl = UIController(
+        project_name="async_proj",
+        projects_root=proj_root,
+        blackboard_dir=board_root,
+        agents={"conductor": conductor, "developer": dev},
+    )
+
+    job = ctrl.execute_command_async("Build in background")
+    assert job.id == "job_1"
+
+    # Wait for completion
+    timeout_sec = 10.0
+    start = time.time()
+    while job.status == "running" and (time.time() - start) < timeout_sec:
+        time.sleep(0.05)
+
+    assert job.status == "completed"
+    assert len(job.logs) > 0
+
+    combined_logs = "\n".join(job.logs)
+    assert "[1/3] 🧠 Conductor" in combined_logs
+    assert "기획 완료" in combined_logs
+    assert "[2/3] 🛠️" in combined_logs
+    assert "[task-bg-1]" in combined_logs
+    assert "작업 완료" in combined_logs
+
+    jobs = ctrl.get_jobs()
+    assert len(jobs) == 1
+    assert jobs[0]["id"] == "job_1"
+    assert jobs[0]["status"] == "completed"
+    assert jobs[0]["logs"] == job.logs
+
+

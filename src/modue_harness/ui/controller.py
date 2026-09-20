@@ -18,8 +18,10 @@ class UIController:
         project_name: Optional[str] = None,
         projects_root: Optional[Path] = None,
         blackboard_dir: Optional[Path] = None,
+        agents: Optional[Dict[str, Any]] = None,
         agents_file: Optional[Path] = None,
         specific_agent: Optional[str] = None,
+        conductor_name: Optional[str] = None,
         model: Optional[str] = None,
         effort: Optional[str] = None,
         timeout: Optional[float] = None,
@@ -30,8 +32,10 @@ class UIController:
             project_name=project_name,
             projects_root=projects_root,
             blackboard_dir=blackboard_dir,
+            agents=agents,
             agents_file=agents_file,
             specific_agent=specific_agent,
+            conductor_name=conductor_name,
             model=model,
             effort=effort,
             timeout=timeout,
@@ -265,7 +269,9 @@ class UIController:
 
     def get_tasks(self) -> List[Dict[str, Any]]:
         """List task objects from the blackboard."""
-        if not self.session.project_name or not self.session.blackboard.is_initialized():
+        if not self.session.project_name:
+            return []
+        if not self.session.blackboard.is_initialized() and not self.session.blackboard.tasks_dir.exists():
             return []
         tasks = []
         for t in self.session.blackboard.list_tasks():
@@ -313,6 +319,7 @@ class UIController:
                 "duration_sec": j.duration_sec,
                 "error": j.error,
                 "started_at": j.started_at,
+                "logs": list(getattr(j, "logs", [])),
             })
         return sorted(jobs_list, key=lambda x: x["started_at"], reverse=True)
 
@@ -338,7 +345,7 @@ class UIController:
         on_progress: Optional[Callable[[str, Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """Execute a natural-language task synchronously."""
-        return self.session.execute_command(command, live_progress=True)
+        return self.session.execute_command(command, live_progress=True, on_progress=on_progress)
 
     def execute_command_async(self, command: str) -> BackgroundJob:
         """Execute a natural-language task asynchronously in background."""

@@ -41,6 +41,7 @@ class BackgroundJob:
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     thread: Optional[threading.Thread] = None
+    logs: List[str] = field(default_factory=list)
 
     @property
     def duration_sec(self) -> float:
@@ -558,10 +559,12 @@ class InteractiveSession:
         self,
         command: str,
         live_progress: bool = True,
+        on_progress: Optional[Callable[[str, Dict[str, Any]], None]] = None,
     ) -> Dict[str, Any]:
         """Execute a user natural-language command synchronously.
 
-        Live progress updates are printed to stdout if live_progress is True.
+        Live progress updates are printed to stdout if live_progress is True,
+        and forwarded to on_progress callback if supplied.
         """
         command = command.strip()
         if not command:
@@ -592,12 +595,11 @@ class InteractiveSession:
         self.last_commands = []
 
         def _console_progress(event: str, data: Dict[str, Any]) -> None:
-            if not live_progress:
-                return
+            lines = []
             if event == "planning_start":
-                print(f"  [1/3] 🧠 Conductor({data.get('conductor')}) 작업 목표 분석 및 계획 수립 중...")
+                lines.append(f"  [1/3] 🧠 Conductor({data.get('conductor')}) 작업 목표 분석 및 계획 수립 중...")
                 if data.get("command"):
-                    print(f"        💻 CLI 실행: {data.get('command')}")
+                    lines.append(f"        💻 CLI 실행: {data.get('command')}")
                 if data.get("full_command_str") or data.get("command"):
                     self.last_commands.append({
                         "phase": "기획 (Planning)",
@@ -607,21 +609,21 @@ class InteractiveSession:
             elif event == "planning_end":
                 if data.get("is_success"):
                     tasks = data.get("tasks", [])
-                    print(f"  ✓ 기획 완료: {len(tasks)}개 서브태스크 생성 (blackboard/tasks)")
+                    lines.append(f"  ✓ 기획 완료: {len(tasks)}개 서브태스크 생성 (blackboard/tasks)")
                     for t in tasks:
                         desc = (t.get("instruction") or "")[:50]
-                        print(f"    • [{t.get('id')}] {t.get('assigned_agent')}: {desc}")
+                        lines.append(f"    • [{t.get('id')}] {t.get('assigned_agent')}: {desc}")
                 else:
                     err_msg = data.get("error") or "계획 수립 실패"
-                    print(f"  ✗ 기획 실패: {err_msg}")
+                    lines.append(f"  ✗ 기획 실패: {err_msg}")
             elif event == "task_start":
                 idx = data.get("index", 1)
                 tot = data.get("total", 1)
                 desc = (data.get("instruction") or "")[:60]
-                print(f"  [2/3] 🛠️ [{idx}/{tot}] {data.get('agent')} 실행 중 ({data.get('task_id')})...")
-                print(f"        지시: {desc}")
+                lines.append(f"  [2/3] 🛠️ [{idx}/{tot}] {data.get('agent')} 실행 중 ({data.get('task_id')})...")
+                lines.append(f"        지시: {desc}")
                 if data.get("command"):
-                    print(f"        💻 CLI 실행: {data.get('command')}")
+                    lines.append(f"        💻 CLI 실행: {data.get('command')}")
                 if data.get("full_command_str") or data.get("command"):
                     self.last_commands.append({
                         "phase": f"태스크 [{idx}/{tot}] {data.get('task_id')}",
@@ -631,15 +633,15 @@ class InteractiveSession:
             elif event == "task_end":
                 dur = data.get("duration_sec", 0.0)
                 if data.get("is_success"):
-                    print(f"  ✓ [{data.get('task_id')}] 실행 완료 ({dur:.1f}s)")
+                    lines.append(f"  ✓ [{data.get('task_id')}] 실행 완료 ({dur:.1f}s)")
                 else:
                     err_str = data.get("error") or "서브태스크 실행 실패"
-                    print(f"  ✗ [{data.get('task_id')}] 실행 실패 ({dur:.1f}s)")
-                    print(f"        ❌ 서브태스크 실패 원인: {err_str}")
+                    lines.append(f"  ✗ [{data.get('task_id')}] 실행 실패 ({dur:.1f}s)")
+                    lines.append(f"        ❌ 서브태스크 실패 원인: {err_str}")
             elif event == "synthesis_start":
-                print(f"  [3/3] 📝 Conductor({data.get('conductor')}) 최종 검토 및 종합 보고서 작성 중...")
+                lines.append(f"  [3/3] 📝 Conductor({data.get('conductor')}) 최종 검토 및 종합 보고서 작성 중...")
                 if data.get("command"):
-                    print(f"        💻 CLI 실행: {data.get('command')}")
+                    lines.append(f"        💻 CLI 실행: {data.get('command')}")
                 if data.get("full_command_str") or data.get("command"):
                     self.last_commands.append({
                         "phase": "종합 검토 (Synthesis)",
@@ -648,10 +650,22 @@ class InteractiveSession:
                     })
             elif event == "synthesis_end":
                 if data.get("is_success"):
-                    print(f"  ✓ 최종 종합 보고서 저장: blackboard/artifacts/synthesis_report.md")
+                    lines.append("  ✓ 최종 종합 보고서 저장: blackboard/artifacts/synthesis_report.md")
                 else:
                     err_str = data.get("error") or "종합 보고서 작성 실패"
-                    print(f"  ✗ 최종 종합 보고서 작성 실패: {err_str}")
+                    lines.append(f"  ✗ 최종 종합 보고서 작성 실패: {err_str}")
+
+            if live_progress:
+                for l in lines:
+                    print(l)
+
+            if on_progress:
+                payload = dict(data)
+                payload["lines"] = lines
+                try:
+                    on_progress(event, payload)
+                except Exception:
+                    pass
 
         # Run Leader-Worker Conductor
         runner = ConductorRunner(
@@ -725,14 +739,49 @@ class InteractiveSession:
 
         def _bg_worker():
             def _bg_progress(event: str, data: Dict[str, Any]):
+                lines = []
                 if event == "planning_start":
                     job.stage = "기획 중 (planning)"
+                    lines.append(f"  [1/3] 🧠 Conductor({data.get('conductor')}) 작업 목표 분석 및 계획 수립 중...")
+                    if data.get("command"):
+                        lines.append(f"        💻 CLI 실행: {data.get('command')}")
+                elif event == "planning_end":
+                    if data.get("is_success"):
+                        tasks = data.get("tasks", [])
+                        lines.append(f"  ✓ 기획 완료: {len(tasks)}개 서브태스크 생성 (blackboard/tasks)")
+                        for t in tasks:
+                            desc = (t.get("instruction") or "")[:50]
+                            lines.append(f"    • [{t.get('id')}] {t.get('assigned_agent')}: {desc}")
+                    else:
+                        lines.append(f"  ✗ 기획 실패: {data.get('error') or '실패'}")
                 elif event == "task_start":
                     idx = data.get("index", 1)
                     tot = data.get("total", 1)
+                    desc = (data.get("instruction") or "")[:60]
                     job.stage = f"태스크 [{idx}/{tot}] {data.get('agent')} ({data.get('task_id')})"
+                    lines.append(f"  [2/3] 🛠️ [{idx}/{tot}] {data.get('agent')} 실행 중 ({data.get('task_id')})...")
+                    lines.append(f"        지시: {desc}")
+                    if data.get("command"):
+                        lines.append(f"        💻 CLI 실행: {data.get('command')}")
+                elif event == "task_end":
+                    dur = data.get("duration_sec", 0.0)
+                    if data.get("is_success"):
+                        lines.append(f"  ✓ [{data.get('task_id')}] 실행 완료 ({dur:.1f}s)")
+                    else:
+                        lines.append(f"  ✗ [{data.get('task_id')}] 실행 실패 ({dur:.1f}s): {data.get('error')}")
                 elif event == "synthesis_start":
                     job.stage = "최종 종합 보고서 작성 중 (synthesis)"
+                    lines.append(f"  [3/3] 📝 Conductor({data.get('conductor')}) 최종 검토 및 종합 보고서 작성 중...")
+                    if data.get("command"):
+                        lines.append(f"        💻 CLI 실행: {data.get('command')}")
+                elif event == "synthesis_end":
+                    if data.get("is_success"):
+                        lines.append("  ✓ 최종 종합 보고서 저장: blackboard/artifacts/synthesis_report.md")
+                    else:
+                        lines.append(f"  ✗ 최종 종합 보고서 작성 실패: {data.get('error')}")
+
+                for l in lines:
+                    job.logs.append(l)
 
             runner = ConductorRunner(
                 goal=command,
@@ -753,10 +802,19 @@ class InteractiveSession:
                 if not res.get("success", False) and not job.error:
                     job.error = res.get("error_message") or res.get("error")
                 job.stage = "done"
+
+                status_text = "SUCCESS" if res.get("success") else "FAILED"
+                job.logs.append(f"\n<<< [{job.id}] 작업 완료 (상태: {status_text}, 소요 시간: {job.duration_sec:.1f}s)")
+                if res.get("subtasks"):
+                    job.logs.append(f"[실행된 서브태스크 ({len(res['subtasks'])})]")
+                    for st in res["subtasks"]:
+                        mark = "✓" if st.get("is_success") else "✗"
+                        job.logs.append(f"  [{mark}] {st.get('task_id')} ({st.get('agent')})")
             except Exception as e:
                 job.status = "failed"
                 job.error = str(e)
                 job.stage = "error"
+                job.logs.append(f"\n❌ [{job.id}] 작업 오류: {e}")
             finally:
                 job.ended_at = time.time()
                 # Print async completion toast to terminal

@@ -94,9 +94,10 @@ def run_app(
         prompt_input = None
         new_project_dialog = None
         on_refresh_all_click = lambda: None
+        refresh_tasks = lambda: None
 
         def _render_dashboard_impl() -> None:
-            nonlocal prompt_input, new_project_dialog, on_refresh_all_click
+            nonlocal prompt_input, new_project_dialog, on_refresh_all_click, refresh_tasks
             # Clear containers
             header_container.clear()
             main_container.clear()
@@ -518,9 +519,42 @@ def run_app(
 
                         if is_async:
                             job = ctrl.execute_command_async(cmd)
-                            push_log(i18n("log_bg_job_started", id=job.id))
+                            push_log(f"\n🚀 [ModueHarness] 백그라운드 작업 시작 (ID: {job.id})")
+                            push_log(f"   프로젝트: '{ctrl.project_name}'")
+                            push_log(f"   작업 명령: {cmd}\n")
                             ui.notify(i18n("notify_bg_job_dispatched", id=job.id), type="info")
                             refresh_jobs()
+
+                            state["is_running"] = True
+                            status_badge.set_text(i18n("status_executing"))
+                            status_badge.props("color=amber-600")
+
+                            last_log_count = [0]
+                            bg_timer = [None]
+
+                            def check_bg():
+                                j = ctrl.session.jobs.get(job.id)
+                                if not j:
+                                    if bg_timer[0]:
+                                        bg_timer[0].cancel()
+                                    return
+                                new_logs = j.logs[last_log_count[0]:]
+                                for l in new_logs:
+                                    push_log(l)
+                                last_log_count[0] = len(j.logs)
+                                refresh_tasks()
+
+                                if j.status in ("completed", "failed", "cancelled"):
+                                    if bg_timer[0]:
+                                        bg_timer[0].cancel()
+                                    state["is_running"] = False
+                                    state["status_text_key"] = "status_completed" if j.status == "completed" else "status_failed"
+                                    state["status_color"] = "green-600" if j.status == "completed" else "red-600"
+                                    status_badge.set_text(i18n(state["status_text_key"]))
+                                    status_badge.props(f"color={state['status_color']}")
+                                    refresh_all()
+
+                            bg_timer[0] = ui.timer(0.5, check_bg)
                         else:
                             state["is_running"] = True
                             state["status_text_key"] = "status_executing"
@@ -530,30 +564,64 @@ def run_app(
                             async_btn.disable()
                             status_badge.set_text(i18n("status_executing"))
                             status_badge.props("color=amber-600")
-                            push_log(i18n("log_executing", cmd=cmd))
+
+                            push_log(f"\n🚀 [ModueHarness] 작업 시작 (프로젝트: '{ctrl.project_name}')")
+                            push_log(f"   작업 명령: {cmd}\n")
 
                             try:
-                                def on_sync():
-                                    return ctrl.execute_command(cmd)
-
                                 loop = asyncio.get_event_loop()
+
+                                def handle_progress(event: str, data: Dict[str, Any]):
+                                    lines = data.get("lines", [])
+                                    for line in lines:
+                                        loop.call_soon_threadsafe(push_log, line)
+                                    if event in ("planning_end", "task_start", "task_end"):
+                                        loop.call_soon_threadsafe(refresh_tasks)
+                                        loop.call_soon_threadsafe(refresh_artifacts)
+
+                                def on_sync():
+                                    return ctrl.execute_command(cmd, on_progress=handle_progress)
+
                                 res = await loop.run_in_executor(None, on_sync)
                                 success = res.get("success", False)
                                 state["status_text_key"] = "status_completed" if success else "status_failed"
                                 state["status_color"] = "green-600" if success else "red-600"
                                 status_badge.set_text(i18n(state["status_text_key"]))
                                 status_badge.props(f"color={state['status_color']}")
-                                push_log(
-                                    i18n(
-                                        "log_finished",
-                                        status=res.get("status"),
-                                        duration=res.get("total_duration_sec", 0.0),
-                                    )
-                                )
+
+                                push_log("\n" + "=" * 54)
+                                status_text = "SUCCESS" if success else "FAILED"
+                                dur = res.get("total_duration_sec", 0.0)
+                                push_log(f"상태: {status_text} (소요 시간: {dur:.2f}s)")
+                                push_log(f"프로젝트 구현 폴더: {res.get('project_dir', ctrl.project_dir)}")
+
                                 if not success and res.get("error"):
-                                    push_log(i18n("log_error", error=res.get("error")))
+                                    push_log(f"❌ [실패 상세 원인]: {res.get('error')}")
+
+                                if res.get("subtasks"):
+                                    push_log(f"\n[실행된 서브태스크 ({len(res['subtasks'])})]")
+                                    for st in res["subtasks"]:
+                                        mark = "✓" if st.get("is_success") else "✗"
+                                        cmd_line = f" [💻 {st.get('command')}]" if st.get("command") else ""
+                                        push_log(f"  [{mark}] {st.get('task_id')} ({st.get('agent')}){cmd_line}")
+                                        if not st.get("is_success") and st.get("error"):
+                                            push_log(f"      ❌ 오류: {st.get('error')}")
+
+                                if res.get("project_files"):
+                                    push_log(f"\n[프로젝트 내 생성/수정된 파일 ({len(res['project_files'])})]")
+                                    for pf in res["project_files"]:
+                                        push_log(f"  📄 {pf}")
+
+                                if res.get("artifacts"):
+                                    push_log(f"\n[블랙보드 정보교환 산출물 ({len(res['artifacts'])})]")
+                                    for af in res["artifacts"]:
+                                        push_log(f"  📌 {af}")
+                                push_log("=" * 54)
+
+                                refresh_tasks()
                                 refresh_file_list()
                                 refresh_artifacts()
+                                refresh_jobs()
                             finally:
                                 state["is_running"] = False
                                 run_btn.props(remove="loading")
@@ -564,12 +632,13 @@ def run_app(
                     async_btn.on_click(lambda: run_task(is_async=True))
                     cancel_btn.on_click(lambda: (ctrl.cancel_job(), ui.notify(i18n("notify_task_cancelled"), type="warning")))
 
-                # Right Pane: Blackboard Artifacts & Project Files
+                # Right Pane: Blackboard Tasks, Artifacts & Project Files
                 with ui.card().classes(
                     "w-1/4 h-full flex flex-col p-3 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden box-border"
                 ):
                     with ui.row().classes("w-full items-center justify-between border-b border-slate-700 pb-1 flex-shrink-0"):
                         with ui.tabs().classes("text-xs flex-1") as tabs:
+                            tab_tasks = ui.tab(i18n("tab_tasks"))
                             tab_artifacts = ui.tab(i18n("tab_artifacts"))
                             tab_files = ui.tab(i18n("tab_files"))
                             tab_jobs = ui.tab(i18n("tab_jobs"))
@@ -577,7 +646,65 @@ def run_app(
                             .props("flat dense round size=sm text-color=slate-300 hover:text-white")\
                             .tooltip(i18n("tooltip_refresh_all"))
 
-                    with ui.tab_panels(tabs, value=tab_artifacts).classes("w-full flex-1 min-h-0 bg-transparent overflow-hidden"):
+                    with ui.tab_panels(tabs, value=tab_tasks).classes("w-full flex-1 min-h-0 bg-transparent overflow-hidden"):
+                        # Tab 0: Tasks (Blackboard Tasks)
+                        with ui.tab_panel(tab_tasks).classes("p-0 h-full flex flex-col gap-2 overflow-hidden"):
+                            with ui.row().classes("w-full items-center justify-between flex-shrink-0"):
+                                tasks_title_label = ui.label(i18n("tasks_overview")).classes("text-xs font-semibold text-slate-300")
+                                ui.button(icon="refresh", on_click=lambda: on_refresh_tasks_click())\
+                                    .props("dense outline size=sm text-color=blue-300")\
+                                    .tooltip(i18n("tooltip_refresh_tasks"))\
+                                    .classes("border-blue-500/40 hover:bg-blue-900/30")
+
+                            tasks_container = ui.column().classes("w-full flex-1 min-h-0 overflow-y-auto gap-2 pr-0.5")
+
+                            def refresh_tasks():
+                                try:
+                                    tasks_container.clear()
+                                    tasks = ctrl.get_tasks()
+                                    tasks_title_label.set_text(f"{i18n('tasks_overview')} ({len(tasks)})")
+                                    with tasks_container:
+                                        if not tasks:
+                                            ui.label(i18n("no_tasks_yet")).classes("text-xs text-slate-400 italic p-3 text-center")
+                                        else:
+                                            for t in tasks:
+                                                st = (t.get("status") or "pending").lower()
+                                                badge_color = {
+                                                    "completed": "green-700",
+                                                    "in_progress": "amber-700",
+                                                    "failed": "red-700",
+                                                    "pending": "slate-700",
+                                                }.get(st, "slate-600")
+
+                                                status_icon = {
+                                                    "completed": "✓",
+                                                    "in_progress": "▶",
+                                                    "failed": "✗",
+                                                    "pending": "○",
+                                                }.get(st, "•")
+
+                                                with ui.card().classes("w-full p-2.5 bg-slate-900 border border-slate-700 rounded gap-1 flex-shrink-0"):
+                                                    with ui.row().classes("w-full items-center justify-between no-wrap"):
+                                                        with ui.row().classes("items-center gap-1.5 min-w-0"):
+                                                            ui.badge(f"{status_icon} {st}", color=badge_color).classes("text-[10px] font-bold")
+                                                            ui.label(t.get("id", "task")).classes("text-xs font-mono font-bold text-white truncate")
+                                                        ui.badge(t.get("assigned_agent", "N/A"), color="purple-700").classes("text-[10px]")
+
+                                                    desc = t.get("instruction") or t.get("title") or ""
+                                                    if desc:
+                                                        ui.label(desc).classes("text-xs text-slate-300 line-clamp-3 mt-0.5")
+
+                                                    if t.get("output_artifact"):
+                                                        with ui.row().classes("items-center gap-1 mt-1 text-[11px] text-blue-300"):
+                                                            ui.icon("description", size="xs").classes("text-blue-400")
+                                                            ui.label(t["output_artifact"]).classes("font-mono text-[10px]")
+                                except Exception:
+                                    pass
+
+                            def on_refresh_tasks_click():
+                                refresh_tasks()
+                                ui.notify(i18n("notify_tasks_refreshed"), type="info")
+
                         # Tab 1: Artifacts (Project-isolated)
                         with ui.tab_panel(tab_artifacts).classes("p-0 h-full flex flex-col gap-2 overflow-hidden"):
                             with ui.row().classes("w-full items-center gap-1.5 flex-shrink-0"):
@@ -673,16 +800,24 @@ def run_app(
                         refresh_file_list()
                         ui.notify(i18n("notify_files_refreshed"), type="info")
 
-                    def on_refresh_all_click_impl():
+                    def refresh_all():
                         refresh_projects()
+                        refresh_tasks()
                         refresh_artifacts()
                         refresh_file_list()
                         refresh_jobs()
+
+                    def on_refresh_all_click_impl():
+                        refresh_all()
                         ui.notify(i18n("notify_refreshed"), type="info")
 
                     on_refresh_all_click = on_refresh_all_click_impl
 
                 # Initial data population
+                try:
+                    refresh_tasks()
+                except Exception:
+                    pass
                 try:
                     refresh_file_list()
                 except Exception:
