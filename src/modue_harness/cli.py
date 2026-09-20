@@ -181,6 +181,12 @@ def create_parser() -> argparse.ArgumentParser:
         default="blackboard",
         help="Path to blackboard directory (default: blackboard)",
     )
+    projects_parser.add_argument(
+        "--delete",
+        type=str,
+        metavar="PROJECT_NAME",
+        help="Delete a specific project directory and its blackboard data",
+    )
 
     # Command: run (legacy workflow support)
     run_parser = subparsers.add_parser("run", help="Run a multi-AI collaboration workflow specification file")
@@ -523,9 +529,30 @@ def handle_status(args: argparse.Namespace) -> int:
 
 
 def handle_projects(args: argparse.Namespace) -> int:
-    """Handle 'projects' command: List projects in projects directory and blackboard."""
+    """Handle 'projects' command: List projects or delete a project."""
     projects_dir = Path(getattr(args, "projects_dir", "projects")).resolve()
     board_dir = Path(getattr(args, "dir", "blackboard")).resolve()
+
+    delete_target = getattr(args, "delete", None)
+    if delete_target:
+        import shutil
+        deleted_any = False
+        target_proj = projects_dir / delete_target
+        if target_proj.exists():
+            shutil.rmtree(target_proj)
+            deleted_any = True
+            print(f"✓ Removed project directory:    {target_proj}")
+        target_bb = board_dir / delete_target
+        if target_bb.exists():
+            shutil.rmtree(target_bb)
+            deleted_any = True
+            print(f"✓ Removed blackboard directory: {target_bb}")
+        if not deleted_any:
+            print(f"⚠️ Project '{delete_target}' not found in {projects_dir} or {board_dir}.")
+            return 1
+        print(f"✓ Successfully deleted project '{delete_target}'.")
+        return 0
+
     projects = set()
     if projects_dir.exists():
         for p in projects_dir.iterdir():

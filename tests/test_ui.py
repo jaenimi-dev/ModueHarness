@@ -62,6 +62,40 @@ def test_ui_controller_project_switching_and_files(tmp_path: Path):
     assert p2_dir.exists()
 
 
+def test_ui_controller_project_deletion(tmp_path: Path):
+    """Test deleting a project via UIController and CLI."""
+    projects_dir = tmp_path / "projects"
+    board_dir = tmp_path / "blackboard"
+
+    ctrl = UIController(
+        project_name="to_delete",
+        projects_root=projects_dir,
+        blackboard_dir=board_dir,
+    )
+    ctrl.switch_project("keep_me")
+    ctrl.switch_project("to_delete")
+
+    assert (projects_dir / "to_delete").exists()
+    assert (board_dir / "to_delete").exists()
+    assert "to_delete" in ctrl.get_projects()
+
+    # Delete project
+    success = ctrl.delete_project("to_delete")
+    assert success is True
+    assert not (projects_dir / "to_delete").exists()
+    assert not (board_dir / "to_delete").exists()
+    assert "to_delete" not in ctrl.get_projects()
+    # It should have switched to keep_me
+    assert ctrl.project_name == "keep_me"
+
+    # Test CLI projects --delete
+    (projects_dir / "cli_del").mkdir(parents=True, exist_ok=True)
+    (board_dir / "cli_del").mkdir(parents=True, exist_ok=True)
+    ret = main(["projects", "--projects-dir", str(projects_dir), "--dir", str(board_dir), "--delete", "cli_del"])
+    assert ret == 0
+    assert not (projects_dir / "cli_del").exists()
+
+
 def test_ui_controller_artifacts_and_tasks(tmp_path: Path):
     """Test reading artifacts and tasks via UIController."""
     projects_dir = tmp_path / "projects"

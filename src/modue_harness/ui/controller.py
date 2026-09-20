@@ -69,6 +69,10 @@ class UIController:
         """Switch active target project folder."""
         return self.session.switch_project(project_name)
 
+    def delete_project(self, project_name: str) -> bool:
+        """Delete target project folder and its isolated blackboard."""
+        return self.session.delete_project(project_name)
+
     def get_agents_info(self) -> List[Dict[str, Any]]:
         """Return information about configured AI agents."""
         info = []

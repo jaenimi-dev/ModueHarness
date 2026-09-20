@@ -124,6 +124,8 @@ def run_app(
         # Forward declarations of handlers / variables
         prompt_input = None
         new_project_dialog = None
+        delete_project_dialog = None
+        delete_target_label = None
         push_log = lambda text: None
         refresh_tasks = lambda: None
         refresh_artifacts = lambda: None
@@ -133,7 +135,7 @@ def run_app(
         on_refresh_all_click = lambda: None
 
         def _render_dashboard_impl() -> None:
-            nonlocal prompt_input, new_project_dialog, push_log, refresh_tasks, refresh_artifacts, refresh_file_list, refresh_jobs, refresh_projects, on_refresh_all_click
+            nonlocal prompt_input, new_project_dialog, delete_project_dialog, delete_target_label, push_log, refresh_tasks, refresh_artifacts, refresh_file_list, refresh_jobs, refresh_projects, on_refresh_all_click
             # Clear containers
             header_container.clear()
             main_container.clear()
@@ -208,6 +210,25 @@ def run_app(
                      .tooltip(i18n("tooltip_new_project"))\
                      .classes("text-xs border-blue-500/50 hover:bg-blue-900/30")
 
+                    # Delete Project button
+                    def open_delete_project_dialog():
+                        if not delete_project_dialog:
+                            return
+                        cur_p = ctrl.project_name
+                        if not cur_p or cur_p == i18n("no_projects_yet"):
+                            ui.notify(i18n("notify_select_project_first"), type="warning")
+                            return
+                        if delete_target_label:
+                            delete_target_label.set_text(f"📁 {cur_p}")
+                        delete_project_dialog.open()
+
+                    ui.button(
+                        icon="delete",
+                        on_click=open_delete_project_dialog,
+                    ).props("dense outline size=xs text-color=red-400")\
+                     .tooltip(i18n("tooltip_delete_project"))\
+                     .classes("text-xs border-red-500/50 hover:bg-red-900/30")
+
                     # Refresh all button in header
                     ui.button(
                         icon="refresh",
@@ -267,6 +288,32 @@ def run_app(
                     with ui.row().classes("w-full justify-end gap-2 mt-2"):
                         ui.button(i18n("btn_cancel"), on_click=new_project_dialog.close).props("flat text-color=slate-400")
                         ui.button(i18n("btn_create_project"), color="primary", on_click=create_project_submit)
+
+                # 2-0B: Delete Project Dialog
+                delete_project_dialog = ui.dialog()
+                with delete_project_dialog, ui.card().classes("w-96 p-4 bg-slate-900 border border-slate-700 text-white gap-2"):
+                    ui.label(i18n("dialog_delete_project_title")).classes("text-base font-bold text-red-400")
+                    ui.label(i18n("dialog_delete_project_msg")).classes("text-xs text-slate-300")
+                    delete_target_label = ui.label("").classes("font-mono font-bold text-white text-sm bg-slate-800 p-2 rounded border border-slate-700 w-full")
+                    ui.label(i18n("dialog_delete_project_warning")).classes("text-xs text-red-400 font-semibold")
+
+                    def delete_project_submit():
+                        cur_p = ctrl.project_name
+                        if not cur_p or cur_p == i18n("no_projects_yet"):
+                            delete_project_dialog.close()
+                            return
+                        success = ctrl.delete_project(cur_p)
+                        delete_project_dialog.close()
+                        if success:
+                            ui.notify(i18n("notify_project_deleted", name=cur_p), type="positive")
+                            push_log(f"\n🗑️ [프로젝트 삭제] '{cur_p}' 프로젝트 및 블랙보드 데이터가 삭제되었습니다.")
+                            render_dashboard()
+                        else:
+                            ui.notify(i18n("notify_delete_failed"), type="negative")
+
+                    with ui.row().classes("w-full justify-end gap-2 mt-2"):
+                        ui.button(i18n("btn_cancel"), on_click=delete_project_dialog.close).props("flat text-color=slate-400")
+                        ui.button(i18n("btn_delete"), color="red", on_click=delete_project_submit).props("dense")
 
                 # 2-A: Edit Agent Dialog
                 edit_dialog = ui.dialog()

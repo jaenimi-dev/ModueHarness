@@ -580,6 +580,43 @@ class InteractiveSession:
                 pass
         return sorted(list(projects))
 
+    def delete_project(self, project_name: str) -> bool:
+        """Delete project directory and its associated isolated blackboard."""
+        clean_name = project_name.strip()
+        if not clean_name:
+            return False
+
+        import shutil
+        # 1. Remove from projects_root
+        proj_dir = self.projects_root / clean_name
+        if proj_dir.exists():
+            try:
+                shutil.rmtree(proj_dir)
+            except Exception:
+                pass
+
+        # 2. Remove from blackboard_root
+        if hasattr(self, "blackboard_root") and self.blackboard_root.exists():
+            bb_proj_dir = self.blackboard_root / clean_name
+            if bb_proj_dir.exists():
+                try:
+                    shutil.rmtree(bb_proj_dir)
+                except Exception:
+                    pass
+
+        # 3. If currently active project was deleted, switch to another project or clear
+        if self.project_name == clean_name:
+            remaining = [p for p in self.list_projects() if p != clean_name]
+            if remaining:
+                self.switch_project(remaining[0])
+            else:
+                self.project_name = None
+                self.project_dir = None
+                self.blackboard_dir = self.blackboard_root
+                self.blackboard = Blackboard(root_dir=self.blackboard_root, event_bus=self.event_bus)
+
+        return True
+
     def list_project_files(self) -> List[str]:
         """List all implementation files inside the active project folder."""
         if not self.project_dir or not self.project_dir.exists():

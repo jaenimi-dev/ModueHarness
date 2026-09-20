@@ -27,6 +27,14 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "notify_project_created": "새 프로젝트 '{name}'이(가) 생성되었습니다.",
         "notify_select_project_first": "먼저 새 프로젝트를 생성하거나 선택해주세요.",
         "notify_invalid_project_name": "올바른 프로젝트 이름을 입력해주세요 (특수문자 제외).",
+        "btn_delete_project": "삭제",
+        "tooltip_delete_project": "현재 프로젝트 삭제",
+        "dialog_delete_project_title": "🗑️ 프로젝트 삭제",
+        "dialog_delete_project_msg": "다음 프로젝트를 정말 삭제하시겠습니까?",
+        "dialog_delete_project_warning": "⚠️ 이 작업은 되돌릴 수 없습니다. 프로젝트 폴더와 블랙보드 데이터가 모두 영구 삭제됩니다.",
+        "btn_delete": "삭제",
+        "notify_project_deleted": "프로젝트 '{name}'이(가) 삭제되었습니다.",
+        "notify_delete_failed": "프로젝트 삭제에 실패했습니다.",
 
         # Left Pane - Task Dispatcher
         "task_dispatcher": "🎯 작업 지시",
@@ -142,6 +150,14 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "notify_project_created": "New project '{name}' created.",
         "notify_select_project_first": "Please create or select a project first.",
         "notify_invalid_project_name": "Please enter a valid project name (no special characters).",
+        "btn_delete_project": "Delete",
+        "tooltip_delete_project": "Delete active project",
+        "dialog_delete_project_title": "🗑️ Delete Project",
+        "dialog_delete_project_msg": "Are you sure you want to delete this project?",
+        "dialog_delete_project_warning": "⚠️ This action cannot be undone. Project folder and blackboard data will be permanently deleted.",
+        "btn_delete": "Delete",
+        "notify_project_deleted": "Project '{name}' has been deleted.",
+        "notify_delete_failed": "Failed to delete project.",
 
         # Left Pane - Task Dispatcher
         "task_dispatcher": "🎯 Task Dispatcher",
