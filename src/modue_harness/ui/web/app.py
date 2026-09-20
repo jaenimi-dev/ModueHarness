@@ -8,6 +8,35 @@ from modue_harness.ui.controller import UIController
 from modue_harness.ui.i18n import DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES, I18n
 
 
+GLOBAL_VIEWPORT_CSS = """
+<style>
+    html, body {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .q-header {
+        height: 52px !important;
+    }
+    .q-page-container {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+        padding-top: 52px !important;
+        padding-bottom: 0 !important;
+    }
+    .q-page {
+        min-height: 0 !important;
+        height: 100% !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+    }
+</style>
+"""
+
+
 def run_app(
     controller: Optional[UIController] = None,
     host: str = "127.0.0.1",
@@ -23,46 +52,27 @@ def run_app(
             "NiceGUI is not installed. Please install it using: pip install 'modue-harness[ui]' or pip install nicegui"
         ) from e
 
+    # Inject global viewport reset CSS across all clients
+    try:
+        ui.add_head_html(GLOBAL_VIEWPORT_CSS, shared=True)
+    except Exception:
+        pass
+
     ctrl = controller or UIController(lang=lang)
     if hasattr(ctrl, "lang") and not ctrl.lang:
         ctrl.lang = lang
 
-    def build_dashboard() -> None:
-        """Construct the 3-column dashboard UI layout for each connecting client."""
+    def _build_dashboard_impl() -> None:
         # Dark mode by default
         dark = ui.dark_mode(value=True)
 
         current_lang = lang or getattr(ctrl, "lang", DEFAULT_LANGUAGE)
         i18n = I18n(current_lang)
 
-        # Global viewport reset: prevent body/page scrolling and clipping
-        ui.add_head_html("""
-        <style>
-            html, body {
-                height: 100vh !important;
-                max-height: 100vh !important;
-                overflow: hidden !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            .q-header {
-                height: 52px !important;
-            }
-            .q-page-container {
-                height: 100vh !important;
-                max-height: 100vh !important;
-                overflow: hidden !important;
-                padding-top: 52px !important;
-                padding-bottom: 0 !important;
-            }
-            .q-page {
-                min-height: 0 !important;
-                height: 100% !important;
-                overflow: hidden !important;
-                padding: 0 !important;
-            }
-        </style>
-        """)
+        try:
+            ui.add_head_html(GLOBAL_VIEWPORT_CSS)
+        except Exception:
+            pass
 
         # Persistent state for this client session across language switches
         state: Dict[str, Any] = {
@@ -83,9 +93,8 @@ def run_app(
         # Forward declarations of handlers / variables
         prompt_input = None
 
-        def render_dashboard() -> None:
+        def _render_dashboard_impl() -> None:
             nonlocal prompt_input
-
             # Clear containers
             header_container.clear()
             main_container.clear()
@@ -495,14 +504,19 @@ def run_app(
                             )
 
                             def refresh_artifacts():
-                                arts = [a["name"] for a in ctrl.get_artifacts()]
-                                art_select.options = arts
-                                if arts:
-                                    chosen = art_select.value if art_select.value in arts else arts[0]
-                                    art_select.value = chosen
-                                    content = ctrl.get_artifact_content(chosen)
-                                    art_markdown.set_content(content if content else i18n("empty_content"))
-                                else:
+                                try:
+                                    arts = [a["name"] for a in ctrl.get_artifacts()]
+                                    art_select.options = arts
+                                    if arts:
+                                        chosen = art_select.value if art_select.value in arts else arts[0]
+                                        art_select.value = chosen
+                                        content = ctrl.get_artifact_content(chosen)
+                                        art_markdown.set_content(content if content else i18n("empty_content"))
+                                    else:
+                                        art_select.value = None
+                                        art_markdown.set_content(i18n("no_artifact_selected"))
+                                except Exception as ex:
+                                    art_select.options = []
                                     art_select.value = None
                                     art_markdown.set_content(i18n("no_artifact_selected"))
 
@@ -518,13 +532,18 @@ def run_app(
                             file_code = ui.code("", language="python").classes("text-xs flex-1 min-h-0 overflow-auto rounded")
 
                             def refresh_file_list():
-                                files = ctrl.get_project_files()
-                                file_select.options = files
-                                if files:
-                                    chosen = file_select.value if file_select.value in files else files[0]
-                                    file_select.value = chosen
-                                    file_code.set_content(ctrl.get_project_file_content(chosen))
-                                else:
+                                try:
+                                    files = ctrl.get_project_files()
+                                    file_select.options = files
+                                    if files:
+                                        chosen = file_select.value if file_select.value in files else files[0]
+                                        file_select.value = chosen
+                                        file_code.set_content(ctrl.get_project_file_content(chosen))
+                                    else:
+                                        file_select.value = None
+                                        file_code.set_content("")
+                                except Exception as ex:
+                                    file_select.options = []
                                     file_select.value = None
                                     file_code.set_content("")
 
@@ -539,23 +558,66 @@ def run_app(
                             jobs_container = ui.column().classes("w-full flex-1 min-h-0 overflow-y-auto gap-2")
 
                             def refresh_jobs():
-                                jobs_container.clear()
-                                with jobs_container:
-                                    jobs = ctrl.get_jobs()
-                                    if not jobs:
-                                        ui.label(i18n("empty_content")).classes("text-xs text-slate-400 italic p-2")
-                                    for j in jobs:
-                                        with ui.card().classes("w-full p-2 bg-slate-900 rounded text-xs"):
-                                            ui.label(f"[{j['id']}] {j['status']} ({j['duration_sec']:.1f}s)").classes("font-bold")
-                                            ui.label(j['command']).classes("text-slate-400 truncate")
+                                try:
+                                    jobs_container.clear()
+                                    with jobs_container:
+                                        jobs = ctrl.get_jobs()
+                                        if not jobs:
+                                            ui.label(i18n("empty_content")).classes("text-xs text-slate-400 italic p-2")
+                                        for j in jobs:
+                                            with ui.card().classes("w-full p-2 bg-slate-900 rounded text-xs"):
+                                                ui.label(f"[{j['id']}] {j['status']} ({j['duration_sec']:.1f}s)").classes("font-bold")
+                                                ui.label(j['command']).classes("text-slate-400 truncate")
+                                except Exception:
+                                    pass
 
                 # Initial data population
-                refresh_file_list()
-                refresh_artifacts()
-                refresh_jobs()
+                try:
+                    refresh_file_list()
+                except Exception:
+                    pass
+                try:
+                    refresh_artifacts()
+                except Exception:
+                    pass
+                try:
+                    refresh_jobs()
+                except Exception:
+                    pass
+
+        def render_dashboard() -> None:
+            try:
+                _render_dashboard_impl()
+            except Exception as exc:
+                import sys, traceback
+                traceback.print_exc(file=sys.stderr)
+                try:
+                    main_container.clear()
+                    with main_container:
+                        with ui.card().classes("w-full p-6 bg-slate-900 border border-red-500 rounded text-white"):
+                            ui.label("⚠️ ModueHarness Dashboard Render Error").classes("text-lg font-bold text-red-400")
+                            ui.label(str(exc)).classes("text-sm text-slate-300 my-2")
+                            ui.code(traceback.format_exc(), language="text").classes("text-xs bg-slate-950 p-3 rounded overflow-auto")
+                except Exception:
+                    pass
 
         # Initial render of the dashboard
         render_dashboard()
+
+    def build_dashboard() -> None:
+        """Construct the 3-column dashboard UI layout for each connecting client."""
+        try:
+            _build_dashboard_impl()
+        except Exception as exc:
+            import sys, traceback
+            traceback.print_exc(file=sys.stderr)
+            try:
+                with ui.card().classes("w-full max-w-3xl mx-auto my-10 p-6 bg-slate-900 border border-red-500 rounded text-white"):
+                    ui.label("⚠️ ModueHarness Dashboard Error").classes("text-lg font-bold text-red-400")
+                    ui.label(str(exc)).classes("text-sm text-slate-300 my-2")
+                    ui.code(traceback.format_exc(), language="text").classes("text-xs bg-slate-950 p-3 rounded overflow-auto")
+            except Exception:
+                pass
 
     # Prepare ui.run kwargs
     run_kwargs = {
@@ -566,11 +628,15 @@ def run_app(
         "show": open_browser,
     }
 
+    # Always register root route "/" with ui.page for standard FastAPI/Starlette routing
+    try:
+        ui.page("/")(build_dashboard)
+    except Exception:
+        pass
+
     sig = inspect.signature(ui.run)
     if "root" in sig.parameters:
         run_kwargs["root"] = build_dashboard
-    else:
-        ui.page("/")(build_dashboard)
 
     try:
         ui.run(**run_kwargs)

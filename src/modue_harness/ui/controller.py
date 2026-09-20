@@ -172,77 +172,93 @@ class UIController:
         p = self.config_file_path
         if p:
             try:
-                return str(p.relative_to(Path.cwd()))
+                return p.relative_to(Path.cwd()).as_posix()
             except Exception:
                 return p.name
         return "config/agents.yaml"
 
     def get_artifacts(self) -> List[Dict[str, Any]]:
         """List artifacts available for the current project on blackboard or project directory."""
-        if not self.session.blackboard.is_initialized():
-            return []
+        try:
+            if not self.session.blackboard.is_initialized():
+                return []
 
-        all_artifacts = self.session.blackboard.list_artifacts()
-        current_project = self.session.project_name
+            try:
+                all_artifacts = self.session.blackboard.list_artifacts()
+            except Exception:
+                all_artifacts = []
 
-        has_tagged = False
-        matched = []
-        untagged = []
+            current_project = self.session.project_name
 
-        for name in all_artifacts:
-            meta = self.session.blackboard.read_artifact_metadata(name)
-            p = self.session.blackboard.artifacts_dir / name
-            size = p.stat().st_size if p.exists() else 0
-            mtime = p.stat().st_mtime if p.exists() else 0
-            item = {
-                "name": name,
-                "size_bytes": size,
-                "modified_at": mtime,
-                "path": str(p),
-            }
+            has_tagged = False
+            matched = []
+            untagged = []
 
-            proj_meta = None
-            if meta:
-                custom = meta.get("custom", {})
-                proj_meta = custom.get("project") if isinstance(custom, dict) else meta.get("project")
+            for name in all_artifacts:
+                try:
+                    meta = self.session.blackboard.read_artifact_metadata(name)
+                    p = self.session.blackboard.artifacts_dir / name
+                    size = p.stat().st_size if p.exists() else 0
+                    mtime = p.stat().st_mtime if p.exists() else 0
+                    item = {
+                        "name": name,
+                        "size_bytes": size,
+                        "modified_at": mtime,
+                        "path": str(p),
+                    }
 
-            if proj_meta:
-                has_tagged = True
-                if proj_meta == current_project:
-                    matched.append(item)
+                    proj_meta = None
+                    if meta:
+                        custom = meta.get("custom", {})
+                        proj_meta = custom.get("project") if isinstance(custom, dict) else meta.get("project")
+
+                    if proj_meta:
+                        has_tagged = True
+                        if proj_meta == current_project:
+                            matched.append(item)
+                    else:
+                        untagged.append(item)
+                except Exception:
+                    continue
+
+            # Also inspect project_dir / "artifacts"
+            try:
+                proj_art_dir = self.session.project_dir / "artifacts"
+                if proj_art_dir.is_dir():
+                    for p in sorted(proj_art_dir.rglob("*")):
+                        try:
+                            if p.is_file() and not p.name.startswith("."):
+                                rel = p.relative_to(proj_art_dir).as_posix()
+                                if not any(r["name"] == rel for r in matched):
+                                    matched.append({
+                                        "name": rel,
+                                        "size_bytes": p.stat().st_size,
+                                        "modified_at": p.stat().st_mtime,
+                                        "path": str(p),
+                                    })
+                        except Exception:
+                            continue
+            except Exception:
+                pass
+
+            if matched:
+                return matched
+            elif not has_tagged:
+                return untagged
             else:
-                untagged.append(item)
-
-        # Also inspect project_dir / "artifacts"
-        proj_art_dir = self.session.project_dir / "artifacts"
-        if proj_art_dir.is_dir():
-            for p in sorted(proj_art_dir.rglob("*")):
-                if p.is_file() and not p.name.startswith("."):
-                    rel = str(p.relative_to(proj_art_dir))
-                    if not any(r["name"] == rel for r in matched):
-                        matched.append({
-                            "name": rel,
-                            "size_bytes": p.stat().st_size,
-                            "modified_at": p.stat().st_mtime,
-                            "path": str(p),
-                        })
-
-        if matched:
-            return matched
-        elif not has_tagged:
-            return untagged
-        else:
+                return []
+        except Exception:
             return []
 
     def get_artifact_content(self, name: str) -> str:
         """Read artifact content as string for the current project."""
-        # 1. Project-local artifacts
-        proj_art = self.session.project_dir / "artifacts" / name
-        if proj_art.is_file():
-            try:
+        try:
+            # 1. Project-local artifacts
+            proj_art = self.session.project_dir / "artifacts" / name
+            if proj_art.is_file():
                 return proj_art.read_text(encoding="utf-8", errors="replace")
-            except Exception:
-                pass
+        except Exception:
+            pass
         # 2. Blackboard
         try:
             content = self.session.blackboard.read_artifact(name)
@@ -268,14 +284,18 @@ class UIController:
 
     def get_project_files(self) -> List[str]:
         """List implementation files inside current project directory."""
-        return self.session.list_project_files()
+        try:
+            return self.session.list_project_files()
+        except Exception:
+            return []
 
     def get_project_file_content(self, rel_path: str) -> str:
         """Read content of a file within the current project directory."""
-        target = (self.session.project_dir / rel_path).resolve()
-        if not target.is_relative_to(self.session.project_dir) or not target.is_file():
-            return ""
         try:
+            proj_dir = self.session.project_dir.resolve()
+            target = (proj_dir / rel_path).resolve()
+            if not target.is_relative_to(proj_dir) or not target.is_file():
+                return ""
             return target.read_text(encoding="utf-8", errors="replace")
         except Exception:
             return ""

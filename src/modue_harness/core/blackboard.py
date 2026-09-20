@@ -138,7 +138,11 @@ class Blackboard:
 
     def resolve_artifact_path(self, relative_path: str) -> Path:
         """Resolve a relative artifact path under blackboard/artifacts/."""
-        clean_path = relative_path.replace("blackboard/artifacts/", "").lstrip("/")
+        clean_path = (
+            relative_path.replace("\\", "/")
+            .replace("blackboard/artifacts/", "")
+            .lstrip("/")
+        )
         return self.artifacts_dir / clean_path
 
     def write_artifact(
@@ -186,12 +190,15 @@ class Blackboard:
 
     def read_artifact_metadata(self, relative_path: str) -> Optional[Dict[str, Any]]:
         """Read companion metadata for an artifact."""
-        target_path = self.resolve_artifact_path(relative_path)
-        meta_file = target_path.with_name(f".{target_path.name}.meta.json")
-        if not meta_file.exists():
+        try:
+            target_path = self.resolve_artifact_path(relative_path)
+            meta_file = target_path.with_name(f".{target_path.name}.meta.json")
+            if not meta_file.exists():
+                return None
+            with open(meta_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
             return None
-        with open(meta_file, "r", encoding="utf-8") as f:
-            return json.load(f)
 
     def has_artifact(self, relative_path: str) -> bool:
         """Check if an artifact exists."""
@@ -201,11 +208,14 @@ class Blackboard:
         """List all artifact paths relative to artifacts/ (excluding meta files)."""
         if not self.artifacts_dir.exists():
             return []
-        return [
-            str(p.relative_to(self.artifacts_dir))
-            for p in sorted(self.artifacts_dir.rglob("*"))
-            if p.is_file() and not p.name.startswith(".")
-        ]
+        try:
+            return [
+                p.relative_to(self.artifacts_dir).as_posix()
+                for p in sorted(self.artifacts_dir.rglob("*"))
+                if p.is_file() and not p.name.startswith(".")
+            ]
+        except Exception:
+            return []
 
     # ---------------- Logs Management ---------------- #
 

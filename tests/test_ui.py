@@ -444,3 +444,93 @@ def test_ui_controller_project_artifacts_isolation(tmp_path: Path):
     assert arts_a_again[0]["name"] == "plan_a.md"
 
 
+def test_corrupt_artifact_metadata_and_windows_paths(tmp_path: Path):
+    """Test that Blackboard and UIController safely handle corrupt .meta.json and Windows paths."""
+    board_dir = tmp_path / "blackboard"
+    board = Blackboard(root_dir=board_dir)
+    board.initialize()
+
+    # 1. Normal artifact
+    board.write_artifact("valid.md", "valid content")
+
+    # 2. Corrupt .meta.json
+    corrupt_meta = board.artifacts_dir / ".valid.md.meta.json"
+    corrupt_meta.write_text("NOT_JSON{", encoding="utf-8")
+
+    assert board.read_artifact_metadata("valid.md") is None
+
+    # 3. Windows path resolution test
+    resolved = board.resolve_artifact_path("blackboard\\artifacts\\subdir\\test.txt")
+    assert resolved == board.artifacts_dir / "subdir" / "test.txt"
+
+    # 4. Controller get_artifacts with corrupt metadata should not crash
+    ctrl = UIController(blackboard_dir=board_dir, projects_root=tmp_path / "projects")
+    artifacts = ctrl.get_artifacts()
+    assert any(a["name"] == "valid.md" for a in artifacts)
+
+
+def test_ui_controller_posix_paths(tmp_path: Path):
+    """Test that file paths are normalized to POSIX style (forward slashes)."""
+    projects_dir = tmp_path / "projects"
+    p_dir = projects_dir / "myproj"
+    (p_dir / "sub" / "deep").mkdir(parents=True, exist_ok=True)
+    (p_dir / "sub" / "deep" / "module.py").write_text("x = 1", encoding="utf-8")
+
+    ctrl = UIController(
+        project_name="myproj",
+        projects_root=projects_dir,
+        blackboard_dir=tmp_path / "blackboard",
+    )
+
+    files = ctrl.get_project_files()
+    assert "sub/deep/module.py" in files
+    assert "\\" not in files[0]
+
+    # Content retrieval with posix path
+    content = ctrl.get_project_file_content("sub/deep/module.py")
+    assert content == "x = 1"
+
+
+def test_web_app_error_boundary(monkeypatch):
+    """Test that run_app's build_dashboard handles unexpected errors gracefully without crashing."""
+    import sys
+    from unittest.mock import MagicMock
+
+    mock_ui = MagicMock()
+    mock_app = MagicMock()
+
+    registered_page_func = None
+
+    def fake_page(path):
+        def decorator(fn):
+            nonlocal registered_page_func
+            registered_page_func = fn
+            return fn
+        return decorator
+
+    mock_ui.page = fake_page
+
+    def fake_run(root=None, **kwargs):
+        pass
+
+    mock_ui.run = fake_run
+    monkeypatch.setitem(sys.modules, "nicegui", MagicMock(ui=mock_ui, app=mock_app))
+
+    run_app(open_browser=False)
+
+    assert registered_page_func is not None
+
+    # Mock _build_dashboard_impl raising an error
+    monkeypatch.setattr(
+        "modue_harness.ui.web.app.UIController.get_projects",
+        MagicMock(side_effect=RuntimeError("Simulated Controller Crash")),
+    )
+
+    # Calling the page function should not raise an unhandled exception
+    try:
+        registered_page_func()
+    except Exception as e:
+        pytest.fail(f"build_dashboard raised an unhandled exception: {e}")
+
+
+

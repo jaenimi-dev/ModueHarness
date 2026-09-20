@@ -491,22 +491,28 @@ class InteractiveSession:
         """List all existing project names under projects_root."""
         if not self.projects_root.exists():
             return []
-        return sorted([
-            p.name for p in self.projects_root.iterdir()
-            if p.is_dir() and not p.name.startswith(".")
-        ])
+        try:
+            return sorted([
+                p.name for p in self.projects_root.iterdir()
+                if p.is_dir() and not p.name.startswith(".")
+            ])
+        except Exception:
+            return []
 
     def list_project_files(self) -> List[str]:
         """List all implementation files inside the active project folder."""
         if not self.project_dir.exists():
             return []
         files = []
-        for p in self.project_dir.rglob("*"):
-            if p.is_file() and not any(part.startswith(".") for part in p.parts):
-                try:
-                    files.append(str(p.relative_to(self.project_dir)))
-                except Exception:
-                    pass
+        try:
+            for p in self.project_dir.rglob("*"):
+                if p.is_file() and not any(part.startswith(".") for part in p.parts):
+                    try:
+                        files.append(p.relative_to(self.project_dir).as_posix())
+                    except Exception:
+                        pass
+        except Exception:
+            pass
         return sorted(files)
 
     def execute_command(
