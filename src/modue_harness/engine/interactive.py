@@ -86,6 +86,7 @@ def load_or_detect_agents(
     model: Optional[str] = None,
     effort: Optional[str] = None,
     cwd: Optional[Path] = None,
+    require_agents_file: bool = False,
 ) -> Dict[str, BaseCLIAdapter]:
     """Load agents from YAML file or auto-detect available AI CLI tools on the system."""
     base_dir = cwd or Path.cwd()
@@ -120,6 +121,11 @@ def load_or_detect_agents(
         return {specific_agent: create_adapter(specific_agent, name=specific_agent, **kwargs)}
 
     # 2. User specified agents file
+    if require_agents_file and agents_file and not agents_file.exists():
+        raise RuntimeError(
+            f"지정한 AI 팀 명세 파일을 찾을 수 없습니다: {agents_file}"
+        )
+
     target_file: Optional[Path] = None
     if agents_file and agents_file.exists():
         target_file = agents_file
@@ -150,8 +156,19 @@ def load_or_detect_agents(
                     loaded[name] = create_adapter(adapter_type, **kwargs)
             if loaded:
                 return loaded
-        except Exception:
-            pass
+            raise ValueError("파일에 유효한 에이전트 정의(agents)가 없습니다.")
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"
+            if require_agents_file:
+                raise RuntimeError(
+                    f"AI 팀 명세 파일을 불러오지 못했습니다: {target_file}\n   원인: {detail}"
+                ) from exc
+            print(
+                f"⚠️ AI 팀 명세 파일을 불러오지 못했습니다: {target_file}\n"
+                f"   원인: {detail}\n"
+                f"   → 시스템에 설치된 AI CLI 자동 감지로 대체합니다.",
+                file=sys.stderr,
+            )
 
     # 3. Auto-detect installed AI CLI tools on system PATH or local installation directories
     def _find_bin(cmd_name: str) -> Optional[str]:
@@ -291,6 +308,7 @@ class InteractiveSession:
         effort: Optional[str] = None,
         event_bus: Optional[EventBus] = None,
         timeout: Optional[float] = None,
+        require_agents_file: bool = False,
     ) -> None:
         self.projects_root = (projects_root or (Path.cwd() / "projects")).resolve()
         raw_board_dir = (blackboard_dir or (Path.cwd() / "blackboard")).resolve()
@@ -342,6 +360,7 @@ class InteractiveSession:
             model=model,
             effort=effort,
             cwd=Path.cwd(),
+            require_agents_file=require_agents_file,
         )
 
         if conductor_name and conductor_name in self.agents:
