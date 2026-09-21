@@ -43,6 +43,12 @@ agents:
 # -------------------------------------------------------------
 # 예시 2: Google Antigravity (AGY) 전담 팀 (필요시 위 agents를 대체)
 # -------------------------------------------------------------
+# ⚠️ Antigravity 주의: 모델 ID 자체가 추론 수준을 접미사로 포함합니다
+#    (gemini-3.8-flash-high / -medium / -low, gemini-3.1-pro-high / -low).
+#    따라서 model 접미사와 effort 값이 어긋나면 agy CLI가 실행을 거부합니다:
+#      error: invalid model selection (--model "gemini-3.8-flash-high" --effort "medium"):
+#             --model gemini-3.8-flash-high conflicts with --effort=medium
+#    둘을 일치시키거나(권장), effort를 아예 생략해 모델 접미사에 맡기세요.
 # agents:
 #   architect:
 #     adapter: "antigravity"             # 또는 "agy"
@@ -57,7 +63,7 @@ agents:
 #     adapter: "antigravity"
 #     command: "agy"
 #     args: ["--dangerously-skip-permissions"]
-#     model: "gemini-3.7-flash-high"
+#     model: "gemini-3.7-flash-medium"   # 모델명 접미사와 effort를 반드시 일치시킬 것
 #     effort: "medium"
 #     role: "Software Engineer"
 #     system_instruction: "You write clean, tested code in the project directory."
@@ -85,7 +91,7 @@ agents:
 #     adapter: "antigravity"             # 고속 코드 구현: Antigravity (Gemini Flash)
 #     command: "agy"
 #     args: ["--dangerously-skip-permissions"]
-#     model: "gemini-3.8-flash-high"
+#     model: "gemini-3.8-flash-medium"   # 모델명 접미사와 effort를 반드시 일치시킬 것
 #     effort: "medium"
 #   reviewer:
 #     adapter: "claude"                  # 최종 보안 및 품질 검토: Claude
