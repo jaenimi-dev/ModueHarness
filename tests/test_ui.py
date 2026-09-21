@@ -1067,8 +1067,11 @@ def test_adapter_cancel_terminates_subprocess(tmp_path: Path):
     t = threading.Thread(target=_run)
     t.start()
 
-    # Wait until process is running
-    time.sleep(0.1)
+    # Wait until the process is running. Spawning is slow on Windows under
+    # load, so poll instead of assuming a fixed delay is enough.
+    deadline = time.time() + 5.0
+    while adapter._current_process is None and time.time() < deadline:
+        time.sleep(0.01)
     assert adapter._current_process is not None
 
     # Call cancel
