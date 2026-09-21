@@ -12,6 +12,7 @@ from modue_harness import __version__
 from modue_harness.adapters import create_adapter
 from modue_harness.core.blackboard import Blackboard
 from modue_harness.core.config import load_dotenv
+from modue_harness.core.encoding import ensure_utf8_io
 from modue_harness.engine.debate import DebateRunner
 from modue_harness.engine.interactive import InteractiveSession
 from modue_harness.engine.pipeline import PipelineRunner
@@ -816,6 +817,9 @@ def handle_debate(args: argparse.Namespace) -> int:
 def main(argv: Optional[List[str]] = None) -> int:
     """Main CLI entrypoint."""
     try:
+        # Must run before the first print: Windows consoles default to the
+        # system locale codec (cp949) and would abort on status glyphs.
+        ensure_utf8_io()
         load_dotenv()
         args = parse_cli_args(argv)
 

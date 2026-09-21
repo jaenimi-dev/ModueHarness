@@ -10,6 +10,7 @@ import sys
 import time
 from typing import Any, Dict, Generator, List, Optional
 
+from modue_harness.core.encoding import apply_utf8_env
 from modue_harness.core.types import TaskStatus, TurnContext, TurnResult
 
 # Regex to strip ANSI escape codes (colors, cursor movements, etc.)
@@ -166,6 +167,7 @@ class BaseCLIAdapter(ABC):
             env.update(context.env)
         if custom_env:
             env.update(custom_env)
+        apply_utf8_env(env)
 
         stdin_input = full_prompt if self.prompt_delivery == "stdin" else None
 
@@ -287,6 +289,7 @@ class BaseCLIAdapter(ABC):
             env.update(context.env)
         if custom_env:
             env.update(custom_env)
+        apply_utf8_env(env)
 
         start_time = time.time()
         self._current_process = None
