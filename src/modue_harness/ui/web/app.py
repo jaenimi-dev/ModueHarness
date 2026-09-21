@@ -109,8 +109,8 @@ def run_app(
 
         # Containers for layout
         header_container = ui.header().classes(
-            "h-[58px] items-center justify-between bg-slate-900 text-white px-4 py-1.5 border-b border-slate-700"
-        )
+            "h-[58px] items-center justify-between bg-slate-900 text-white px-3 sm:px-4 py-1.5 border-b border-slate-700 flex-nowrap overflow-x-auto overflow-y-hidden"
+        ).props("no-wrap")
         main_container = ui.row().classes(
             "w-full min-h-0 p-2.5 gap-2.5 no-wrap box-border overflow-hidden"
         ).style("height: calc(100vh - 58px); max-height: calc(100vh - 58px); min-height: 0;")
@@ -131,11 +131,12 @@ def run_app(
         refresh_artifacts = lambda: None
         refresh_file_list = lambda: None
         refresh_jobs = lambda: None
+        refresh_usage = lambda: None
         refresh_projects = lambda: None
         on_refresh_all_click = lambda: None
 
         def _render_dashboard_impl() -> None:
-            nonlocal prompt_input, new_project_dialog, delete_project_dialog, delete_target_label, push_log, refresh_tasks, refresh_artifacts, refresh_file_list, refresh_jobs, refresh_projects, on_refresh_all_click
+            nonlocal prompt_input, new_project_dialog, delete_project_dialog, delete_target_label, push_log, refresh_tasks, refresh_artifacts, refresh_file_list, refresh_jobs, refresh_usage, refresh_projects, on_refresh_all_click
             # Clear containers
             header_container.clear()
             main_container.clear()
@@ -143,23 +144,23 @@ def run_app(
 
             # 1. Header
             with header_container:
-                with ui.row().classes("items-center gap-3"):
-                    ui.icon("hub", size="md").classes("text-blue-400")
-                    ui.label(i18n("app_title")).classes("text-lg font-bold tracking-tight")
-                    ui.badge("v0.8.0", color="blue-600").classes("text-xs")
+                with ui.row().classes("items-center gap-2 sm:gap-3 flex-nowrap flex-shrink-0"):
+                    ui.icon("hub", size="md").classes("text-blue-400 flex-shrink-0")
+                    ui.label(i18n("app_title")).classes("text-sm sm:text-base md:text-lg font-bold tracking-tight whitespace-nowrap")
+                    ui.badge("v0.8.0", color="blue-600").classes("text-xs hidden md:inline-flex flex-shrink-0")
 
-                with ui.row().classes("items-center gap-2 sm:gap-3"):
+                with ui.row().classes("items-center gap-1.5 sm:gap-2 md:gap-2.5 flex-nowrap flex-shrink-0"):
                     projects = ctrl.get_projects()
                     current_p = ctrl.project_name
                     if current_p and current_p not in projects:
                         projects.append(current_p)
 
-                    ui.label(i18n("project")).classes("text-sm text-slate-400")
+                    ui.label(i18n("project")).classes("text-xs sm:text-sm text-slate-400 whitespace-nowrap hidden sm:inline flex-shrink-0")
                     if projects:
                         project_select = ui.select(
                             options=projects,
                             value=current_p or projects[0],
-                        ).props("dense outlined").classes("w-36 sm:w-44 bg-slate-800 text-white rounded text-xs")
+                        ).props("dense outlined").classes("w-28 sm:w-36 md:w-44 bg-slate-800 text-white rounded text-xs flex-shrink-0")
 
                         def on_project_change(e):
                             if e.value and e.value != i18n("no_projects_yet"):
@@ -171,13 +172,14 @@ def run_app(
                                 refresh_artifacts()
                                 refresh_file_list()
                                 refresh_jobs()
+                                refresh_usage()
 
                         project_select.on_value_change(on_project_change)
                     else:
                         project_select = ui.select(
                             options=[i18n("no_projects_yet")],
                             value=i18n("no_projects_yet"),
-                        ).props("dense outlined disable").classes("w-36 sm:w-44 bg-slate-800 text-slate-400 rounded text-xs")
+                        ).props("dense outlined disable").classes("w-28 sm:w-36 md:w-44 bg-slate-800 text-slate-400 rounded text-xs flex-shrink-0")
 
                     def refresh_projects_impl():
                         try:
@@ -202,16 +204,16 @@ def run_app(
 
                     refresh_projects = refresh_projects_impl
 
-                    # + New Project button (enlarged)
-                    ui.button(
-                        i18n("btn_new_project"),
+                    # + New Project button (enlarged, responsive label)
+                    with ui.button(
                         icon="add_circle",
                         on_click=lambda: new_project_dialog.open() if new_project_dialog else None,
                     ).props("unelevated size=md text-color=white")\
                      .tooltip(i18n("tooltip_new_project"))\
-                     .classes("h-9 px-3.5 text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-500 rounded-md shadow-sm")
+                     .classes("h-9 px-2.5 sm:px-3.5 bg-blue-600 hover:bg-blue-500 rounded-md shadow-sm whitespace-nowrap flex-shrink-0"):
+                        ui.label(i18n("btn_new_project")).classes("hidden md:inline text-xs sm:text-sm font-semibold ml-1")
 
-                    # Delete Project button (enlarged)
+                    # Delete Project button (enlarged, responsive label)
                     def open_delete_project_dialog():
                         if not delete_project_dialog:
                             return
@@ -223,31 +225,31 @@ def run_app(
                             delete_target_label.set_text(f"📁 {cur_p}")
                         delete_project_dialog.open()
 
-                    ui.button(
-                        i18n("btn_delete_project"),
+                    with ui.button(
                         icon="delete_forever",
                         on_click=open_delete_project_dialog,
                     ).props("outline size=md text-color=red-200")\
                      .tooltip(i18n("tooltip_delete_project"))\
-                     .classes("h-9 px-3.5 text-xs sm:text-sm font-semibold bg-red-950/70 border border-red-500/80 hover:bg-red-900 rounded-md shadow-sm")
+                     .classes("h-9 px-2.5 sm:px-3.5 bg-red-950/70 border border-red-500/80 hover:bg-red-900 rounded-md shadow-sm whitespace-nowrap flex-shrink-0"):
+                        ui.label(i18n("btn_delete_project")).classes("hidden md:inline text-xs sm:text-sm font-semibold ml-1")
 
-                    # Refresh all button in header (enlarged)
-                    ui.button(
-                        i18n("btn_refresh"),
+                    # Refresh all button in header (enlarged, responsive label)
+                    with ui.button(
                         icon="refresh",
                         on_click=lambda: on_refresh_all_click(),
                     ).props("outline size=md text-color=slate-100")\
                      .tooltip(i18n("tooltip_refresh_all"))\
-                     .classes("h-9 px-3.5 text-xs sm:text-sm font-semibold bg-slate-800 border border-slate-600 hover:bg-slate-700 rounded-md shadow-sm")
+                     .classes("h-9 px-2.5 sm:px-3.5 bg-slate-800 border border-slate-600 hover:bg-slate-700 rounded-md shadow-sm whitespace-nowrap flex-shrink-0"):
+                        ui.label(i18n("btn_refresh")).classes("hidden md:inline text-xs sm:text-sm font-semibold ml-1")
 
                     bb_text = f"blackboard/{current_p}" if current_p else "blackboard"
-                    bb_badge = ui.badge(bb_text, color="slate-700").classes("text-[10px] font-mono text-slate-400 hidden sm:inline-flex")
+                    bb_badge = ui.badge(bb_text, color="slate-700").classes("text-[10px] font-mono text-slate-400 hidden xl:inline-flex flex-shrink-0")
 
                     # Language Selector
                     lang_select = ui.select(
                         options=SUPPORTED_LANGUAGES,
                         value=i18n.lang,
-                    ).props("dense outlined").classes("w-28 sm:w-32 bg-slate-800 text-white rounded text-xs")
+                    ).props("dense outlined").classes("w-24 sm:w-28 bg-slate-800 text-white rounded text-xs flex-shrink-0")
 
                     def on_lang_change(e):
                         if e.value and e.value != i18n.lang:
@@ -262,7 +264,8 @@ def run_app(
                     # Dark mode switch
                     ui.button(icon="dark_mode", on_click=lambda: dark.toggle())\
                         .props("flat round text-color=white")\
-                        .tooltip(i18n("theme_toggle"))
+                        .tooltip(i18n("theme_toggle"))\
+                        .classes("flex-shrink-0")
 
             # 2. Modals (inside dialogs_container)
             current_edit_target = {"name": ""}
