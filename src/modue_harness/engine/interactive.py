@@ -603,16 +603,8 @@ class InteractiveSession:
             except Exception:
                 pass
         if hasattr(self, "blackboard_root") and self.blackboard_root.exists():
-            try:
-                for p in self.blackboard_root.iterdir():
-                    if (
-                        p.is_dir()
-                        and not p.name.startswith(".")
-                        and p.name not in {"tasks", "artifacts", "logs", "jobs"}
-                    ):
-                        projects.add(p.name)
-            except Exception:
-                pass
+            for p in Blackboard.find_project_dirs(self.blackboard_root):
+                projects.add(p.name)
         return sorted(list(projects))
 
     def delete_project(self, project_name: str) -> bool:

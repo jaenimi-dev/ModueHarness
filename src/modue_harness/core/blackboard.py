@@ -11,6 +11,10 @@ from modue_harness.core.types import Task, TaskStatus
 from modue_harness.core.usage import UsageTracker
 
 
+#: Directory names the blackboard owns itself; they are never project names.
+RESERVED_DIR_NAMES = frozenset({"tasks", "artifacts", "logs", "jobs", "usage"})
+
+
 class Blackboard:
     """Manages the shared blackboard directory, state, tasks, artifacts, and logs."""
 
@@ -51,19 +55,29 @@ class Blackboard:
             project=clean_name,
         )
 
-    def _get_subproject_dirs(self) -> List[Path]:
-        """Find any project blackboard subdirectories under root_dir."""
-        if not self.root_dir.exists() or not self.root_dir.is_dir():
+    @staticmethod
+    def find_project_dirs(root: Path) -> List[Path]:
+        """Return the per-project blackboard subdirectories directly under `root`.
+
+        Reserved directories the blackboard creates for itself (tasks/, jobs/,
+        usage/, ...) are skipped, and a candidate must carry at least one
+        project marker file, so unrelated folders are never listed as projects.
+        """
+        if not root.exists() or not root.is_dir():
             return []
         subdirs = []
         try:
-            for d in self.root_dir.iterdir():
-                if d.is_dir() and not d.name.startswith(".") and d.name not in {"tasks", "artifacts", "logs", "jobs", "usage"}:
+            for d in root.iterdir():
+                if d.is_dir() and not d.name.startswith(".") and d.name not in RESERVED_DIR_NAMES:
                     if (d / "state.json").exists() or (d / "artifacts").exists() or (d / "tasks").exists() or (d / "jobs").exists():
                         subdirs.append(d)
         except Exception:
             pass
         return subdirs
+
+    def _get_subproject_dirs(self) -> List[Path]:
+        """Find any project blackboard subdirectories under root_dir."""
+        return self.find_project_dirs(self.root_dir)
 
     @staticmethod
     def _clean_relative_path(relative_path: str) -> str:
