@@ -669,6 +669,8 @@ def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
         model=getattr(args, "model", None),
         effort=getattr(args, "effort", None),
         timeout=getattr(args, "timeout", None),
+        # -a/--agents 로 직접 지정한 파일은 읽기 대상이므로, 로딩 실패를 조용히 넘기지 않는다.
+        require_agents_file=agents_file is not None,
     )
 
     # 1. User requested interactive session explicitly or running in a TTY terminal without args
@@ -812,6 +814,8 @@ def handle_debate(args: argparse.Namespace) -> int:
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Main CLI entrypoint."""
+    # 파싱 이전 단계에서 예외가 나도 아래 except 절이 참조할 수 있도록 미리 둔다.
+    args = argparse.Namespace(debug=False)
     try:
         # Must run before the first print: Windows consoles default to the
         # system locale codec (cp949) and would abort on status glyphs.
@@ -839,6 +843,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     except KeyboardInterrupt:
         print("\n👋 작업을 종료했습니다 (Ctrl+C).")
         return 0
+    except RuntimeError as e:
+        # 설정 로딩 실패 등, 원인이 분명한 오류는 트레이스백 대신 사유만 표시한다.
+        if getattr(args, "debug", False):
+            raise
+        print(f"❌ {e}")
+        return 1
 
 
 if __name__ == "__main__":
