@@ -142,3 +142,60 @@ def test_cli_status_project_isolated_blackboard(tmp_path: Path, capsys):
     assert "report.md" in captured.out
     assert "alpha_corp" in captured.out
 
+
+
+def test_cli_status_excludes_reserved_blackboard_dirs(tmp_path: Path, capsys):
+    """Reserved blackboard folders (jobs/, usage/, ...) are not projects."""
+    from modue_harness.core.blackboard import RESERVED_DIR_NAMES, Blackboard
+
+    board_dir = tmp_path / "blackboard"
+    projects_dir = tmp_path / "projects"
+    Blackboard(root_dir=board_dir).initialize()
+    projects_dir.mkdir(parents=True, exist_ok=True)
+    Blackboard(root_dir=board_dir, project="alpha_corp").initialize()
+
+    exit_code = main([
+        "status", "--dir", str(board_dir), "--projects-dir", str(projects_dir),
+    ])
+    assert exit_code == 0
+
+    captured = capsys.readouterr()
+    assert "--- Projects (1) ---" in captured.out
+    assert "alpha_corp" in captured.out
+    for reserved in RESERVED_DIR_NAMES:
+        assert f"• {reserved}" not in captured.out
+
+
+def test_cli_projects_excludes_reserved_blackboard_dirs(tmp_path: Path, capsys):
+    """The 'projects' subcommand applies the same reserved-name filter."""
+    from modue_harness.core.blackboard import RESERVED_DIR_NAMES, Blackboard
+
+    board_dir = tmp_path / "blackboard"
+    projects_dir = tmp_path / "projects"
+    Blackboard(root_dir=board_dir).initialize()
+    projects_dir.mkdir(parents=True, exist_ok=True)
+    Blackboard(root_dir=board_dir, project="alpha_corp").initialize()
+
+    exit_code = main([
+        "projects", "--dir", str(board_dir), "--projects-dir", str(projects_dir),
+    ])
+    assert exit_code == 0
+
+    captured = capsys.readouterr()
+    assert "=== ModueHarness Projects (1) ===" in captured.out
+    assert "alpha_corp" in captured.out
+    for reserved in RESERVED_DIR_NAMES:
+        assert f"• {reserved}" not in captured.out
+
+
+def test_find_project_dirs_ignores_unrelated_folders(tmp_path: Path):
+    """A stray folder without project markers is not reported as a project."""
+    from modue_harness.core.blackboard import Blackboard
+
+    board_dir = tmp_path / "blackboard"
+    Blackboard(root_dir=board_dir).initialize()
+    Blackboard(root_dir=board_dir, project="alpha_corp").initialize()
+    (board_dir / "scratch_notes").mkdir(parents=True, exist_ok=True)
+
+    found = {d.name for d in Blackboard.find_project_dirs(board_dir)}
+    assert found == {"alpha_corp"}

@@ -483,10 +483,8 @@ def handle_status(args: argparse.Namespace) -> int:
         for p in projects_dir.iterdir():
             if p.is_dir() and not p.name.startswith("."):
                 projects_set.add(p.name)
-    if board_dir.exists():
-        for p in board_dir.iterdir():
-            if p.is_dir() and not p.name.startswith(".") and p.name not in {"tasks", "artifacts", "logs"}:
-                projects_set.add(p.name)
+    for p in Blackboard.find_project_dirs(board_dir):
+        projects_set.add(p.name)
     existing_projects = sorted(list(projects_set))
 
     active_p = target_project or state.get("current_project")
@@ -559,10 +557,8 @@ def handle_projects(args: argparse.Namespace) -> int:
         for p in projects_dir.iterdir():
             if p.is_dir() and not p.name.startswith("."):
                 projects.add(p.name)
-    if board_dir.exists():
-        for p in board_dir.iterdir():
-            if p.is_dir() and not p.name.startswith(".") and p.name not in {"tasks", "artifacts", "logs"}:
-                projects.add(p.name)
+    for p in Blackboard.find_project_dirs(board_dir):
+        projects.add(p.name)
 
     sorted_projects = sorted(list(projects))
     print(f"=== ModueHarness Projects ({len(sorted_projects)}) ===")
