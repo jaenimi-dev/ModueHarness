@@ -153,6 +153,10 @@ def load_or_detect_agents(
                         kwargs["effort"] = agent_effort
                     if cfg.get("system_instruction"):
                         kwargs["system_instruction"] = cfg["system_instruction"]
+                    # 권한 관련 설정은 어댑터마다 받는 키가 다르므로, 지원하는 것만 넘긴다.
+                    for opt_key in ("permission_mode", "skip_permissions"):
+                        if opt_key in cfg:
+                            kwargs[opt_key] = cfg[opt_key]
                     loaded[name] = create_adapter(adapter_type, **kwargs)
             if loaded:
                 return loaded

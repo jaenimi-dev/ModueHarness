@@ -361,3 +361,23 @@ def test_codex_get_available_models(monkeypatch, tmp_path):
 
 
 
+
+
+def test_create_adapter_drops_optional_kwargs_the_adapter_cannot_take():
+    """A permission key meant for one adapter must not break another."""
+    from modue_harness.adapters import create_adapter
+
+    # GenericCLIAdapter takes no permission_mode; it should be ignored, not raise.
+    adapter = create_adapter("generic", name="tool", command="echo", permission_mode="plan")
+    assert adapter.command == "echo"
+    assert "--permission-mode" not in adapter.default_args
+
+
+def test_create_adapter_still_raises_on_unknown_keys():
+    """Typos outside the optional set stay visible."""
+    import pytest
+
+    from modue_harness.adapters import create_adapter
+
+    with pytest.raises(TypeError):
+        create_adapter("generic", name="tool", command="echo", nonexistent_option=1)
