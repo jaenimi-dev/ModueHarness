@@ -570,3 +570,33 @@ def test_interactive_session_models_command(tmp_path: Path, capsys):
 
 
 
+
+
+def test_agents_yaml_can_set_permission_flags(tmp_path: Path):
+    """agents.yaml must be able to tighten the permission flags of each adapter."""
+    import yaml
+
+    from modue_harness.engine.interactive import load_or_detect_agents
+
+    spec = {
+        "version": "0.8.0",
+        "agents": {
+            "planner": {"adapter": "claude", "command": "claude", "permission_mode": "plan"},
+            "guarded": {"adapter": "antigravity", "command": "agy", "skip_permissions": False},
+            "default_agy": {"adapter": "antigravity", "command": "agy"},
+        },
+    }
+    spec_file = tmp_path / "agents.yaml"
+    spec_file.write_text(yaml.safe_dump(spec), encoding="utf-8")
+
+    agents = load_or_detect_agents(agents_file=spec_file, require_agents_file=True)
+
+    planner_cmd = agents["planner"].build_command("PROMPT")
+    assert "--permission-mode" in planner_cmd
+    assert planner_cmd[planner_cmd.index("--permission-mode") + 1] == "plan"
+
+    # Opting out of --dangerously-skip-permissions was previously impossible from YAML.
+    assert "--dangerously-skip-permissions" not in agents["guarded"].build_command("PROMPT")
+
+    # Omitting the key keeps the existing default, so current setups are unaffected.
+    assert "--dangerously-skip-permissions" in agents["default_agy"].build_command("PROMPT")

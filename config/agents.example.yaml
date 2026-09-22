@@ -7,6 +7,22 @@ version: "0.6.0"
 name: "my-engineering-team"
 
 # -------------------------------------------------------------
+# 권한 설정 (permission_mode / skip_permissions)
+# -------------------------------------------------------------
+# 에이전트는 기본적으로 CLI 자체의 쓰기 확인을 끈 채 실행됩니다
+# (Claude: --permission-mode auto, Antigravity: --dangerously-skip-permissions).
+# 대화형 프롬프트 없이 자동 진행하기 위한 설정이지만, 그만큼 도구가 제공하는
+# 안전장치도 함께 사라집니다. 에이전트가 배정된 프로젝트 폴더 밖에 파일을 쓴
+# 사례가 있으므로, 신뢰할 수 없는 작업에는 아래 키로 조여서 쓰세요.
+#
+#   permission_mode: "plan"     # Claude 계열. acceptEdits / auto / bypassPermissions
+#                               #              / manual / dontAsk / plan 중 선택
+#   skip_permissions: false     # Antigravity 계열. --dangerously-skip-permissions 제거
+#
+# 키를 생략하면 기존 기본값이 그대로 적용됩니다.
+# 주의: 확인을 요구하는 모드로 바꾸면 비대화형 실행이 응답을 기다리다 멈출 수 있습니다.
+
+# -------------------------------------------------------------
 # 예시 1: Claude Code 전담 팀 (기본 예시)
 # -------------------------------------------------------------
 agents:
