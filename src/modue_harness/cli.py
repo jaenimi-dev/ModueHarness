@@ -714,6 +714,13 @@ def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
             print(f"\n[블랙보드 정보교환 산출물 ({len(summary['artifacts'])})]")
             for af in summary["artifacts"]:
                 print(f"  📌 {af}")
+
+        if summary.get("external_writes"):
+            outside = summary["external_writes"]
+            print(f"\n⚠️ [프로젝트 폴더 밖에서 변경된 파일 ({len(outside)})]")
+            print("   에이전트가 배정된 작업 공간을 벗어나 파일을 쓴 것으로 보입니다. 내용을 확인하세요.")
+            for of in outside:
+                print(f"  ⚠️ {of}")
         print("=" * 64)
 
         return 0 if summary["success"] else 1

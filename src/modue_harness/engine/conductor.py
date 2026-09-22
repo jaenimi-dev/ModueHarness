@@ -1,6 +1,7 @@
 """Leader-Worker Conductor Orchestrator."""
 
 import json
+import os
 from pathlib import Path
 import re
 import shlex
@@ -12,6 +13,72 @@ from modue_harness.core.blackboard import Blackboard
 from modue_harness.core.events import EventBus, EventType, HarnessEvent
 from modue_harness.core.types import Task, TaskStatus, TurnContext, TurnResult
 from modue_harness.engine.workflow import WorkflowConfig
+
+# 스캔에서 제외할 디렉터리 (도구가 만드는 잡음).
+_GUARD_SKIP_DIRS = frozenset({
+    "__pycache__",
+    "node_modules",
+    "venv",
+    "env",
+    "dist",
+    "build",
+    "site-packages",
+})
+
+
+def _is_within(path: Path, parent: Path) -> bool:
+    """Return True when `path` is `parent` or lives inside it."""
+    try:
+        path.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
+def detect_external_writes(
+    guard_root: Path,
+    allowed_dirs: List[Path],
+    since_ts: float,
+    max_results: int = 50,
+) -> List[str]:
+    """Find files under `guard_root` written after `since_ts` outside `allowed_dirs`.
+
+    Agents run with their CLI's write confirmation disabled, so nothing stops one from
+    writing outside the project directory it was given. This reports such writes after
+    the fact so they are not discovered later as mysterious repository changes.
+    """
+    found: List[str] = []
+    try:
+        for current, dirnames, filenames in os.walk(guard_root):
+            current_path = Path(current)
+
+            # 허용된 작업 공간과 잡음 디렉터리는 통째로 건너뛴다.
+            dirnames[:] = [
+                d
+                for d in dirnames
+                if not d.startswith(".")
+                and d not in _GUARD_SKIP_DIRS
+                and not any(_is_within(current_path / d, allowed) for allowed in allowed_dirs)
+            ]
+
+            if any(_is_within(current_path, allowed) for allowed in allowed_dirs):
+                continue
+
+            for name in filenames:
+                if name.startswith("."):
+                    continue
+                target = current_path / name
+                try:
+                    if target.stat().st_mtime >= since_ts:
+                        found.append(str(target.relative_to(guard_root)))
+                except OSError:
+                    continue
+                if len(found) >= max_results:
+                    return sorted(found)
+    except Exception:
+        # 감시 기능의 실패가 작업 자체를 망가뜨려서는 안 된다.
+        return sorted(found)
+    return sorted(found)
 
 
 class ConductorRunner:
@@ -29,6 +96,7 @@ class ConductorRunner:
         progress_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
         timeout: Optional[float] = None,
         job_id: Optional[str] = None,
+        guard_root: Optional[Path] = None,
     ) -> None:
         self.goal = goal
         self.conductor_name = conductor_agent_name
@@ -41,6 +109,8 @@ class ConductorRunner:
         self.progress_callback = progress_callback
         self.timeout = timeout
         self.job_id = job_id
+        # 에이전트가 배정된 작업 공간 밖에 쓴 파일을 찾을 때 훑을 범위.
+        self.guard_root = (guard_root or Path.cwd()).resolve()
         self._is_cancelled: bool = False
         self._active_adapter: Optional[Any] = None
 
@@ -434,6 +504,26 @@ class ConductorRunner:
         team_agents = list(set([self.conductor_name] + list(self.worker_adapters.keys())))
         usage_summary = self.blackboard.get_usage_summary(team_agents)
 
+        # Detect writes that escaped the assigned project workspace
+        board_dir = Path(self.blackboard.root_dir).resolve()
+        allowed_dirs = [self.workspace_dir, board_dir]
+        # 프로젝트별 칠판(blackboard/<project>)이면 공용 칠판 루트 전체를 허용한다.
+        # 칠판은 하네스 전용 상태 저장소이므로 그 안의 쓰기는 이탈이 아니다.
+        if board_dir.parent != self.guard_root:
+            allowed_dirs.append(board_dir.parent)
+
+        external_writes = detect_external_writes(
+            guard_root=self.guard_root,
+            allowed_dirs=allowed_dirs,
+            since_ts=start_time,
+        )
+        if external_writes:
+            self._notify("external_writes", {
+                "guard_root": str(self.guard_root),
+                "workspace_dir": str(self.workspace_dir),
+                "files": external_writes,
+            })
+
         return {
             "status": final_status,
             "success": overall_success,
@@ -442,5 +532,6 @@ class ConductorRunner:
             "total_duration_sec": total_duration,
             "project_files": sorted(project_files),
             "usage_summary": usage_summary,
+            "external_writes": external_writes,
             "error_message": failure_reason,
         }
