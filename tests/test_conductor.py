@@ -127,3 +127,79 @@ def test_conductor_runner_subtask_failure_reports_reason(tmp_path: Path):
     assert summary["subtasks"][0]["is_success"] is False
     assert "ModuleNotFoundError" in summary["subtasks"][0]["error"]
 
+
+
+def test_detect_external_writes_flags_files_outside_workspace(tmp_path: Path):
+    """Files written outside the assigned project directory must be reported."""
+    import time
+
+    from modue_harness.engine.conductor import detect_external_writes
+
+    guard_root = tmp_path
+    workspace = guard_root / "projects" / "calculator"
+    board_dir = guard_root / "blackboard" / "calculator"
+    workspace.mkdir(parents=True)
+    board_dir.mkdir(parents=True)
+
+    # Pre-existing repository file that the run does not touch
+    repo_tests = guard_root / "tests"
+    repo_tests.mkdir()
+    untouched = repo_tests / "test_existing.py"
+    untouched.write_text("# untouched\n", encoding="utf-8")
+    old_ts = time.time() - 3600
+    import os
+
+    os.utime(untouched, (old_ts, old_ts))
+
+    since = time.time()
+    time.sleep(0.01)
+
+    # Legitimate writes: inside the workspace and the blackboard
+    (workspace / "calculator.py").write_text("def add(a, b): return a + b\n", encoding="utf-8")
+    (board_dir / "plan.json").write_text("[]", encoding="utf-8")
+    # Escaped write: the repository's own test suite
+    (repo_tests / "test_calculator.py").write_text("# stray\n", encoding="utf-8")
+
+    found = detect_external_writes(guard_root, [workspace, board_dir], since)
+
+    assert found == ["tests/test_calculator.py"], found
+
+
+def test_detect_external_writes_returns_empty_when_contained(tmp_path: Path):
+    """A run that stays inside its workspace reports nothing."""
+    import time
+
+    from modue_harness.engine.conductor import detect_external_writes
+
+    workspace = tmp_path / "projects" / "demo"
+    board_dir = tmp_path / "blackboard" / "demo"
+    workspace.mkdir(parents=True)
+    board_dir.mkdir(parents=True)
+
+    since = time.time()
+    time.sleep(0.01)
+    (workspace / "main.py").write_text("print('hi')\n", encoding="utf-8")
+    (board_dir / "notes.md").write_text("# notes\n", encoding="utf-8")
+
+    assert detect_external_writes(tmp_path, [workspace, board_dir], since) == []
+
+
+def test_detect_external_writes_skips_noise_directories(tmp_path: Path):
+    """Cache and dependency directories are not reported as agent writes."""
+    import time
+
+    from modue_harness.engine.conductor import detect_external_writes
+
+    workspace = tmp_path / "projects" / "demo"
+    workspace.mkdir(parents=True)
+    noise = tmp_path / "__pycache__"
+    noise.mkdir()
+    hidden = tmp_path / ".git"
+    hidden.mkdir()
+
+    since = time.time()
+    time.sleep(0.01)
+    (noise / "module.cpython-314.pyc").write_bytes(b"\x00")
+    (hidden / "COMMIT_EDITMSG").write_text("msg\n", encoding="utf-8")
+
+    assert detect_external_writes(tmp_path, [workspace], since) == []

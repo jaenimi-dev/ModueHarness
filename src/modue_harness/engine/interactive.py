@@ -875,6 +875,7 @@ class InteractiveSession:
             "project_files": project_files,
             "artifacts": artifacts,
             "usage_summary": result.get("usage_summary", []),
+            "external_writes": result.get("external_writes", []),
             "error": result.get("error_message") or result.get("error"),
         }
 
