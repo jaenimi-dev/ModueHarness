@@ -21,6 +21,8 @@ ModueHarness의 전체 기능, 환경 설정, 지원 AI CLI 도구 연동 및 �
   Google Deepmind 공식 가이드 기반 `agy` CLI 설치, 인증, 모델(`gemini-3.8-flash-high`, `gemini-3.1-pro-high`), 무인 자동화 권한 플래그 및 하이브리드 팀 구성.
 - 🧠 **[OpenAI ChatGPT Codex CLI 연동 가이드 (codex_guide.md)](codex_guide.md)**  
   OpenAI 공식 가이드 기반 `codex` CLI 설치, `codex login` 인증, 모델(`gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`), 샌드박스 작업 공간 쓰기 권한 설정 및 연동 가이드.
+- 🌐 **[OpenRouter 에이전트 어댑터 가이드 (openrouter_guide.md)](openrouter_guide.md)**  
+  외부 CLI 없이 하네스가 OpenRouter API를 직접 호출하는 내장 에이전트. 도구 권한(`none`/`read`/`full`), 프로젝트 폴더 격리, `run_command` 허용 목록, OpenAI 호환 서버(`base_url`) 연동.
 
 ---
 

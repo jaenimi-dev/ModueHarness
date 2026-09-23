@@ -25,12 +25,16 @@ dependencies = [
 dev = [
     "pytest>=7.0",
 ]
+openrouter = [
+    "openai>=1.0",
+]
 ui = [
     "nicegui>=1.4.0",
     "textual>=0.50.0",
 ]
 all = [
     "pytest>=7.0",
+    "openai>=1.0",
     "nicegui>=1.4.0",
     "textual>=0.50.0",
 ]

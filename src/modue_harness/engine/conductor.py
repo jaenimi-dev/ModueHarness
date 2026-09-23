@@ -232,6 +232,7 @@ class ConductorRunner:
             model=getattr(conductor_adapter, "model", None),
             prompt_length=len(plan_prompt),
             is_success=plan_result.is_success,
+            override_usage=plan_result.metadata.get("usage"),
         )
 
         if self._is_cancelled:
@@ -369,6 +370,7 @@ class ConductorRunner:
                 model=getattr(worker_adapter, "model", None),
                 prompt_length=len(worker_prompt),
                 is_success=res.is_success,
+                override_usage=res.metadata.get("usage"),
             )
 
             task_record = {
@@ -458,6 +460,7 @@ class ConductorRunner:
                 model=getattr(conductor_adapter, "model", None),
                 prompt_length=len(synth_prompt),
                 is_success=synth_res.is_success,
+                override_usage=synth_res.metadata.get("usage"),
             )
 
             if synth_res.is_success:

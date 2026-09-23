@@ -53,6 +53,7 @@ class PipelineRunner:
                     kwargs["effort"] = agent_cfg.effort
                 if agent_cfg.system_instruction:
                     kwargs["system_instruction"] = agent_cfg.system_instruction
+                kwargs.update(getattr(agent_cfg, "options", None) or {})
 
                 self.adapters[agent_name] = create_adapter(agent_cfg.adapter, **kwargs)
 

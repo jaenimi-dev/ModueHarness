@@ -47,9 +47,13 @@ class WorkflowAgentConfig:
     model: Optional[str] = None
     effort: Optional[str] = None
     system_instruction: Optional[str] = None
+    # 어댑터별 선택 설정 (permission_mode, tools, max_turns 등). create_adapter 가 지원 여부를 거른다.
+    options: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, name: str, data: Dict[str, Any]) -> "WorkflowAgentConfig":
+        from modue_harness.adapters import AGENT_CONFIG_PASSTHROUGH_KEYS
+
         return cls(
             name=name,
             adapter=data.get("adapter", "generic"),
@@ -59,6 +63,7 @@ class WorkflowAgentConfig:
             model=data.get("model"),
             effort=data.get("effort"),
             system_instruction=data.get("system_instruction"),
+            options={k: data[k] for k in AGENT_CONFIG_PASSTHROUGH_KEYS if k in data},
         )
 
 

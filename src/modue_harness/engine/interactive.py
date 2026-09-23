@@ -18,6 +18,8 @@ from modue_harness.adapters import (
     AiderCLIAdapter,
     CodexCLIAdapter,
     GenericCLIAdapter,
+    OpenRouterAgentAdapter,
+    AGENT_CONFIG_PASSTHROUGH_KEYS,
     create_adapter,
 )
 from modue_harness.core.blackboard import Blackboard
@@ -118,6 +120,12 @@ def load_or_detect_agents(
                 kwargs["model"] = model
             if effort:
                 kwargs["effort"] = effort
+        elif specific_agent.lower() == "openrouter":
+            kwargs = {}
+            if model:
+                kwargs["model"] = model
+            if effort:
+                kwargs["effort"] = effort
         return {specific_agent: create_adapter(specific_agent, name=specific_agent, **kwargs)}
 
     # 2. User specified agents file
@@ -153,8 +161,8 @@ def load_or_detect_agents(
                         kwargs["effort"] = agent_effort
                     if cfg.get("system_instruction"):
                         kwargs["system_instruction"] = cfg["system_instruction"]
-                    # 권한 관련 설정은 어댑터마다 받는 키가 다르므로, 지원하는 것만 넘긴다.
-                    for opt_key in ("permission_mode", "skip_permissions"):
+                    # 권한·도구 관련 설정은 어댑터마다 받는 키가 다르므로, 지원하는 것만 넘긴다.
+                    for opt_key in AGENT_CONFIG_PASSTHROUGH_KEYS:
                         if opt_key in cfg:
                             kwargs[opt_key] = cfg[opt_key]
                     loaded[name] = create_adapter(adapter_type, **kwargs)
@@ -435,11 +443,15 @@ class InteractiveSession:
                 adapter_type = "agy"
             elif "aider" in cls_name:
                 adapter_type = "aider"
+            elif isinstance(agent, OpenRouterAgentAdapter):
+                adapter_type = "openrouter"
 
             entry: Dict[str, Any] = {
                 "adapter": adapter_type,
             }
             cmd = getattr(agent, "command", None)
+            if adapter_type == "openrouter":
+                cmd = None  # API 어댑터는 실행할 CLI 명령이 없다.
             if cmd and cmd != "generic" and not ("python" in str(cmd).lower()):
                 entry["command"] = cmd
             args = getattr(agent, "default_args", None)
@@ -454,6 +466,9 @@ class InteractiveSession:
             ins = getattr(agent, "system_instruction", None)
             if ins:
                 entry["system_instruction"] = ins
+            extras = getattr(agent, "config_extras", None)
+            if callable(extras):
+                entry.update(extras())
 
             agents_data[name] = entry
 
@@ -548,6 +563,8 @@ class InteractiveSession:
             current_adapter = "aider"
         elif "codex" in cls_name or "chatgpt" in cls_name:
             current_adapter = "codex"
+        elif isinstance(agent, OpenRouterAgentAdapter):
+            current_adapter = "openrouter"
 
         target_adapter = (adapter_type or current_adapter).lower()
         if target_adapter != current_adapter:

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **OpenRouter Agent Adapter (`adapter: "openrouter"`)**:
+  - Built-in tool-calling agent that calls OpenRouter (or any OpenAI-compatible API via `base_url`) through the OpenAI SDK, with no external CLI required.
+  - Workspace-scoped tools (`list_dir`, `read_file`, `search`, `write_file`, `edit_file`, `run_command`) gated by `tools: none | read | full` (default `read`).
+  - Path containment (rejects `..`, absolute paths, symlink escapes and writes into `.git`) and an allow-list-only `run_command` with no shell, per-command timeout and argument path checks.
+  - Real token usage and OpenRouter cost recorded in `TurnResult.metadata["usage"]` and passed to the usage tracker by the conductor.
+  - New optional dependency group `[openrouter]` (`openai>=1.0`), `OPENROUTER_API_KEY` in `.env.example`, and `docs/openrouter_guide.md`.
+- **Adapter-specific agents.yaml options** (`permission_mode`, `skip_permissions`, `tools`, `max_turns`, ...) now also reach adapters created by the pipeline workflow loader.
+
 ## [0.8.0] - 2026-09-20
 
 ### Added
