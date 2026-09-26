@@ -1474,20 +1474,42 @@ class InteractiveSession:
                     ag = item.get("agent")
                     f_h = item.get("five_hour", {})
                     wk = item.get("weekly", {})
+                    lt = item.get("lifetime", {})
                     st_label = item.get("status_label", "정상")
-                    f_tok = f_h.get("total_tokens", 0)
-                    f_max = f_h.get("limit_tokens", 0)
-                    w_tok = wk.get("total_tokens", 0)
-                    w_max = wk.get("limit_tokens", 0)
-                    cost_5h = f_h.get("cost_usd", 0.0)
-                    cost_wk = wk.get("cost_usd", 0.0)
-                    calls_5h = f_h.get("calls", 0)
-                    calls_wk = wk.get("calls", 0)
                     res_str = f" [리셋: {item.get('resets_at')}]" if item.get("resets_at") else ""
 
-                    print(f"\n• {ag} [{st_label}{res_str}]")
-                    print(f"    - 5시간 윈도우: {f_tok:,} / {f_max:,} 토큰 ({f_h.get('percent_str', '0%')}) | {calls_5h}회 호출 | ${cost_5h:.4f}")
-                    print(f"    - 주간 윈도우 : {w_tok:,} / {w_max:,} 토큰 ({wk.get('percent_str', '0%')}) | {calls_wk}회 호출 | ${cost_wk:.4f}")
+                    # Check if adapter is OpenRouter
+                    agent_obj = self.agents.get(ag)
+                    is_openrouter = "openrouter" in getattr(agent_obj, "__class__", type).__name__.lower()
+
+                    if is_openrouter:
+                        tot_cost = lt.get("cost_usd", 0.0)
+                        tot_tokens = lt.get("total_tokens", 0)
+                        tot_in = lt.get("input_tokens", 0)
+                        tot_out = lt.get("output_tokens", 0)
+                        calls_5h = f_h.get("calls", 0)
+                        calls_wk = wk.get("calls", 0)
+                        calls_tot = lt.get("calls", 0)
+                        rl_hits = lt.get("rate_limit_hits", 0)
+
+                        print(f"\n• {ag} [OpenRouter API | {st_label}{res_str}]")
+                        print(f"    - 누적 비용 : ${tot_cost:.4f} USD")
+                        print(f"    - 토큰 사용 : 총 {tot_tokens:,} 토큰 (입력 {tot_in:,} / 출력 {tot_out:,})")
+                        rl_str = f" | 제한 발생 {rl_hits}회" if rl_hits > 0 else ""
+                        print(f"    - 호출 횟수 : 최근 5h {calls_5h}회 | 주간 {calls_wk}회 (총 {calls_tot}회{rl_str})")
+                    else:
+                        f_tok = f_h.get("total_tokens", 0)
+                        f_max = f_h.get("limit_tokens", 0)
+                        w_tok = wk.get("total_tokens", 0)
+                        w_max = wk.get("limit_tokens", 0)
+                        cost_5h = f_h.get("cost_usd", 0.0)
+                        cost_wk = wk.get("cost_usd", 0.0)
+                        calls_5h = f_h.get("calls", 0)
+                        calls_wk = wk.get("calls", 0)
+
+                        print(f"\n• {ag} [{st_label}{res_str}]")
+                        print(f"    - 5시간 윈도우: {f_tok:,} / {f_max:,} 토큰 ({f_h.get('percent_str', '0%')}) | {calls_5h}회 호출 | ${cost_5h:.4f}")
+                        print(f"    - 주간 윈도우 : {w_tok:,} / {w_max:,} 토큰 ({wk.get('percent_str', '0%')}) | {calls_wk}회 호출 | ${cost_wk:.4f}")
                 print()
 
         elif cmd in ["/help", "/?"]:

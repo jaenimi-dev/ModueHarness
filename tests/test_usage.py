@@ -176,3 +176,52 @@ def test_blackboard_and_controller_usage_integration(tmp_path: Path):
     summary = ctrl.get_usage_summary()
     assert len(summary) >= 1
     assert any(s["agent"] == "tester" for s in summary)
+    tester_sum = next(s for s in summary if s["agent"] == "tester")
+    assert "adapter" in tester_sum
+    assert "lifetime" in tester_sum
+
+
+def test_openrouter_usage_summary_enrichment(tmp_path: Path):
+    """Verify that OpenRouter agents are correctly enriched with adapter type and lifetime cost."""
+    from unittest.mock import MagicMock
+    from modue_harness.adapters.openrouter import OpenRouterAgentAdapter
+
+    board = Blackboard(root_dir=tmp_path / "blackboard", project="demo_or")
+    board.initialize()
+
+    # Record usage for openrouter agent
+    board.record_usage(
+        agent="or_agent",
+        stdout="AI response from deepseek",
+        stderr="",
+        duration_sec=1.2,
+        job_id="job_or",
+        override_usage={
+            "input_tokens": 1200,
+            "output_tokens": 300,
+            "total_tokens": 1500,
+            "cost_usd": 0.0035,
+        },
+    )
+
+    ctrl = UIController(
+        project_name="demo_or",
+        projects_root=tmp_path / "projects",
+        blackboard_dir=tmp_path / "blackboard",
+    )
+    mock_or_agent = MagicMock(spec=OpenRouterAgentAdapter)
+    mock_or_agent.__class__.__name__ = "OpenRouterAgentAdapter"
+    mock_or_agent.model = "deepseek/deepseek-chat"
+    ctrl.session.agents = {"or_agent": mock_or_agent}
+
+    summary = ctrl.get_usage_summary()
+    assert len(summary) == 1
+    or_summary = summary[0]
+    assert or_summary["agent"] == "or_agent"
+    assert or_summary["adapter"] == "openrouter"
+    assert or_summary["model"] == "deepseek/deepseek-chat"
+    assert or_summary["lifetime"]["total_tokens"] == 1500
+    assert or_summary["lifetime"]["cost_usd"] == 0.0035
+    assert or_summary["lifetime"]["input_tokens"] == 1200
+    assert or_summary["lifetime"]["output_tokens"] == 300
+

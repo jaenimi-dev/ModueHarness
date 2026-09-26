@@ -458,10 +458,21 @@ class UIController:
         return self.session.execute_command_async(command)
 
     def get_usage_summary(self) -> List[Dict[str, Any]]:
-        """Return 5-hour and weekly usage metrics and limit status for all agents."""
+        """Return usage metrics and limit status for all agents (5-hour/weekly for CLI, cost/tokens for OpenRouter)."""
         try:
             team_agents = list(self.session.agents.keys())
-            return self.session.blackboard.get_usage_summary(team_agents)
+            summaries = self.session.blackboard.get_usage_summary(team_agents)
+            # Enrich each summary with agent's adapter type and current model
+            agents_info_map = {a["name"]: a for a in self.get_agents_info()}
+            for item in summaries:
+                ag_name = item.get("agent")
+                if ag_name in agents_info_map:
+                    item["adapter"] = agents_info_map[ag_name].get("adapter", "generic")
+                    item["model"] = agents_info_map[ag_name].get("model")
+                else:
+                    item["adapter"] = "generic"
+                    item["model"] = None
+            return summaries
         except Exception:
             return []
 

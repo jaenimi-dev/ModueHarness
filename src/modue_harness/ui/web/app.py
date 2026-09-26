@@ -1342,6 +1342,9 @@ def run_app(
                                                     f_h = u.get("five_hour", {})
                                                     wk = u.get("weekly", {})
 
+                                                    is_openrouter = u.get("adapter") == "openrouter"
+                                                    lt = u.get("lifetime", {})
+
                                                     badge_class = "bg-green-900/40 text-green-300 border-green-500/30"
                                                     if status == "rate_limited":
                                                         badge_class = "bg-red-900/50 text-red-300 border-red-500/40"
@@ -1351,39 +1354,74 @@ def run_app(
                                                     with ui.card().classes("w-full p-2.5 bg-slate-900/70 border border-slate-700/60 rounded gap-1.5 flex flex-col"):
                                                         with ui.row().classes("w-full items-center justify-between"):
                                                             with ui.row().classes("items-center gap-1.5"):
-                                                                ui.icon("smart_toy", size="xs").classes("text-blue-400")
+                                                                ui.icon("bolt" if is_openrouter else "smart_toy", size="xs").classes("text-yellow-400" if is_openrouter else "text-blue-400")
                                                                 ui.label(agent_name).classes("font-semibold text-xs text-white")
+                                                                if is_openrouter:
+                                                                    ui.label("OpenRouter API").classes("text-[9px] px-1 py-0.2 rounded bg-purple-900/40 text-purple-300 border border-purple-500/30 font-medium")
                                                             with ui.row().classes("items-center gap-1"):
                                                                 if resets_at:
                                                                     ui.label(f"리셋: {resets_at}").classes("text-[10px] px-1 py-0.5 rounded bg-slate-800 text-slate-300 font-mono")
                                                                 ui.label(status_label).classes(f"text-[10px] px-1.5 py-0.5 rounded border {badge_class} font-bold")
 
-                                                        # 5-hour limit bar
-                                                        f_ratio = f_h.get("usage_ratio", 0.0)
-                                                        f_tokens = f_h.get("total_tokens", 0)
-                                                        f_limit = f_h.get("limit_tokens", 0)
-                                                        f_pct = f_h.get("percent_str", "0%")
-                                                        with ui.column().classes("w-full gap-0.5 mt-1"):
-                                                            with ui.row().classes("w-full justify-between text-[11px] text-slate-300"):
-                                                                ui.label("⏱️ 5시간 윈도우").classes("font-medium")
-                                                                ui.label(f"{f_tokens:,} / {f_limit:,} ({f_pct})").classes("font-mono text-slate-400 text-[10px]")
-                                                            ui.linear_progress(value=f_ratio, size="4px").classes("rounded").props("color=blue-400" if f_ratio < 0.8 else "color=red-400")
+                                                        if is_openrouter:
+                                                            # OpenRouter API: 종량제/크레딧 실시간 지표 표시 (비용, 토큰, 호출수)
+                                                            tot_cost = lt.get("cost_usd", 0.0)
+                                                            tot_in = lt.get("input_tokens", 0)
+                                                            tot_out = lt.get("output_tokens", 0)
+                                                            tot_tokens = lt.get("total_tokens", 0)
+                                                            calls_5h = f_h.get("calls", 0)
+                                                            calls_wk = wk.get("calls", 0)
+                                                            calls_tot = lt.get("calls", 0)
 
-                                                        # Weekly limit bar
-                                                        w_ratio = wk.get("usage_ratio", 0.0)
-                                                        w_tokens = wk.get("total_tokens", 0)
-                                                        w_limit = wk.get("limit_tokens", 0)
-                                                        w_pct = wk.get("percent_str", "0%")
-                                                        with ui.column().classes("w-full gap-0.5 mt-1"):
-                                                            with ui.row().classes("w-full justify-between text-[11px] text-slate-300"):
-                                                                ui.label("📅 주간 윈도우").classes("font-medium")
-                                                                ui.label(f"{w_tokens:,} / {w_limit:,} ({w_pct})").classes("font-mono text-slate-400 text-[10px]")
-                                                            ui.linear_progress(value=w_ratio, size="4px").classes("rounded").props("color=indigo-400" if w_ratio < 0.8 else "color=red-400")
+                                                            # Cost & Tokens row
+                                                            with ui.row().classes("w-full items-center justify-between p-2 mt-1 rounded bg-slate-950/60 border border-slate-800/80"):
+                                                                with ui.column().classes("gap-0"):
+                                                                    ui.label(i18n("usage_total_cost")).classes("text-[10px] text-slate-400 font-medium")
+                                                                    ui.label(f"${tot_cost:.4f} USD").classes("font-mono text-sm font-bold text-amber-400")
+                                                                with ui.column().classes("gap-0 items-end"):
+                                                                    ui.label(i18n("usage_tokens_breakdown")).classes("text-[10px] text-slate-400 font-medium")
+                                                                    ui.label(f"{tot_tokens:,} tok").classes("font-mono text-xs font-semibold text-emerald-300")
 
-                                                        # Extra stats: calls, cost
-                                                        with ui.row().classes("w-full justify-between items-center text-[10px] text-slate-400 mt-1 pt-1 border-t border-slate-800"):
-                                                            ui.label(f"호출: 5h({f_h.get('calls', 0)}회) / 주간({wk.get('calls', 0)}회)")
-                                                            ui.label(f"비용(추정): ${f_h.get('cost_usd', 0):.4f}")
+                                                            # Token breakdown detail
+                                                            with ui.row().classes("w-full justify-between text-[10px] text-slate-400 px-0.5"):
+                                                                ui.label(i18n("usage_tokens_detail", inp=tot_in, out=tot_out, tot=tot_tokens)).classes("font-mono")
+
+                                                            # Call stats
+                                                            with ui.row().classes("w-full justify-between items-center text-[10px] text-slate-400 mt-0.5 pt-1 border-t border-slate-800"):
+                                                                ui.label(i18n("usage_call_detail", calls_5h=calls_5h, calls_wk=calls_wk, calls_tot=calls_tot))
+                                                                rl_hits = lt.get("rate_limit_hits", 0)
+                                                                if rl_hits > 0:
+                                                                    ui.label(f"{i18n('usage_rate_limit_hits')}: {rl_hits}회").classes("text-red-400 font-semibold")
+                                                                else:
+                                                                    ui.label(i18n("usage_type_api")).classes("text-slate-500")
+                                                        else:
+                                                            # CLI 슬라이딩 윈도우 한도 표시 (Claude Code, Antigravity 등)
+                                                            # 5-hour limit bar
+                                                            f_ratio = f_h.get("usage_ratio", 0.0)
+                                                            f_tokens = f_h.get("total_tokens", 0)
+                                                            f_limit = f_h.get("limit_tokens", 0)
+                                                            f_pct = f_h.get("percent_str", "0%")
+                                                            with ui.column().classes("w-full gap-0.5 mt-1"):
+                                                                with ui.row().classes("w-full justify-between text-[11px] text-slate-300"):
+                                                                    ui.label("⏱️ 5시간 윈도우").classes("font-medium")
+                                                                    ui.label(f"{f_tokens:,} / {f_limit:,} ({f_pct})").classes("font-mono text-slate-400 text-[10px]")
+                                                                ui.linear_progress(value=f_ratio, size="4px").classes("rounded").props("color=blue-400" if f_ratio < 0.8 else "color=red-400")
+
+                                                            # Weekly limit bar
+                                                            w_ratio = wk.get("usage_ratio", 0.0)
+                                                            w_tokens = wk.get("total_tokens", 0)
+                                                            w_limit = wk.get("limit_tokens", 0)
+                                                            w_pct = wk.get("percent_str", "0%")
+                                                            with ui.column().classes("w-full gap-0.5 mt-1"):
+                                                                with ui.row().classes("w-full justify-between text-[11px] text-slate-300"):
+                                                                    ui.label("📅 주간 윈도우").classes("font-medium")
+                                                                    ui.label(f"{w_tokens:,} / {w_limit:,} ({w_pct})").classes("font-mono text-slate-400 text-[10px]")
+                                                                ui.linear_progress(value=w_ratio, size="4px").classes("rounded").props("color=indigo-400" if w_ratio < 0.8 else "color=red-400")
+
+                                                            # Extra stats: calls, cost
+                                                            with ui.row().classes("w-full justify-between items-center text-[10px] text-slate-400 mt-1 pt-1 border-t border-slate-800"):
+                                                                ui.label(f"호출: 5h({f_h.get('calls', 0)}회) / 주간({wk.get('calls', 0)}회)")
+                                                                ui.label(f"비용(추정): ${f_h.get('cost_usd', 0):.4f}")
 
                                     if client:
                                         with client:
