@@ -620,11 +620,7 @@ def run_app(
                         with ui.row().classes("items-center gap-1.5"):
                             ui.label(i18n("ai_team_config")).classes("text-xs font-semibold text-slate-300")
                             ui.badge(ctrl.config_file_name, color="slate-700").classes("text-[9px] font-mono text-slate-400")
-                        with ui.row().classes("items-center gap-1"):
-                            ui.button(icon="key", on_click=open_api_keys_modal)\
-                                .props("dense outline size=xs text-color=amber-400")\
-                                .tooltip(i18n("btn_api_keys"))
-                            ui.button(i18n("btn_add_ai"), on_click=add_dialog.open).props("dense outline size=xs text-color=blue-400")
+                        ui.button(i18n("btn_add_ai"), on_click=add_dialog.open).props("dense outline size=xs text-color=blue-400")
 
                     # Agents list container (Scrolls independently within left pane!)
                     agents_container = ui.column().classes("w-full flex-1 min-h-0 overflow-y-auto gap-1.5 pr-0.5")
