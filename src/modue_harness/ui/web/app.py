@@ -421,14 +421,22 @@ def run_app(
                         eff = None if edit_effort.value == "default" else edit_effort.value
                         mod = edit_model.value.strip() or None
                         ins = edit_instruction.value.strip() or None
-                        ctrl.update_agent(
-                            name=target_name,
-                            adapter_type=edit_adapter.value,
-                            model=mod,
-                            effort=eff,
-                            is_conductor=edit_leader_cb.value,
-                            system_instruction=ins,
-                        )
+                        try:
+                            ctrl.update_agent(
+                                name=target_name,
+                                adapter_type=edit_adapter.value,
+                                model=mod,
+                                effort=eff,
+                                is_conductor=edit_leader_cb.value,
+                                system_instruction=ins,
+                            )
+                        except ImportError as e:
+                            ui.notify(f"⚠️ {e}", type="negative", multi_line=True, timeout=8.0)
+                            return
+                        except Exception as e:
+                            ui.notify(f"❌ 에이전트 수정 실패: {e}", type="negative", timeout=6.0)
+                            return
+
                         ui.notify(
                             i18n("notify_agent_saved_to", name=target_name, path=ctrl.config_file_name),
                             type="positive",
@@ -496,14 +504,22 @@ def run_app(
                         eff = None if add_effort.value == "default" else add_effort.value
                         mod = add_model.value.strip() or None
                         ins = add_instruction.value.strip() or None
-                        ctrl.add_agent(
-                            name=name,
-                            adapter_type=add_adapter.value,
-                            model=mod,
-                            effort=eff,
-                            is_conductor=add_leader_cb.value,
-                            system_instruction=ins,
-                        )
+                        try:
+                            ctrl.add_agent(
+                                name=name,
+                                adapter_type=add_adapter.value,
+                                model=mod,
+                                effort=eff,
+                                is_conductor=add_leader_cb.value,
+                                system_instruction=ins,
+                            )
+                        except ImportError as e:
+                            ui.notify(f"⚠️ {e}", type="negative", multi_line=True, timeout=8.0)
+                            return
+                        except Exception as e:
+                            ui.notify(f"❌ 에이전트 추가 실패: {e}", type="negative", timeout=6.0)
+                            return
+
                         ui.notify(
                             i18n("notify_agent_saved_to", name=name, path=ctrl.config_file_name),
                             type="positive",

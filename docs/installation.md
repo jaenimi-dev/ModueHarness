@@ -59,14 +59,18 @@ cd ModueHarness
 원하는 환경에 맞춰 옵션을 선택하여 설치합니다.
 
 ```bash
-# [추천] 전체 패키지 한 번에 설치 (Core + Dev + Web UI NiceGUI + Terminal TUI Textual)
+# [추천] 전체 패키지 한 번에 설치 (Core + Dev + Web UI NiceGUI + Terminal TUI Textual + OpenRouter)
 pip install -e ".[all]"
 
-# (선택) CLI 코어와 단위 테스트 도구만 가볍게 설치할 때
-pip install -e ".[dev]"
+# (선택) OpenRouter 어댑터만 추가 설치할 때 (OpenAI SDK 의존성)
+pip install -e ".[openrouter]"
+# 또는: pip install openai
 
 # (선택) Web UI 및 TUI 대시보드 도구만 추가 설치할 때
 pip install -e ".[ui]"
+
+# (선택) CLI 코어와 단위 테스트 도구만 가볍게 설치할 때
+pip install -e ".[dev]"
 ```
 
 ---
@@ -138,6 +142,18 @@ python run.py "FastAPI 기반 REST API와 테스트 코드를 작성해줘" -P m
 * **원인**: 설치 스크립트가 윈도우 환경변수(PATH)에 실행 경로를 추가했으나, 기존 터미널 창에 반영되지 않은 상태입니다.
 * **해결 방법**:
   현재 열려 있는 모든 PowerShell 창과 VS Code 터미널을 닫고 **새로운 PowerShell 창을 열어 재기동**합니다.
+
+### Q3. 에이전트 수정/추가 시 `The 'openrouter' adapter requires the OpenAI SDK` 오류가 발생합니다.
+* **원인**: OpenRouter 어댑터는 OpenAI-호환 통신을 위해 `openai` SDK가 필요하지만, 패키지 설치 시 `[openrouter]` 또는 `[all]`이 포함되지 않았습니다.
+* **해결 방법**:
+  터미널(또는 Windows PowerShell/CMD)에서 다음 명령어로 설치합니다:
+  ```bash
+  pip install "modue-harness[openrouter]"
+  # 또는
+  pip install "modue-harness[all]"
+  # 또는 직접 설치:
+  pip install openai
+  ```
 
 ---
 

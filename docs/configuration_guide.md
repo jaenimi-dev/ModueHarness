@@ -100,7 +100,19 @@ ModueHarness는 사용자의 시스템에 설치된 실제 AI CLI 명령어를 �
   ```
 - 💡 **상세 매뉴얼**: 설치 및 권한, 모델 설정, ModueHarness 연동 방법은 **[docs/codex_guide.md](codex_guide.md)**를 참조하십시오.
 
-### 5. 로컬 LLM 및 범용 스크립트 (`generic`)
+### 5. OpenRouter 에이전트 (`openrouter`)
+- **설명**: 외부 CLI 없이 하네스 내부에서 직접 OpenRouter API(및 OpenAI 호환 서버)를 호출하는 내장 에이전트
+- **의존성 설치**:
+  ```bash
+  pip install "modue-harness[openrouter]"
+  # 또는
+  pip install openai
+  ```
+- **인증**:
+  `.env` 파일에 `OPENROUTER_API_KEY` 설정 (또는 환경 변수)
+- 💡 **상세 매뉴얼**: 도구 권한(`read`, `full`), 지원 모델 및 프롬프트 설정은 **[docs/openrouter_guide.md](openrouter_guide.md)**를 참조하십시오.
+
+### 6. 로컬 LLM 및 범용 스크립트 (`generic`)
 - Ollama(`ollama run llama3`), 로컬 Python 스크립트, Shell 명령 등은 별도 클라우드 API 키 없이 즉시 `generic` 어댑터로 등록할 수 있습니다.
 
 ---

@@ -151,7 +151,7 @@ def test_detect_external_writes_flags_files_outside_workspace(tmp_path: Path):
 
     os.utime(untouched, (old_ts, old_ts))
 
-    since = time.time()
+    since = time.time() - 0.05
     time.sleep(0.01)
 
     # Legitimate writes: inside the workspace and the blackboard
