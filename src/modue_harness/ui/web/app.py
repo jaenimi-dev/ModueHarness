@@ -321,6 +321,34 @@ def run_app(
                         ui.button(i18n("btn_cancel"), on_click=delete_project_dialog.close).props("flat text-color=slate-400")
                         ui.button(i18n("btn_delete"), color="red", on_click=delete_project_submit).props("dense")
 
+                # 2-0.5: API Keys Settings Dialog
+                api_keys_dialog = ui.dialog()
+                with api_keys_dialog, ui.card().classes("w-[420px] max-w-[95vw] p-4 bg-slate-900 border border-slate-700 text-white gap-2"):
+                    ui.label(i18n("dialog_api_keys_title")).classes("text-base font-bold text-amber-400")
+                    ui.label(i18n("openrouter_key_help")).classes("text-xs text-slate-400 leading-relaxed mb-1")
+
+                    key_input = ui.input(
+                        label=i18n("openrouter_key_label"),
+                        placeholder=i18n("openrouter_key_placeholder"),
+                        password=True,
+                        password_toggle_button=True,
+                    ).classes("w-full")
+
+                    def open_api_keys_modal():
+                        existing_k = ctrl.get_env_var("OPENROUTER_API_KEY") or ""
+                        key_input.set_value(existing_k)
+                        api_keys_dialog.open()
+
+                    def save_api_keys():
+                        val = key_input.value.strip()
+                        ctrl.set_env_var("OPENROUTER_API_KEY", val, persist_to_dotenv=True)
+                        ui.notify(i18n("notify_api_key_saved"), type="positive")
+                        api_keys_dialog.close()
+
+                    with ui.row().classes("w-full justify-end gap-2 mt-3"):
+                        ui.button(i18n("btn_cancel"), on_click=api_keys_dialog.close).props("flat text-color=slate-400")
+                        ui.button(i18n("btn_save"), color="primary", on_click=save_api_keys)
+
                 # 2-A: Edit Agent Dialog
                 edit_dialog = ui.dialog()
                 with edit_dialog, ui.card().classes("w-96 p-4 bg-slate-900 border border-slate-700 text-white gap-2"):
@@ -396,6 +424,7 @@ def run_app(
                                     ui.notify("OpenRouter 모델 목록 갱신 완료", type="positive")
 
                                 ui.button("🔄", on_click=refresh_openrouter).props("dense flat size=xs text-color=violet-400").tooltip("OpenRouter API에서 최신 도구지원 모델 새로고침")
+                                ui.button("🔑 API 키", on_click=open_api_keys_modal).props("dense outline size=xs text-color=amber-300").tooltip("OpenRouter API 키 설정")
                             else:
                                 ui.button("sonnet", on_click=lambda: target_input.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
                                 ui.button("flash-high", on_click=lambda: target_input.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")
@@ -591,7 +620,11 @@ def run_app(
                         with ui.row().classes("items-center gap-1.5"):
                             ui.label(i18n("ai_team_config")).classes("text-xs font-semibold text-slate-300")
                             ui.badge(ctrl.config_file_name, color="slate-700").classes("text-[9px] font-mono text-slate-400")
-                        ui.button(i18n("btn_add_ai"), on_click=add_dialog.open).props("dense outline size=xs text-color=blue-400")
+                        with ui.row().classes("items-center gap-1"):
+                            ui.button(icon="key", on_click=open_api_keys_modal)\
+                                .props("dense outline size=xs text-color=amber-400")\
+                                .tooltip(i18n("btn_api_keys"))
+                            ui.button(i18n("btn_add_ai"), on_click=add_dialog.open).props("dense outline size=xs text-color=blue-400")
 
                     # Agents list container (Scrolls independently within left pane!)
                     agents_container = ui.column().classes("w-full flex-1 min-h-0 overflow-y-auto gap-1.5 pr-0.5")

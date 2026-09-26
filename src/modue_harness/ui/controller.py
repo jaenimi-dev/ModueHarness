@@ -132,6 +132,44 @@ class UIController:
         """Update session execution timeout in seconds (None for unlimited)."""
         return self.session.set_timeout(timeout)
 
+    def get_env_var(self, key: str) -> Optional[str]:
+        """Read environment variable from process env or .env file."""
+        import os
+        from modue_harness.adapters.openrouter import _read_env_key
+        return _read_env_key(key)
+
+    def set_env_var(self, key: str, value: str, persist_to_dotenv: bool = True) -> bool:
+        """Set environment variable in memory and optionally persist into project .env."""
+        import os
+        clean_val = (value or "").strip()
+        os.environ[key] = clean_val
+
+        # Also reset any cached client in existing OpenRouterAgentAdapter instances
+        for agent in self.session.agents.values():
+            if getattr(agent, "api_key_env", None) == key:
+                if hasattr(agent, "_client"):
+                    agent._client = None
+
+        if persist_to_dotenv:
+            try:
+                env_path = Path.cwd() / ".env"
+                lines = []
+                found = False
+                if env_path.is_file():
+                    content = env_path.read_text(encoding="utf-8-sig", errors="ignore")
+                    for line in content.splitlines():
+                        if line.startswith(f"{key}=") or line.startswith(f"{key} ="):
+                            lines.append(f"{key}={clean_val}")
+                            found = True
+                        else:
+                            lines.append(line)
+                if not found:
+                    lines.append(f"{key}={clean_val}")
+                env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            except Exception:
+                pass
+        return True
+
     def set_conductor(self, agent_name: str) -> bool:
         """Set an existing agent as the team leader/conductor."""
         return self.session.set_conductor(agent_name)

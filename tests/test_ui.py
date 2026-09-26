@@ -167,6 +167,10 @@ def test_ui_controller_dynamic_settings(tmp_path: Path):
     assert or_agent["adapter"] == "openrouter"
     assert or_agent["model"] == "qwen/qwen3-coder"
 
+    # Test get_env_var and set_env_var
+    ctrl.set_env_var("OPENROUTER_API_KEY", "sk-or-test-key-12345", persist_to_dotenv=False)
+    assert ctrl.get_env_var("OPENROUTER_API_KEY") == "sk-or-test-key-12345"
+
 
 def test_web_app_missing_dependency(monkeypatch):
     """Test run_app raises informative ImportError when nicegui is missing."""
