@@ -149,6 +149,24 @@ def test_ui_controller_dynamic_settings(tmp_path: Path):
     assert isinstance(agents, list)
     assert len(agents) >= 1
 
+    # Verify OpenRouter adapter model retrieval and agent recognition
+    models = ctrl.get_adapter_models("openrouter")
+    assert isinstance(models, list)
+    assert len(models) >= 1
+    assert any("claude" in m["id"] or "gpt" in m["id"] or "qwen" in m["id"] for m in models)
+
+    # Test adding an openrouter agent
+    ctrl.add_agent(
+        name="or_coder",
+        adapter_type="openrouter",
+        model="qwen/qwen3-coder",
+    )
+    agents_after = ctrl.get_agents_info()
+    or_agent = next((a for a in agents_after if a["name"] == "or_coder"), None)
+    assert or_agent is not None
+    assert or_agent["adapter"] == "openrouter"
+    assert or_agent["model"] == "qwen/qwen3-coder"
+
 
 def test_web_app_missing_dependency(monkeypatch):
     """Test run_app raises informative ImportError when nicegui is missing."""

@@ -19,7 +19,7 @@ from modue_harness.engine.pipeline import PipelineRunner
 from modue_harness.engine.workflow import WorkflowConfig
 from modue_harness.plugins.reporter import MarkdownReportPlugin
 
-KNOWN_SUBCOMMANDS = {"init", "status", "projects", "run", "debate", "ui", "tui"}
+KNOWN_SUBCOMMANDS = {"init", "status", "projects", "run", "debate", "ui", "tui", "models"}
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -253,6 +253,22 @@ def create_parser() -> argparse.ArgumentParser:
         type=str,
         default="blackboard",
         help="Path to blackboard directory (default: blackboard)",
+    )
+
+    # Command: models
+    models_parser = subparsers.add_parser("models", help="Fetch and list available AI models for an adapter on-demand")
+    models_parser.add_argument(
+        "adapter",
+        type=str,
+        nargs="?",
+        default=None,
+        help="Adapter name (openrouter, agy, codex, claude). If omitted, displays all.",
+    )
+    models_parser.add_argument(
+        "--refresh", "-r",
+        action="store_true",
+        default=True,
+        help="Force refresh model list from live APIs (default: True)",
     )
 
     # Command: ui
@@ -570,6 +586,46 @@ def handle_projects(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_models(args: argparse.Namespace) -> int:
+    """Handle 'models' subcommand: Fetch available models on-demand from live APIs."""
+    target_adp = (getattr(args, "adapter", None) or "").strip().lower()
+    force_refresh = getattr(args, "refresh", True)
+    show_all = not target_adp
+
+    if show_all or target_adp in ("agy", "antigravity"):
+        from modue_harness.adapters.agy import get_available_agy_models
+        agy_models = get_available_agy_models(force_refresh=force_refresh)
+        print(f"\n🚀 Google Antigravity (agy models - {len(agy_models)}개):")
+        for m in agy_models:
+            print(f"  • {m['id']:<26} - {m['name']}")
+
+    if show_all or target_adp in ("codex", "chatgpt"):
+        from modue_harness.adapters.codex import get_available_codex_models
+        codex_models = get_available_codex_models(force_refresh=force_refresh)
+        print(f"\n🧠 OpenAI ChatGPT Codex 지원 모델 ({len(codex_models)}개):")
+        for m in codex_models:
+            print(f"  • {m['id']:<26} - {m['name']}")
+
+    if show_all or target_adp in ("claude", "claude-code"):
+        from modue_harness.adapters.claude import get_available_claude_models
+        claude_models = get_available_claude_models(force_refresh=force_refresh)
+        print(f"\n🎭 Claude Code 지원 모델 ({len(claude_models)}개):")
+        for m in claude_models:
+            print(f"  • {m['id']:<26} - {m['name']}")
+
+    if show_all or target_adp == "openrouter":
+        from modue_harness.adapters.openrouter import get_available_openrouter_models
+        openrouter_models = get_available_openrouter_models(force_refresh=force_refresh)
+        print(f"\n🌐 OpenRouter 도구 지원 모델 (실시간 조회 - {len(openrouter_models)}개):")
+        for m in openrouter_models[:25]:
+            print(f"  • {m['id']:<38} - {m['name']}")
+        if len(openrouter_models) > 25:
+            print(f"  ... 외 {len(openrouter_models) - 25}개 모델 지원")
+
+    print()
+    return 0
+
+
 def handle_ui(args: argparse.Namespace) -> int:
     """Handle 'ui' command or '--ui' flag: Launch NiceGUI web dashboard."""
     try:
@@ -836,6 +892,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             return handle_status(args)
         elif args.command == "projects":
             return handle_projects(args)
+        elif args.command == "models":
+            return handle_models(args)
         elif args.command == "ui":
             return handle_ui(args)
         elif args.command == "tui":

@@ -328,7 +328,7 @@ def run_app(
                     edit_name_label = ui.label("").classes("text-xs font-mono text-slate-400 mb-1")
 
                     edit_adapter = ui.select(
-                        options=["claude", "agy", "codex", "aider", "generic"],
+                        options=["claude", "agy", "codex", "openrouter", "aider", "generic"],
                         label=i18n("adapter_type"),
                     ).classes("w-full bg-slate-800 text-white rounded")
 
@@ -383,6 +383,19 @@ def run_app(
                                     ui.notify("Claude 모델 목록 갱신 완료", type="positive")
 
                                 ui.button("🔄", on_click=refresh_claude).props("dense flat size=xs text-color=amber-400").tooltip("Claude 모델 새로고침")
+                            elif adp == "openrouter":
+                                for m in models[:6]:
+                                    short_label = m["id"].split("/")[-1]
+                                    ui.button(
+                                        short_label,
+                                        on_click=lambda mid=m["id"]: target_input.set_value(mid),
+                                    ).props("dense outline size=xs text-color=violet-300").tooltip(f"{m['id']} ({m['name']})")
+
+                                def refresh_openrouter():
+                                    render_presets(row, target_input, "openrouter", force_refresh=True)
+                                    ui.notify("OpenRouter 모델 목록 갱신 완료", type="positive")
+
+                                ui.button("🔄", on_click=refresh_openrouter).props("dense flat size=xs text-color=violet-400").tooltip("OpenRouter API에서 최신 도구지원 모델 새로고침")
                             else:
                                 ui.button("sonnet", on_click=lambda: target_input.set_value("sonnet")).props("dense outline size=xs text-color=slate-300")
                                 ui.button("flash-high", on_click=lambda: target_input.set_value("gemini-3.8-flash-high")).props("dense outline size=xs text-color=slate-300")
@@ -448,7 +461,7 @@ def run_app(
                     ).classes("w-full")
 
                     add_adapter = ui.select(
-                        options=["claude", "agy", "codex", "aider", "generic"],
+                        options=["claude", "agy", "codex", "openrouter", "aider", "generic"],
                         value="claude",
                         label=i18n("adapter_type"),
                     ).classes("w-full bg-slate-800 text-white rounded")
@@ -600,6 +613,7 @@ def run_app(
                                             "agy": "blue-600",
                                             "codex": "emerald-600",
                                             "chatgpt": "emerald-600",
+                                            "openrouter": "violet-600",
                                             "aider": "teal-600",
                                         }.get(a["adapter"], "slate-600")
                                         ui.badge(a["adapter"], color=adapter_color).classes("text-[10px]")

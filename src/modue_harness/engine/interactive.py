@@ -1353,6 +1353,15 @@ class InteractiveSession:
                 for m in claude_models:
                     print(f"  • {m['id']:<26} - {m['name']}")
                 print("  👉 적용 예: /model sonnet (또는 /model claude-3-7-sonnet-latest)")
+            if show_all or target_adp == "openrouter":
+                from modue_harness.adapters.openrouter import get_available_openrouter_models
+                openrouter_models = get_available_openrouter_models(force_refresh=True)
+                print(f"\n🌐 OpenRouter 도구 지원 모델 (실시간 조회 - {len(openrouter_models)}개):")
+                for m in openrouter_models[:20]:
+                    print(f"  • {m['id']:<38} - {m['name']}")
+                if len(openrouter_models) > 20:
+                    print(f"  ... 외 {len(openrouter_models) - 20}개 모델 지원")
+                print("  👉 적용 예: /model openrouter qwen/qwen3-coder")
             print()
 
         elif cmd in ["/effort", "/e"]:

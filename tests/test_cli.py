@@ -199,3 +199,12 @@ def test_find_project_dirs_ignores_unrelated_folders(tmp_path: Path):
 
     found = {d.name for d in Blackboard.find_project_dirs(board_dir)}
     assert found == {"alpha_corp"}
+
+
+def test_cli_models_subcommand(capsys):
+    """Test 'modue-harness models' lists models for adapters on demand."""
+    ret = main(["models", "openrouter"])
+    assert ret == 0
+    captured = capsys.readouterr()
+    assert "OpenRouter" in captured.out
+    assert "모델" in captured.out

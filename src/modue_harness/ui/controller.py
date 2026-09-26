@@ -88,6 +88,8 @@ class UIController:
                 adapter_type = "aider"
             elif "codex" in cls_name or "chatgpt" in cls_name:
                 adapter_type = "codex"
+            elif "openrouter" in cls_name:
+                adapter_type = "openrouter"
 
             info.append({
                 "name": name,
@@ -113,6 +115,9 @@ class UIController:
         elif adp in ("claude", "claude-code"):
             from modue_harness.adapters.claude import get_available_claude_models
             return get_available_claude_models(force_refresh=force_refresh)
+        elif adp == "openrouter":
+            from modue_harness.adapters.openrouter import get_available_openrouter_models
+            return get_available_openrouter_models(force_refresh=force_refresh)
         return []
 
     def set_model(self, model: Optional[str], agent_name: Optional[str] = None) -> List[str]:
