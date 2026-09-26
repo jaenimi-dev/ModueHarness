@@ -460,19 +460,32 @@ class UIController:
     def get_usage_summary(self) -> List[Dict[str, Any]]:
         """Return usage metrics and limit status for all agents (5-hour/weekly for CLI, cost/tokens for OpenRouter)."""
         try:
-            team_agents = list(self.session.agents.keys())
-            summaries = self.session.blackboard.get_usage_summary(team_agents)
-            # Enrich each summary with agent's adapter type and current model
-            agents_info_map = {a["name"]: a for a in self.get_agents_info()}
-            for item in summaries:
-                ag_name = item.get("agent")
-                if ag_name in agents_info_map:
-                    item["adapter"] = agents_info_map[ag_name].get("adapter", "generic")
-                    item["model"] = agents_info_map[ag_name].get("model")
+            agents_info = self.get_agents_info()
+            team_agents = [a["name"] for a in agents_info]
+            raw_summaries = self.session.blackboard.get_usage_summary(team_agents)
+            summaries_by_agent = {s.get("agent"): s for s in raw_summaries}
+
+            # Build summaries strictly following the configuration order of agents
+            ordered_summaries = []
+            for agent_info in agents_info:
+                ag_name = agent_info["name"]
+                if ag_name in summaries_by_agent:
+                    item = summaries_by_agent[ag_name]
                 else:
-                    item["adapter"] = "generic"
-                    item["model"] = None
-            return summaries
+                    item = self.session.blackboard.usage_tracker.get_agent_status(ag_name)
+                item["adapter"] = agent_info.get("adapter", "generic")
+                item["model"] = agent_info.get("model")
+                ordered_summaries.append(item)
+
+            # Append any non-configured historical agents remaining
+            for s in raw_summaries:
+                ag_name = s.get("agent")
+                if ag_name not in [a["name"] for a in agents_info]:
+                    s["adapter"] = "generic"
+                    s["model"] = None
+                    ordered_summaries.append(s)
+
+            return ordered_summaries
         except Exception:
             return []
 

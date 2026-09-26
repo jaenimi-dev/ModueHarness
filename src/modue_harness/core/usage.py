@@ -377,13 +377,23 @@ class UsageTracker:
         }
 
     def get_all_agents_summary(self, agent_names: Optional[List[str]] = None) -> List[Dict[str, Any]]:
-        """Return usage status for all requested or known agents."""
+        """Return usage status for all requested or known agents, preserving agent_names order."""
         all_e = self.load_all_entries()
         known = set(e.agent for e in all_e)
+
+        ordered_names: List[str] = []
         if agent_names:
-            known.update(agent_names)
+            for name in agent_names:
+                if name not in ordered_names:
+                    ordered_names.append(name)
+            # Add any remaining agents from history not explicitly in agent_names
+            for name in sorted(known):
+                if name not in ordered_names:
+                    ordered_names.append(name)
+        else:
+            ordered_names = sorted(known)
 
         summaries = []
-        for name in sorted(known):
+        for name in ordered_names:
             summaries.append(self.get_agent_status(name, entries=all_e))
         return summaries

@@ -667,6 +667,12 @@ def run_app(
                                         e_text = f"/{a.get('effort')}" if a.get("effort") else ""
                                         ui.label(f"{m_text}{e_text}").classes("text-slate-400 font-mono truncate max-w-[120px]")
 
+                        # AI 팀 목록이 변경되면 사용량/리미트 탭도 동기화
+                        try:
+                            refresh_usage()
+                        except Exception:
+                            pass
+
                     refresh_agents()
 
                     # Timeout control (Always pinned at the bottom, never clipped!)
@@ -1472,6 +1478,16 @@ def run_app(
                     pass
                 try:
                     refresh_jobs()
+                except Exception:
+                    pass
+                try:
+                    refresh_usage()
+                except Exception:
+                    pass
+
+                # AI 팀 사용량 및 리미트 주기적 자동 업데이트 (5초 간격)
+                try:
+                    ui.timer(5.0, refresh_usage)
                 except Exception:
                     pass
 

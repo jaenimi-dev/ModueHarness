@@ -225,3 +225,45 @@ def test_openrouter_usage_summary_enrichment(tmp_path: Path):
     assert or_summary["lifetime"]["input_tokens"] == 1200
     assert or_summary["lifetime"]["output_tokens"] == 300
 
+
+def test_usage_summary_order_matches_agents_config(tmp_path: Path):
+    """Verify that get_usage_summary reflects the exact order of configured agents and updates when agents are added."""
+    from unittest.mock import MagicMock
+    from modue_harness.adapters.claude import ClaudeCLIAdapter
+    from modue_harness.adapters.openrouter import OpenRouterAgentAdapter
+
+    board = Blackboard(root_dir=tmp_path / "blackboard", project="order_test")
+    board.initialize()
+
+    ctrl = UIController(
+        project_name="order_test",
+        projects_root=tmp_path / "projects",
+        blackboard_dir=tmp_path / "blackboard",
+    )
+
+    # Initially two agents: beta first, then alpha
+    mock_beta = MagicMock(spec=ClaudeCLIAdapter)
+    mock_beta.__class__.__name__ = "ClaudeCLIAdapter"
+    mock_beta.model = "sonnet"
+
+    mock_alpha = MagicMock(spec=OpenRouterAgentAdapter)
+    mock_alpha.__class__.__name__ = "OpenRouterAgentAdapter"
+    mock_alpha.model = "deepseek/deepseek-chat"
+
+    ctrl.session.agents = {"beta": mock_beta, "alpha": mock_alpha}
+
+    summary = ctrl.get_usage_summary()
+    assert len(summary) == 2
+    assert summary[0]["agent"] == "beta"
+    assert summary[1]["agent"] == "alpha"
+
+    # Add a third agent 'gamma' to the session
+    mock_gamma = MagicMock(spec=ClaudeCLIAdapter)
+    mock_gamma.__class__.__name__ = "ClaudeCLIAdapter"
+    ctrl.session.agents["gamma"] = mock_gamma
+
+    summary_after = ctrl.get_usage_summary()
+    assert len(summary_after) == 3
+    assert [s["agent"] for s in summary_after] == ["beta", "alpha", "gamma"]
+
+
