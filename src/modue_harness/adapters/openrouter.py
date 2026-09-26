@@ -214,8 +214,12 @@ class OpenRouterAgentAdapter(BaseCLIAdapter):
         if self.base_url == DEFAULT_BASE_URL:
             # OpenRouter 전용: 응답에 실제 비용(cost)을 포함시킨다.
             extra_body["usage"] = {"include": True}
-            if self.effort:
-                extra_body["reasoning"] = {"effort": str(self.effort)}
+            eff = str(self.effort or "").strip().lower()
+            # default, off, none 이거나 비어있으면 reasoning effort 파라미터를 전송하지 않는다.
+            if eff and eff not in ("default", "off", "none"):
+                # OpenRouter API는 low, medium, high 를 지원하므로 max/xhigh는 high로 정규화
+                mapped_effort = "high" if eff in ("max", "xhigh") else eff
+                extra_body["reasoning"] = {"effort": mapped_effort}
         if extra_body:
             kwargs["extra_body"] = extra_body
         return kwargs
@@ -312,10 +316,25 @@ class OpenRouterAgentAdapter(BaseCLIAdapter):
                     return fail(f"Execution timed out after {timeout} seconds", last_text, exit_code=124)
 
                 metadata["turns"] = turn
+                req_kwargs = self._request_kwargs(messages, tool_specs, remaining)
                 try:
-                    response = client.chat.completions.create(**self._request_kwargs(messages, tool_specs, remaining))
+                    response = client.chat.completions.create(**req_kwargs)
                 except Exception as exc:
-                    return fail(_describe_api_error(exc), last_text)
+                    # 모델이 reasoning.effort 파라미터를 지원하지 않아 400 오류가 난 경우 안전하게 제외 후 재시도
+                    err_msg = str(exc).lower()
+                    if ("reasoning" in err_msg or "effort" in err_msg) and "extra_body" in req_kwargs:
+                        extra_body = dict(req_kwargs["extra_body"])
+                        if "reasoning" in extra_body:
+                            extra_body.pop("reasoning", None)
+                            req_kwargs["extra_body"] = extra_body
+                            try:
+                                response = client.chat.completions.create(**req_kwargs)
+                            except Exception as retry_exc:
+                                return fail(_describe_api_error(retry_exc), last_text)
+                        else:
+                            return fail(_describe_api_error(exc), last_text)
+                    else:
+                        return fail(_describe_api_error(exc), last_text)
 
                 _add_usage(usage, getattr(response, "usage", None))
                 choices = getattr(response, "choices", None) or []

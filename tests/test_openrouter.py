@@ -438,3 +438,15 @@ def test_save_agents_config_roundtrip(tmp_path: Path):
 
     entry = yaml.safe_load(target.read_text(encoding="utf-8"))["agents"]["dev"]
     assert entry == {"adapter": "openrouter", "model": "m", "tools": "full"}
+
+
+def test_openrouter_effort_normalization_and_fallback():
+    # 1. Effort normalization: 'default' or 'off' must not send reasoning effort
+    a_def = OpenRouterAgentAdapter(name="a", model="m", effort="default", client=FakeClient([]))
+    kwargs_def = a_def._request_kwargs([], [], None)
+    assert "reasoning" not in kwargs_def.get("extra_body", {})
+
+    # 2. 'high' or 'max' mapped properly
+    a_max = OpenRouterAgentAdapter(name="b", model="m", effort="max", client=FakeClient([]))
+    kwargs_max = a_max._request_kwargs([], [], None)
+    assert kwargs_max["extra_body"]["reasoning"] == {"effort": "high"}
