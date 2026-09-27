@@ -17,8 +17,8 @@ from modue_harness.adapters import (
     AGYCLIAdapter,
     CodexCLIAdapter,
     GenericCLIAdapter,
-    OpenRouterAgentAdapter,
     AGENT_CONFIG_PASSTHROUGH_KEYS,
+    adapter_type_of,
     create_adapter,
 )
 from modue_harness.core.blackboard import Blackboard
@@ -421,14 +421,7 @@ class InteractiveSession:
 
         agents_data: Dict[str, Any] = {}
         for name, agent in self.agents.items():
-            adapter_type = "generic"
-            cls_name = agent.__class__.__name__.lower()
-            if "claude" in cls_name:
-                adapter_type = "claude"
-            elif "agy" in cls_name or "antigravity" in cls_name:
-                adapter_type = "agy"
-            elif isinstance(agent, OpenRouterAgentAdapter):
-                adapter_type = "openrouter"
+            adapter_type = adapter_type_of(agent)
 
             entry: Dict[str, Any] = {
                 "adapter": adapter_type,
@@ -537,16 +530,7 @@ class InteractiveSession:
         if not agent:
             return False
 
-        current_adapter = "generic"
-        cls_name = agent.__class__.__name__.lower()
-        if "claude" in cls_name:
-            current_adapter = "claude"
-        elif "agy" in cls_name or "antigravity" in cls_name:
-            current_adapter = "agy"
-        elif "codex" in cls_name or "chatgpt" in cls_name:
-            current_adapter = "codex"
-        elif isinstance(agent, OpenRouterAgentAdapter):
-            current_adapter = "openrouter"
+        current_adapter = adapter_type_of(agent)
 
         target_adapter = (adapter_type or current_adapter).lower()
         if target_adapter != current_adapter:

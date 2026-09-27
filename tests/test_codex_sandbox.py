@@ -81,3 +81,38 @@ def test_sandbox_mode_string_from_agents_yaml(tmp_path: Path):
     )
     agents = load_or_detect_agents(cwd=tmp_path)
     assert agents["dev"].sandbox == "read-only"
+
+
+# ------------------------------------------------------- save / reload roundtrip
+def test_adapter_type_of_covers_all_registered_types():
+    from modue_harness.adapters import GenericCLIAdapter, adapter_type_of
+
+    assert adapter_type_of(create_adapter("codex")) == "codex"
+    assert adapter_type_of(create_adapter("chatgpt")) == "codex"
+    assert adapter_type_of(create_adapter("claude")) == "claude"
+    assert adapter_type_of(create_adapter("antigravity")) == "agy"
+    assert adapter_type_of(GenericCLIAdapter(name="g", command="echo")) == "generic"
+
+
+@pytest.mark.parametrize("sandbox", ["workspace-write", "read-only"])
+def test_codex_agent_survives_save_and_reload(tmp_path: Path, sandbox: str):
+    """Regression: save_agents_config wrote Codex agents back as `adapter: generic`."""
+    import yaml
+
+    from modue_harness.engine.interactive import InteractiveSession, load_or_detect_agents
+
+    session = InteractiveSession.__new__(InteractiveSession)
+    session.agents = {"dev": create_adapter("codex", name="dev", model="gpt-5.5", sandbox=sandbox)}
+    session.conductor_name = "dev"
+    session.agents_file = None
+    target = tmp_path / "config" / "agents.yaml"
+
+    session.save_agents_config(target)
+
+    entry = yaml.safe_load(target.read_text(encoding="utf-8"))["agents"]["dev"]
+    assert entry["adapter"] == "codex"
+    reloaded = load_or_detect_agents(cwd=tmp_path)["dev"]
+    assert isinstance(reloaded, CodexCLIAdapter)
+    assert reloaded.sandbox == sandbox
+    assert reloaded.model == "gpt-5.5"
+    assert reloaded.default_args.count("--sandbox") == 1

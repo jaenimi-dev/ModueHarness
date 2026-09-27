@@ -253,9 +253,22 @@ class PipelineRunner:
                 self.blackboard.create_task(task)
                 turn_result = fallback_adapter.execute(context=context, timeout=step.timeout)
 
-        # Clean up isolated worktree if created
+        # Keep the isolated worktree's output on its branch, then clean up the worktree.
+        worktree_branch: Optional[str] = None
+        worktree_commit: Optional[str] = None
+        worktree_error: Optional[str] = None
         if isolated_worktree_path:
-            self.workspace_manager.remove_worktree(isolated_worktree_path)
+            worktree_branch = f"harness/{step.id}"
+            try:
+                worktree_commit = self.workspace_manager.commit_worktree(
+                    isolated_worktree_path,
+                    message=f"harness: step '{step.id}' by {agent_name}",
+                )
+            except Exception as exc:
+                worktree_error = str(exc)
+            if worktree_error is None:
+                self.workspace_manager.remove_worktree(isolated_worktree_path)
+            # 커밋에 실패하면 결과물을 지우지 않도록 worktree 를 그대로 남긴다.
 
         # Log
         combined_logs = f"=== STDOUT ===\n{turn_result.stdout}\n\n=== STDERR ===\n{turn_result.stderr}"
@@ -298,4 +311,8 @@ class PipelineRunner:
             "error_message": turn_result.error_message,
             "command": turn_result.metadata.get("command_display"),
             "full_command": turn_result.metadata.get("full_command_str"),
+            "worktree_branch": worktree_branch,
+            "worktree_commit": worktree_commit,
+            "worktree_path": str(isolated_worktree_path) if worktree_error else None,
+            "worktree_error": worktree_error,
         }

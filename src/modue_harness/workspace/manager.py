@@ -59,6 +59,32 @@ class GitWorkspaceManager:
 
         return target_dir
 
+    def commit_worktree(self, target_dir: Path, message: str) -> Optional[str]:
+        """Commit every change made inside a worktree onto its branch. Returns the commit SHA, or None if clean.
+
+        에이전트는 스스로 커밋하지 않으므로, 이 단계 없이 remove_worktree(--force)를 부르면
+        worktree 안에서 만든 결과물이 모두 사라진다.
+        """
+        if not self.is_git_repo():
+            return None
+        target_dir = target_dir.resolve()
+        self._run_git(["add", "-A"], cwd=target_dir)
+        if self._run_git(["diff", "--cached", "--quiet"], cwd=target_dir).returncode == 0:
+            return None
+        proc = self._run_git(
+            [
+                # 저장소에 사용자 정보나 서명 설정이 있어도 하네스 커밋이 실패하지 않게 한다.
+                "-c", "user.name=ModueHarness",
+                "-c", "user.email=modue-harness@localhost",
+                "-c", "commit.gpgsign=false",
+                "commit", "--no-verify", "-q", "-m", message,
+            ],
+            cwd=target_dir,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"Failed to commit worktree changes: {proc.stderr.strip()}")
+        return self._run_git(["rev-parse", "HEAD"], cwd=target_dir).stdout.strip() or None
+
     def remove_worktree(self, target_dir: Path, force: bool = True) -> bool:
         """Remove a git worktree and prune."""
         if not self.is_git_repo():

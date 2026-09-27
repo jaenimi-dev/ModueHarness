@@ -9,7 +9,7 @@
 - **공용 칠판과 실제 구현 공간의 분리 (Separation of Coordination & Implementation)**: AI 간 협업 정보 교환(`blackboard/`)과 실제 소스 코드 구현 공간(`projects/<프로젝트명>/`)을 명확히 격리하여 안전하고 깔끔한 프로젝트 관리 보장.
 - **자연어 CLI 및 대화형 협업 (Interactive CLI & REPL)**: 복잡한 워크플로우 YAML 파일 작성 없이, 터미널에서 자연어 명령을 직접 입력하여 Conductor(Leader)와 Worker가 프로젝트를 자율 구현.
 - **다양한 협업 토폴로지 (Flexible Collaboration Topologies)**: 지휘자-워커(Conductor, 계층형 분업 및 종합), 파이프라인(순차 릴레이), 교차 검증/토론(Debate & Consensus) 지원.
-- **작업 격리 및 안전성 (Isolation & Workspace Safety)**: Git Worktree 기반 임시 브랜치 격리, 스냅샷 롤백(`git stash`), 무응답 및 무한 루프 감시.
+- **작업 격리 및 안전성 (Isolation & Workspace Safety)**: CLI별 샌드박스·권한 규칙을 통한 프로젝트 폴더 밖 쓰기 차단과 사후 탐지, 워크플로우(`run`) 스텝 단위 Git Worktree 격리, 스냅샷 롤백(`git stash`), 무응답 및 무한 루프 감시.
 
 ---
 
@@ -160,7 +160,7 @@ flowchart LR
 ---
 
 ### 3.5 워크스페이스 격리 및 안전 감시 (`workspace`, `supervisor`)
-- **Git Worktree 격리**: 격리 실행 옵션 시 별도의 임시 `git worktree`에서 브랜치를 분기하여 작업 후 안전하게 병합 또는 정리.
+- **Git Worktree 격리**: 워크플로우 스텝에 `isolation: "worktree"`를 지정하면 `harness/<스텝 ID>` 브랜치의 임시 `git worktree`에서 실행하고, 끝나면 변경 사항을 그 브랜치에 커밋한 뒤 worktree를 정리합니다(결과 반영은 사용자가 병합). 대화형·직접 실행(Conductor) 경로에는 적용되지 않으며, 이 경로의 폴더 밖 쓰기는 CLI별 샌드박스·권한 규칙으로 막습니다.
 - **프로세스 감시자 (`ProcessSupervisor`)**: 무응답 지연(Stall), 무한 루프, 비정상 대기를 감시하고 타임아웃 강제 종료.
 
 ---

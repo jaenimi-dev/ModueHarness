@@ -209,6 +209,10 @@ class CodexCLIAdapter(BaseCLIAdapter):
         """Dynamically update reasoning effort level."""
         self.effort = effort
 
+    def config_extras(self) -> Dict[str, Any]:
+        """Adapter-specific settings to persist back into agents.yaml."""
+        return {} if self.sandbox == "workspace-write" else {"sandbox": self.sandbox}
+
     def _with_blackboard_dir(self, context: TurnContext, extra_args: Optional[List[str]]) -> List[str]:
         """Let the workspace-write sandbox also write to the shared blackboard directory.
 

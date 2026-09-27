@@ -928,6 +928,10 @@ def handle_run(args: argparse.Namespace) -> int:
         print(f"  [{mark}] Step '{step['step_id']}' by {step['agent']}: exit={step['exit_code']} ({step['duration_sec']:.2f}s)")
         if step.get("error_message"):
             print(f"      Error: {step['error_message']}")
+        if step.get("worktree_commit"):
+            print(f"      🌿 Worktree output committed to branch '{step['worktree_branch']}' ({step['worktree_commit'][:7]})")
+        elif step.get("worktree_error"):
+            print(f"      ⚠️ Worktree output kept at {step['worktree_path']}: {step['worktree_error']}")
 
     return 0 if summary["success"] else 1
 
