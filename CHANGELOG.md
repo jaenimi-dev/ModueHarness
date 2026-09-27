@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Codex agents are saved as Codex again**: saving the team from the interactive session or Web UI wrote Codex agents back as `adapter: generic`, so reloading lost the adapter. Adapter type detection (save, update, UI) now goes through one `adapter_type_of()` helper, and a non-default Codex `sandbox` mode is persisted.
+- **`isolation: worktree` no longer deletes the step's output**: the worktree was force-removed with the agent's uncommitted changes. The pipeline now commits them to the `harness/<step id>` branch before cleanup, reports the branch and commit in the step result and `run` output, and keeps the worktree if the commit fails.
+- **Docs no longer claim Git worktree isolation for every run**: README and architecture docs now state that worktree isolation applies to workflow steps with `isolation: worktree`, while the interactive/direct path relies on the per-CLI write guards.
+
 ### Removed
 - **Aider support**: the `AiderCLIAdapter`, the `aider` adapter name, aider auto-detection, and the Web UI option are removed because aider is not planned to be supported. An existing `adapter: "aider"` entry now falls back to the generic CLI adapter like any unregistered name.
 
