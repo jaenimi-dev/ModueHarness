@@ -9,7 +9,8 @@ import sys
 from typing import List, Optional
 
 from modue_harness import __version__
-from modue_harness.adapters import create_adapter
+from modue_harness.adapters import AGYCLIAdapter, create_adapter
+from modue_harness.adapters import agy_guard
 from modue_harness.core.blackboard import Blackboard
 from modue_harness.core.config import load_dotenv
 from modue_harness.core.encoding import ensure_utf8_io
@@ -19,7 +20,7 @@ from modue_harness.engine.pipeline import PipelineRunner
 from modue_harness.engine.workflow import WorkflowConfig
 from modue_harness.plugins.reporter import MarkdownReportPlugin
 
-KNOWN_SUBCOMMANDS = {"init", "status", "projects", "run", "debate", "ui", "tui", "models"}
+KNOWN_SUBCOMMANDS = {"init", "status", "projects", "run", "debate", "ui", "tui", "models", "agy-guard"}
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -187,6 +188,36 @@ def create_parser() -> argparse.ArgumentParser:
         type=str,
         metavar="PROJECT_NAME",
         help="Delete a specific project directory and its blackboard data",
+    )
+
+    # Command: agy-guard
+    guard_parser = subparsers.add_parser(
+        "agy-guard",
+        help="Install/inspect Antigravity (agy) deny rules that block writes outside the project workspace",
+    )
+    guard_parser.add_argument(
+        "action",
+        choices=["status", "install", "uninstall"],
+        nargs="?",
+        default="status",
+        help="status (default): show missing rules, install: add them, uninstall: remove them",
+    )
+    guard_parser.add_argument(
+        "--projects-dir",
+        type=str,
+        default="projects",
+        help="Path to projects directory (default: projects)",
+    )
+    guard_parser.add_argument(
+        "--dir", "-d",
+        type=str,
+        default="blackboard",
+        help="Path to blackboard directory (default: blackboard)",
+    )
+    guard_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the rules without changing agy settings",
     )
 
     # Command: run (legacy workflow support)
@@ -703,6 +734,58 @@ def handle_tui(args: argparse.Namespace) -> int:
         return 1
 
 
+def _agy_guard_rules(args: argparse.Namespace) -> List[str]:
+    projects_dir = Path(getattr(args, "projects_dir", "projects")).resolve()
+    board_dir = Path(getattr(args, "dir", "blackboard")).resolve()
+    return agy_guard.build_guard_rules(Path.cwd(), allowed_dirs=[projects_dir, board_dir])
+
+
+def handle_agy_guard(args: argparse.Namespace) -> int:
+    """Handle 'agy-guard' command: manage agy deny rules protecting the harness repository."""
+    rules = _agy_guard_rules(args)
+    settings = agy_guard.AGY_SETTINGS_PATH
+    print(f"agy 설정 파일: {settings}")
+
+    if args.action == "status" or args.dry_run:
+        missing = agy_guard.missing_guard_rules(rules, settings)
+        print(f"보호 규칙 {len(rules)}개 중 {len(rules) - len(missing)}개 설치됨")
+        for r in rules:
+            print(f"  [{' ' if r in missing else '✓'}] {r}")
+        if missing and args.action == "status":
+            print("\n설치: modue-harness agy-guard install")
+        return 0
+
+    try:
+        if args.action == "install":
+            added = agy_guard.install_guard_rules(rules, settings)
+            print(f"✅ deny 규칙 {len(added)}개를 추가했습니다." if added else "✅ 이미 모두 설치되어 있습니다.")
+            if added:
+                print(f"   (기존 설정 백업: {settings.name}.modue-backup)")
+            print("   하네스 저장소에 최상위 파일/폴더를 새로 만들면 install 을 다시 실행하세요.")
+        else:
+            removed = agy_guard.uninstall_guard_rules(rules, settings)
+            print(f"✅ deny 규칙 {len(removed)}개를 제거했습니다.")
+    except (OSError, ValueError) as exc:
+        print(f"❌ agy 설정을 수정하지 못했습니다: {exc}")
+        return 1
+    return 0
+
+
+def warn_if_agy_guard_missing(agents, args: argparse.Namespace) -> None:
+    """Warn when an agy agent runs with skip-permissions but the deny rules are not installed."""
+    if not any(isinstance(a, AGYCLIAdapter) and a.skip_permissions for a in agents):
+        return
+    try:
+        missing = agy_guard.missing_guard_rules(_agy_guard_rules(args))
+    except Exception:
+        return
+    if missing:
+        print(
+            f"⚠️ agy 보호 규칙 {len(missing)}개가 설치되지 않았습니다. agy 파일 도구가 프로젝트 폴더 밖에 쓸 수 있습니다.\n"
+            "   설치: modue-harness agy-guard install   (확인: modue-harness agy-guard)\n"
+        )
+
+
 def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
     """Handle direct CLI command execution or interactive REPL session."""
     if getattr(args, "ui", False):
@@ -728,6 +811,7 @@ def handle_interactive_or_prompt(args: argparse.Namespace) -> int:
         # -a/--agents 로 직접 지정한 파일은 읽기 대상이므로, 로딩 실패를 조용히 넘기지 않는다.
         require_agents_file=agents_file is not None,
     )
+    warn_if_agy_guard_missing(session.agents.values(), args)
 
     # 1. User requested interactive session explicitly or running in a TTY terminal without args
     if getattr(args, "interactive", False) or (not getattr(args, "prompt", None) and sys.stdin.isatty()):
@@ -822,6 +906,7 @@ def handle_run(args: argparse.Namespace) -> int:
         report_plugin = MarkdownReportPlugin(output_path=Path(args.report).resolve())
 
     runner = PipelineRunner(config=config, blackboard=board)
+    warn_if_agy_guard_missing(runner.adapters.values(), args)
     if report_plugin:
         report_plugin.on_workflow_start(config.name, len(config.steps))
 
@@ -902,6 +987,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             return handle_run(args)
         elif args.command == "debate":
             return handle_debate(args)
+        elif args.command == "agy-guard":
+            return handle_agy_guard(args)
 
         # If no subcommand, handle direct CLI prompt or interactive session
         return handle_interactive_or_prompt(args)

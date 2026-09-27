@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Real token usage and OpenRouter cost recorded in `TurnResult.metadata["usage"]` and passed to the usage tracker by the conductor.
   - New optional dependency group `[openrouter]` (`openai>=1.0`), `OPENROUTER_API_KEY` in `.env.example`, and `docs/openrouter_guide.md`.
 - **Adapter-specific agents.yaml options** (`permission_mode`, `skip_permissions`, `tools`, `max_turns`, ...) now also reach adapters created by the pipeline workflow loader.
+- **`modue-harness agy-guard [status|install|uninstall]`** (#3):
+  - Adds Antigravity `permissions.deny` rules for the harness repository's top-level entries (except `projects/`, `blackboard/`) and sensitive home paths to `~/.gemini/antigravity-cli/settings.json`, backing the file up first.
+  - agy deny rules take precedence over `--dangerously-skip-permissions`, so agy's file tools can no longer write into the harness `src/`, `tests/`, etc.
+  - Interactive/prompt and `run` modes warn at startup when an agy agent runs with skip-permissions and the rules are missing.
+
+### Changed
+- **Antigravity agents run with `--sandbox` by default** on macOS/Linux (#3): terminal commands can only write to the workspace and temp directories and have no network access. Opt out per agent with `sandbox: false`.
+
+### Fixed
+- **agy headless auto-denied turns are now reported as failures.** When a tool needed a permission that print mode cannot prompt for, agy aborted the turn but exited with code 0, so the harness treated it as a success.
 
 ## [0.8.0] - 2026-09-20
 

@@ -18,6 +18,10 @@ name: "my-engineering-team"
 #   permission_mode: "plan"     # Claude 계열. acceptEdits / auto / bypassPermissions
 #                               #              / manual / dontAsk / plan 중 선택
 #   skip_permissions: false     # Antigravity 계열. --dangerously-skip-permissions 제거
+#   sandbox: false              # Antigravity 계열. 기본 --sandbox(셸 쓰기·네트워크 제한) 해제
+#
+# Antigravity 는 --sandbox 만으로는 파일 도구의 폴더 밖 쓰기를 막지 못합니다.
+# 하네스 저장소 루트에서 `modue-harness agy-guard install` 로 deny 규칙을 설치하세요.
 #
 # 키를 생략하면 기존 기본값이 그대로 적용됩니다.
 # 주의: 확인을 요구하는 모드로 바꾸면 비대화형 실행이 응답을 기다리다 멈출 수 있습니다.
