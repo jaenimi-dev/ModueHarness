@@ -70,6 +70,23 @@ AGENT_CONFIG_PASSTHROUGH_KEYS = (
 )
 
 
+# 어댑터 인스턴스 → agents.yaml 의 adapter 이름. 저장·수정·UI 표시가 모두 이 표를 쓴다.
+_CANONICAL_ADAPTER_TYPES = (
+    (ClaudeCLIAdapter, "claude"),
+    (AGYCLIAdapter, "agy"),
+    (CodexCLIAdapter, "codex"),
+    (OpenRouterAgentAdapter, "openrouter"),
+)
+
+
+def adapter_type_of(agent: BaseCLIAdapter) -> str:
+    """Return the canonical agents.yaml adapter name for an adapter instance ('generic' if unknown)."""
+    for cls, type_name in _CANONICAL_ADAPTER_TYPES:
+        if isinstance(agent, cls):
+            return type_name
+    return "generic"
+
+
 def create_adapter(adapter_type: str, **kwargs: Any) -> BaseCLIAdapter:
     """Instantiate an adapter from registered types or fallback to generic."""
     adapter_cls = ADAPTER_REGISTRY.get(adapter_type.lower(), GenericCLIAdapter)
@@ -96,6 +113,7 @@ __all__ = [
     "CodexCLIAdapter",
     "OpenRouterAgentAdapter",
     "create_adapter",
+    "adapter_type_of",
     "AGENT_CONFIG_PASSTHROUGH_KEYS",
     "strip_ansi",
     "ADAPTER_REGISTRY",

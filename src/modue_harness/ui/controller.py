@@ -8,6 +8,7 @@ import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from modue_harness.adapters import adapter_type_of
 from modue_harness.engine.interactive import BackgroundJob, InteractiveSession
 
 
@@ -78,16 +79,7 @@ class UIController:
         """Return information about configured AI agents."""
         info = []
         for name, agent in self.session.agents.items():
-            adapter_type = "generic"
-            cls_name = agent.__class__.__name__.lower()
-            if "claude" in cls_name:
-                adapter_type = "claude"
-            elif "agy" in cls_name or "antigravity" in cls_name:
-                adapter_type = "agy"
-            elif "codex" in cls_name or "chatgpt" in cls_name:
-                adapter_type = "codex"
-            elif "openrouter" in cls_name:
-                adapter_type = "openrouter"
+            adapter_type = adapter_type_of(agent)
 
             info.append({
                 "name": name,
