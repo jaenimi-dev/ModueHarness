@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional
 from modue_harness.adapters import BaseCLIAdapter, create_adapter
 from modue_harness.core.blackboard import Blackboard
 from modue_harness.core.events import EventBus, EventType, HarnessEvent
+from modue_harness.core.secrets import mask_secrets_obj
 from modue_harness.core.supervisor import ProcessSupervisor
 from modue_harness.core.types import Task, TaskStatus, TurnContext, TurnResult
 from modue_harness.engine.workflow import WorkflowConfig, WorkflowStepConfig
@@ -63,7 +64,10 @@ class PipelineRunner:
                     self.adapters[name] = adapter
 
     def run(self) -> Dict[str, Any]:
-        """Execute the entire pipeline step by step."""
+        """Execute the entire pipeline step by step. Secrets in the returned summary are masked."""
+        return mask_secrets_obj(self._run())
+
+    def _run(self) -> Dict[str, Any]:
         self.blackboard.initialize()
         start_time = time.time()
 

@@ -334,15 +334,26 @@ def run_app(
                         password_toggle_button=True,
                     ).classes("w-full")
 
+                    key_hint_label = ui.label("").classes("text-xs text-emerald-400")
+
                     def open_api_keys_modal():
-                        existing_k = ctrl.get_env_var("OPENROUTER_API_KEY") or ""
-                        key_input.set_value(existing_k)
+                        # 인증 없는 웹 UI 이므로 저장된 키 원문은 브라우저로 보내지 않고 힌트만 보여 준다.
+                        hint = ctrl.get_env_var_hint("OPENROUTER_API_KEY")
+                        key_input.set_value("")
+                        key_hint_label.set_text(i18n("openrouter_key_stored_hint", hint=hint) if hint else "")
                         api_keys_dialog.open()
 
                     def save_api_keys():
-                        val = key_input.value.strip()
-                        ctrl.set_env_var("OPENROUTER_API_KEY", val, persist_to_dotenv=True)
-                        ui.notify(i18n("notify_api_key_saved"), type="positive")
+                        val = (key_input.value or "").strip()
+                        if not val:
+                            ui.notify(i18n("notify_api_key_unchanged"), type="info")
+                            api_keys_dialog.close()
+                            return
+                        if ctrl.set_env_var("OPENROUTER_API_KEY", val, persist_to_dotenv=True):
+                            ui.notify(i18n("notify_api_key_saved"), type="positive")
+                        else:
+                            ui.notify(i18n("notify_api_key_save_failed"), type="warning")
+                        key_input.set_value("")
                         api_keys_dialog.close()
 
                     with ui.row().classes("w-full justify-end gap-2 mt-3"):

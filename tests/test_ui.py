@@ -1175,3 +1175,72 @@ def test_ui_controller_artifact_metadata_and_chronology(tmp_path: Path):
 
 
 
+
+
+# ------------------------------------------------------------ API key storage
+@pytest.fixture
+def key_ctrl(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    return UIController(
+        project_name="demo",
+        projects_root=tmp_path / "projects",
+        blackboard_dir=tmp_path / "blackboard",
+    )
+
+
+def test_env_var_hint_never_reveals_the_key(key_ctrl, monkeypatch):
+    assert key_ctrl.get_env_var_hint("OPENROUTER_API_KEY") is None
+
+    key = "sk-or-v1-" + "0123456789abcdef" * 4
+    monkeypatch.setenv("OPENROUTER_API_KEY", key)
+    hint = key_ctrl.get_env_var_hint("OPENROUTER_API_KEY")
+    assert hint == "sk-or-…cdef"
+    assert key not in hint and len(hint) < 16
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "short-key")
+    assert key_ctrl.get_env_var_hint("OPENROUTER_API_KEY") == "••••"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permissions")
+def test_set_env_var_writes_owner_only_dotenv(key_ctrl, tmp_path: Path, monkeypatch):
+    import stat
+
+    env = tmp_path / ".env"
+    env.write_text("# keep me\nOTHER=1\nOPENROUTER_API_KEY=old\n", encoding="utf-8")
+    env.chmod(0o644)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "old")
+
+    assert key_ctrl.set_env_var("OPENROUTER_API_KEY", "sk-or-new-value-123456") is True
+
+    assert env.read_text(encoding="utf-8") == "# keep me\nOTHER=1\nOPENROUTER_API_KEY=sk-or-new-value-123456\n"
+    assert stat.S_IMODE(env.stat().st_mode) == 0o600
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permissions")
+def test_set_env_var_creates_dotenv_owner_only(key_ctrl, tmp_path: Path, monkeypatch):
+    import stat
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "x")
+    assert key_ctrl.set_env_var("OPENROUTER_API_KEY", "sk-or-created-123456") is True
+    assert stat.S_IMODE((tmp_path / ".env").stat().st_mode) == 0o600
+
+
+def test_set_env_var_reports_persist_failure(key_ctrl, tmp_path: Path, monkeypatch):
+    (tmp_path / ".env").mkdir()  # .env 가 폴더라서 쓸 수 없다
+    monkeypatch.setenv("OPENROUTER_API_KEY", "x")
+
+    assert key_ctrl.set_env_var("OPENROUTER_API_KEY", "sk-or-mem-only-123456") is False
+    # 메모리에는 적용된다
+    assert key_ctrl.get_env_var("OPENROUTER_API_KEY") == "sk-or-mem-only-123456"
+
+
+@pytest.mark.parametrize("host,warned", [("127.0.0.1", False), ("localhost", False), ("0.0.0.0", True)])
+def test_cli_ui_warns_when_exposed_without_auth(monkeypatch, capsys, host, warned):
+    import modue_harness.ui.web.app as web_app
+    from modue_harness.cli import main
+
+    monkeypatch.setattr(web_app, "run_app", lambda **kwargs: None)
+    assert main(["ui", "--host", host, "--no-browser"]) == 0
+    assert ("인증 기능이 없습니다" in capsys.readouterr().out) is warned

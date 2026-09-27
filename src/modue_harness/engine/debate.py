@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from modue_harness.adapters import BaseCLIAdapter
 from modue_harness.core.blackboard import Blackboard
 from modue_harness.core.events import EventBus, EventType, HarnessEvent
+from modue_harness.core.secrets import mask_secrets_obj
 from modue_harness.core.types import TurnContext
 
 
@@ -34,7 +35,10 @@ class DebateRunner:
         self.rounds = max(1, rounds)
 
     def run(self) -> Dict[str, Any]:
-        """Run the debate rounds and produce final consensus."""
+        """Run the debate rounds and produce final consensus. Secrets in the returned summary are masked."""
+        return mask_secrets_obj(self._run())
+
+    def _run(self) -> Dict[str, Any]:
         self.blackboard.initialize()
         start_time = time.time()
 
