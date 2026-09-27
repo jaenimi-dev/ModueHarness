@@ -128,8 +128,23 @@ class UIController:
         from modue_harness.adapters.openrouter import _read_env_key
         return _read_env_key(key)
 
+    def get_env_var_hint(self, key: str) -> Optional[str]:
+        """Return a non-reversible hint of a stored secret (e.g. 'sk-or-…a1b2'), or None if unset.
+
+        웹 UI 는 인증이 없으므로 저장된 키 원문을 브라우저로 보내지 않고 이 힌트만 보여 준다.
+        """
+        value = self.get_env_var(key)
+        if not value:
+            return None
+        if len(value) < 16:
+            return "••••"
+        return f"{value[:6]}…{value[-4:]}"
+
     def set_env_var(self, key: str, value: str, persist_to_dotenv: bool = True) -> bool:
-        """Set environment variable in memory and optionally persist into project .env."""
+        """Set environment variable in memory and optionally persist into project .env.
+
+        Returns False when persisting to .env failed (the value is then only set for this process).
+        """
         import os
         clean_val = (value or "").strip()
         os.environ[key] = clean_val
@@ -155,9 +170,16 @@ class UIController:
                             lines.append(line)
                 if not found:
                     lines.append(f"{key}={clean_val}")
-                env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                # 키가 담긴 파일이므로 소유자만 읽고 쓸 수 있게 만든다 (새 파일은 생성 시점부터).
+                fd = os.open(str(env_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    fh.write("\n".join(lines) + "\n")
+                try:
+                    os.chmod(env_path, 0o600)
+                except OSError:
+                    pass
             except Exception:
-                pass
+                return False
         return True
 
     def set_conductor(self, agent_name: str) -> bool:

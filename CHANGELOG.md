@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Well-known key formats are masked even when not configured: Anthropic, OpenRouter, OpenAI, Google API, GitHub, AWS access keys, Slack, `Bearer` tokens and private key blocks, with word-boundary guards against false positives.
   - Code written by agents into `projects/<project>/` is not modified. Disable with `MODUE_MASK_SECRETS=0`.
 
+### Security
+- **Web UI API key dialog no longer sends the stored key to the browser**: it shows a hint such as `sk-or-…a1b2` and keeps the existing key when the field is left empty. The Web UI has no authentication, so previously anyone who could reach it could read the key.
+- **`.env` written by the Web UI is owner-only (`0600`)**, and a failed write is reported instead of claiming success (the key then applies to the current process only).
+- **`modue-harness ui` warns when bound to a non-loopback host**, since the Web UI has no authentication.
+
 ### Fixed
 - **Codex agents are saved as Codex again**: saving the team from the interactive session or Web UI wrote Codex agents back as `adapter: generic`, so reloading lost the adapter. Adapter type detection (save, update, UI) now goes through one `adapter_type_of()` helper, and a non-default Codex `sandbox` mode is persisted.
 - **`isolation: worktree` no longer deletes the step's output**: the worktree was force-removed with the agent's uncommitted changes. The pipeline now commits them to the `harness/<step id>` branch before cleanup, reports the branch and commit in the step result and `run` output, and keeps the worktree if the commit fails.

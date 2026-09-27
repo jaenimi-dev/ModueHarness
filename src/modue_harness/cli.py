@@ -684,6 +684,11 @@ def handle_ui(args: argparse.Namespace) -> int:
     open_browser = not getattr(args, "no_browser", False)
 
     print(f"🌐 Starting ModueHarness Web UI at http://{host}:{port} ...")
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        print(
+            f"⚠️ 웹 UI에는 인증 기능이 없습니다. --host {host} 로 열면 같은 네트워크의 누구나 접속해 "
+            "에이전트를 실행하고 설정을 바꿀 수 있습니다. 신뢰할 수 있는 네트워크에서만 사용하세요."
+        )
     try:
         run_app(controller=ctrl, host=host, port=port, open_browser=open_browser, lang=lang)
         return 0
