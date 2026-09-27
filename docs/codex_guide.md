@@ -110,6 +110,20 @@ codex exec --ephemeral "레포지토리 요약"
 codex exec --sandbox workspace-write "FastAPI health check 엔드포인트를 추가해줘"
 ```
 
+### ModueHarness의 샌드박스 처리
+
+ModueHarness는 Codex 에이전트를 `--sandbox workspace-write`로 실행합니다(기본값). Codex CLI 0.157.1로 확인한 동작은 다음과 같습니다(`projects/<프로젝트>/`에서 하네스 저장소의 `tests/`와 `README.md`에 쓰기를 시도).
+
+| 실행 방식 | 파일 도구(apply_patch)로 밖에 쓰기 | 셸로 밖에 쓰기 | 작업 폴더 안 쓰기 |
+| :--- | :--- | :--- | :--- |
+| `--sandbox workspace-write` (하네스 기본값) | 차단 (`patch rejected: writing outside of the project`) | 차단 (`Read-only file system`) | 가능 |
+| `--sandbox danger-full-access` | 씀 | 씀 | 가능 |
+
+* 같은 git 저장소 안이어도 작업 폴더(실행 위치) 밖이면 막힙니다. Codex는 Claude·Antigravity와 달리 **별도 규칙 없이 샌드박스만으로 파일 도구와 셸이 모두 차단**됩니다.
+* `workspace-write`는 작업 폴더에만 쓰기를 허용하므로, 하네스는 실행마다 공용 칠판 폴더(`blackboard/<프로젝트>/`)를 `--add-dir`로 추가해 칠판 산출물도 쓸 수 있게 합니다. `args`에 `--add-dir`를 직접 지정하면 그 설정을 따릅니다.
+* 한 번의 패치에 허용 경로와 금지 경로의 파일이 섞이면 **패치 전체가 거부**됩니다.
+* `agents.yaml`의 `sandbox` 키는 Antigravity(참/거짓)와 공유되지만, Codex에는 **모드 문자열**(`read-only`, `workspace-write`, `danger-full-access`)만 받습니다. `sandbox: false`처럼 참/거짓을 지정하면 샌드박스가 조용히 꺼지는 대신 오류가 납니다.
+
 ---
 
 ## 5. 주요 유용한 기능 및 플래그

@@ -26,7 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Blocks Write/Edit into the harness repository even under `--permission-mode auto`, which previously allowed writes anywhere inside the same git repository. Bash writes are not covered yet (requires the Claude Code sandbox with bubblewrap).
   - Skipped when `--settings` is already in `args`, on Windows, or when the current directory does not contain the workspace. Opt out with `write_guard: false`.
 
+- **Codex writes to the shared blackboard**: with the default `--sandbox workspace-write`, the Codex adapter now adds the project's blackboard directory via `--add-dir` on every run, so coordination artifacts are no longer rejected. Verified with Codex CLI 0.157.1 that writes outside the workspace (including elsewhere in the same git repository) stay blocked for both `apply_patch` and shell commands.
+
 ### Changed
+- **Codex rejects boolean `sandbox` values**: `sandbox` is shared with Antigravity agents (boolean), but Codex only accepts a mode string, so an agy-style `sandbox: false` no longer silently removes the Codex sandbox.
 - **Antigravity agents run with `--sandbox` by default** on macOS/Linux (#3): terminal commands can only write to the workspace and temp directories and have no network access. Opt out per agent with `sandbox: false`.
 
 ### Fixed
