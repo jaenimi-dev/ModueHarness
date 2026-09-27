@@ -1,6 +1,6 @@
 # ModueHarness 설정 및 실전 사용 매뉴얼 (Configuration & Setup Guide)
 
-ModueHarness 기본 설치([docs/installation.md](installation.md))를 마친 후, 다양한 AI CLI(Claude Code, Google Antigravity, OpenAI Codex, Aider 등)를 연결하여 팀을 구성하고 실제 프로젝트 작업을 자율적으로 실행하기 위한 **단계별 설정 매뉴얼**입니다.
+ModueHarness 기본 설치([docs/installation.md](installation.md))를 마친 후, 다양한 AI CLI(Claude Code, Google Antigravity, OpenAI Codex, OpenRouter 등)를 연결하여 팀을 구성하고 실제 프로젝트 작업을 자율적으로 실행하기 위한 **단계별 설정 매뉴얼**입니다.
 
 ---
 
@@ -72,19 +72,7 @@ ModueHarness는 사용자의 시스템에 설치된 실제 AI CLI 명령어를 �
   ```
 - 💡 **상세 매뉴얼**: OS별 설치 및 상세 설정, 하이브리드 팀 구성은 **[docs/antigravity_guide.md](antigravity_guide.md)**를 참조하십시오.
 
-### 3. Aider (`aider`)
-- **설치**:
-  ```bash
-  pip install aider-chat
-  ```
-- **인증**:
-  `OPENAI_API_KEY` 또는 `ANTHROPIC_API_KEY`를 환경 변수로 설정
-- **동작 검증**:
-  ```bash
-  aider --message "echo OK" --yes-always --no-git
-  ```
-
-### 4. OpenAI ChatGPT Codex (`codex`)
+### 3. OpenAI ChatGPT Codex (`codex`)
 - **설치**:
   - macOS / Linux: `curl -fsSL https://chatgpt.com/codex/install.sh | sh`
   - Windows: `powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"`  
@@ -100,7 +88,7 @@ ModueHarness는 사용자의 시스템에 설치된 실제 AI CLI 명령어를 �
   ```
 - 💡 **상세 매뉴얼**: 설치 및 권한, 모델 설정, ModueHarness 연동 방법은 **[docs/codex_guide.md](codex_guide.md)**를 참조하십시오.
 
-### 5. OpenRouter 에이전트 (`openrouter`)
+### 4. OpenRouter 에이전트 (`openrouter`)
 - **설명**: 외부 CLI 없이 하네스 내부에서 직접 OpenRouter API(및 OpenAI 호환 서버)를 호출하는 내장 에이전트
 - **의존성 설치**:
   ```bash
@@ -112,7 +100,7 @@ ModueHarness는 사용자의 시스템에 설치된 실제 AI CLI 명령어를 �
   `.env` 파일에 `OPENROUTER_API_KEY` 설정 (또는 환경 변수)
 - 💡 **상세 매뉴얼**: 도구 권한(`read`, `full`), 지원 모델 및 프롬프트 설정은 **[docs/openrouter_guide.md](openrouter_guide.md)**를 참조하십시오.
 
-### 6. 로컬 LLM 및 범용 스크립트 (`generic`)
+### 5. 로컬 LLM 및 범용 스크립트 (`generic`)
 - Ollama(`ollama run llama3`), 로컬 Python 스크립트, Shell 명령 등은 별도 클라우드 API 키 없이 즉시 `generic` 어댑터로 등록할 수 있습니다.
 
 ---
@@ -121,7 +109,7 @@ ModueHarness는 사용자의 시스템에 설치된 실제 AI CLI 명령어를 �
 
 > ⚡ **잠깐! 이 단계를 건너뛰어도 되나요?**  
 > - **건너뛰기 가능 (Skip)**: 1단계에서 터미널을 통해 `claude` 브라우저 로그인을 완료하셨다면 인증 토큰이 로컬에 보관되므로 **`.env` 파일이 필요 없습니다. 바로 실행 단계로 넘어가세요.**  
-> - **설정 필요**: Claude Console 선불 API 키(`ANTHROPIC_API_KEY`)를 직접 쓰거나, Aider를 사용하기 위해 `OPENAI_API_KEY`를 등록해야 할 때만 아래 과정을 진행합니다.
+> - **설정 필요**: Claude Console 선불 API 키(`ANTHROPIC_API_KEY`)를 직접 쓰거나, OpenRouter 에이전트용 `OPENROUTER_API_KEY` 등 API 키를 등록해야 할 때만 아래 과정을 진행합니다.
 
 ModueHarness는 CLI 실행 시 프로젝트 루트의 `.env` 파일을 자동으로 감지하여 하위 AI CLI 서브프로세스에 환경 변수로 전달합니다.
 
@@ -135,7 +123,7 @@ cp .env.example .env
 # Anthropic Claude (브라우저 로그인 대신 API 키를 사용할 경우에만 입력)
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
-# OpenAI (Aider 등에서 사용)
+# OpenAI (Codex 모델 목록 조회 등에서 사용)
 OPENAI_API_KEY=sk-proj-...
 
 # Google Gemini / Antigravity
@@ -350,7 +338,7 @@ cp config/workflow.example.yaml config/workflow.yaml
 ```
 
 ### 2. AI 팀 명세(`config/agents.yaml`)
-Claude Code, Google Antigravity, Aider 등 팀원별로 어댑터와 모델, 추론 노력을 자유롭게 지정할 수 있습니다:
+Claude Code, Google Antigravity, Codex, OpenRouter 등 팀원별로 어댑터와 모델, 추론 노력을 자유롭게 지정할 수 있습니다:
 
 ```yaml
 version: "0.6.0"

@@ -356,7 +356,7 @@ def run_app(
                     edit_name_label = ui.label("").classes("text-xs font-mono text-slate-400 mb-1")
 
                     edit_adapter = ui.select(
-                        options=["claude", "agy", "codex", "openrouter", "aider", "generic"],
+                        options=["claude", "agy", "codex", "openrouter", "generic"],
                         label=i18n("adapter_type"),
                     ).classes("w-full bg-slate-800 text-white rounded")
 
@@ -498,7 +498,7 @@ def run_app(
                     ).classes("w-full")
 
                     add_adapter = ui.select(
-                        options=["claude", "agy", "codex", "openrouter", "aider", "generic"],
+                        options=["claude", "agy", "codex", "openrouter", "generic"],
                         value="claude",
                         label=i18n("adapter_type"),
                     ).classes("w-full bg-slate-800 text-white rounded")
@@ -659,7 +659,6 @@ def run_app(
                                             "codex": "emerald-600",
                                             "chatgpt": "emerald-600",
                                             "openrouter": "violet-600",
-                                            "aider": "teal-600",
                                         }.get(a["adapter"], "slate-600")
                                         ui.badge(a["adapter"], color=adapter_color).classes("text-[10px]")
 

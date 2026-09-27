@@ -76,7 +76,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--agent",
         type=str,
         default=None,
-        help="Override with a specific single AI agent adapter (e.g. claude, agy, aider, generic)",
+        help="Override with a specific single AI agent adapter (e.g. claude, agy, codex, openrouter, generic)",
     )
     parser.add_argument(
         "--model", "-m",

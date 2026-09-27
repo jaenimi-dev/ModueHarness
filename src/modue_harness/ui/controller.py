@@ -84,8 +84,6 @@ class UIController:
                 adapter_type = "claude"
             elif "agy" in cls_name or "antigravity" in cls_name:
                 adapter_type = "agy"
-            elif "aider" in cls_name:
-                adapter_type = "aider"
             elif "codex" in cls_name or "chatgpt" in cls_name:
                 adapter_type = "codex"
             elif "openrouter" in cls_name:

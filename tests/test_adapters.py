@@ -9,7 +9,6 @@ from modue_harness.adapters import (
     GenericCLIAdapter,
     ClaudeCLIAdapter,
     AGYCLIAdapter,
-    AiderCLIAdapter,
     CodexCLIAdapter,
     create_adapter,
     strip_ansi,
@@ -34,8 +33,10 @@ def test_adapter_factory():
     antigravity = create_adapter("antigravity")
     assert isinstance(antigravity, AGYCLIAdapter)
 
+    # aider 전용 어댑터는 제거됐다. 등록되지 않은 이름처럼 generic 으로 대체된다.
     aider = create_adapter("aider")
-    assert isinstance(aider, AiderCLIAdapter)
+    assert type(aider) is GenericCLIAdapter
+    assert aider.command == "aider"
 
     codex = create_adapter("codex")
     assert isinstance(codex, CodexCLIAdapter)

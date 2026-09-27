@@ -13,7 +13,7 @@
   - [Claude Code](claude_guide.md) (`claude`)
   - [Google Antigravity](antigravity_guide.md) (`agy`)
   - [OpenAI ChatGPT Codex](codex_guide.md) (`codex`)
-  - [Aider](configuration_guide.md#3-aider-aider) (`aider`)
+  - [OpenRouter 에이전트](openrouter_guide.md) (`openrouter`, 외부 CLI 없이 API 키만 필요)
   - 또는 로컬 LLM / Python 커스텀 스크립트 (`generic`)
 
 ---

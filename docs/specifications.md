@@ -16,7 +16,7 @@ ModueHarness는 정적 파이프라인 및 복잡한 배치 자동화를 위해 
 
 ## 1. AI 팀 명세 (`agents.yaml`)
 
-어떤 AI CLI 도구(Claude, AGY, Aider 등)와 모델, 권한, 역할을 가진 팀원들로 구성할지 선언합니다.
+어떤 AI CLI 도구(Claude, AGY, Codex, OpenRouter 등)와 모델, 권한, 역할을 가진 팀원들로 구성할지 선언합니다.
 
 ```yaml
 version: "0.8.0"
@@ -24,7 +24,7 @@ name: "modue-engineering-team"
 
 agents:
   planner:
-    adapter: "claude"                  # claude, antigravity (agy), codex, aider, generic
+    adapter: "claude"                  # claude, antigravity (agy), codex, openrouter, generic
     command: "claude"                  # 실행할 CLI 명령어
     args: ["--permission-mode", "auto"] # 추가 실행 인자 (프롬프트 멈춤 방지)
     model: "claude-3-7-sonnet-latest"  # 선택적 모델 지정 (sonnet, opus, haiku 등)
