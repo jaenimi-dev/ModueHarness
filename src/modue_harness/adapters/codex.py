@@ -3,10 +3,11 @@ import os
 from pathlib import Path
 import shutil
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 import urllib.request
 
 from modue_harness.adapters.base import BaseCLIAdapter
+from modue_harness.core.types import TurnContext, TurnResult
 
 
 DEFAULT_CODEX_MODELS: List[Dict[str, str]] = [
@@ -159,6 +160,13 @@ class CodexCLIAdapter(BaseCLIAdapter):
         sandbox: str = "workspace-write",
         system_instruction: Optional[str] = None,
     ) -> None:
+        # agents.yaml 의 sandbox 키는 agy(참/거짓)와 공유된다. agy 용 `sandbox: false` 가
+        # Codex 샌드박스를 조용히 끄지 않도록, Codex 에는 모드 문자열만 받는다.
+        if isinstance(sandbox, bool):
+            raise ValueError(
+                "Codex 'sandbox' must be a mode string "
+                "(read-only | workspace-write | danger-full-access), not a boolean."
+            )
         self.model = model
         self.effort = effort
         self.sandbox = sandbox
@@ -200,6 +208,45 @@ class CodexCLIAdapter(BaseCLIAdapter):
     def set_effort(self, effort: Optional[str]) -> None:
         """Dynamically update reasoning effort level."""
         self.effort = effort
+
+    def _with_blackboard_dir(self, context: TurnContext, extra_args: Optional[List[str]]) -> List[str]:
+        """Let the workspace-write sandbox also write to the shared blackboard directory.
+
+        workspace-write 는 작업 폴더(cwd)에만 쓰기를 허용하므로, 그대로 두면 conductor 가
+        안내하는 칠판 산출물 쓰기가 막힌다.
+        """
+        args = list(extra_args or [])
+        if (
+            self.sandbox == "workspace-write"
+            and context.blackboard_dir
+            and "--add-dir" not in self.default_args
+            and "--add-dir" not in args
+        ):
+            args += ["--add-dir", str(context.blackboard_dir)]
+        return args
+
+    def execute(
+        self,
+        context: TurnContext,
+        extra_args: Optional[List[str]] = None,
+        custom_env: Optional[Dict[str, str]] = None,
+        timeout: Optional[float] = None,
+    ) -> TurnResult:
+        """Run codex exec with the blackboard directory added to the writable roots."""
+        return super().execute(
+            context, extra_args=self._with_blackboard_dir(context, extra_args), custom_env=custom_env, timeout=timeout
+        )
+
+    def execute_stream(
+        self,
+        context: TurnContext,
+        extra_args: Optional[List[str]] = None,
+        custom_env: Optional[Dict[str, str]] = None,
+    ) -> Generator[str, None, TurnResult]:
+        """Stream codex exec output with the blackboard directory added to the writable roots."""
+        return (yield from super().execute_stream(
+            context, extra_args=self._with_blackboard_dir(context, extra_args), custom_env=custom_env
+        ))
 
     @staticmethod
     def _update_arg_pair(args: List[str], flag: str, val: Optional[str]) -> List[str]:

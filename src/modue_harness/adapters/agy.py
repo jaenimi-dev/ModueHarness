@@ -2,12 +2,29 @@
 
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
+import sys
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
+from modue_harness.adapters import agy_guard as _guard
 from modue_harness.adapters.base import BaseCLIAdapter
+from modue_harness.core.types import TaskStatus, TurnContext, TurnResult
+
+# 비대화형(-p) 실행에서 권한 확인이 필요한 도구가 자동 거부되면 agy 는 턴을 끝내고
+# 이 문구를 출력하지만 종료 코드는 0 이다. 그대로 두면 하네스가 성공으로 오인한다.
+_AUTO_DENIED_RE = re.compile(r"headless mode cannot prompt for, so it was auto-denied", re.IGNORECASE)
+
+
+def detect_auto_denied(stdout: str, stderr: str) -> Optional[str]:
+    """Return agy's auto-denied notice line if the turn was aborted by a headless permission denial."""
+    for text in (stderr, stdout):
+        for line in (text or "").splitlines():
+            if _AUTO_DENIED_RE.search(line):
+                return line.strip()
+    return None
 
 
 DEFAULT_AGY_MODELS: List[Dict[str, str]] = [
@@ -123,17 +140,26 @@ class AGYCLIAdapter(BaseCLIAdapter):
         model: Optional[str] = None,
         effort: Optional[str] = None,
         skip_permissions: bool = True,
+        sandbox: Optional[bool] = None,
+        write_guard: bool = True,
         system_instruction: Optional[str] = None,
     ) -> None:
         self.model = model
         self.effort = effort
         self.skip_permissions = skip_permissions
+        # 터미널 샌드박스: 셸 명령의 쓰기를 작업 폴더와 임시 폴더로 제한하고 네트워크를 막는다.
+        # Windows 에서는 아직 Preview 라 기본값에서 뺀다.
+        self.sandbox = (sys.platform != "win32") if sandbox is None else bool(sandbox)
+        # 실행 직전에 agy deny 규칙(agy-guard)을 확인하고 빠진 것을 설치한다.
+        self.write_guard = bool(write_guard)
 
         resolved_command = resolve_agy_binary(command)
 
         args = list(default_args or [])
         if skip_permissions and "--dangerously-skip-permissions" not in args:
             args.append("--dangerously-skip-permissions")
+        if self.sandbox and "--sandbox" not in args:
+            args.append("--sandbox")
         if model and "--model" not in args:
             args.extend(["--model", str(model)])
         if effort and "--effort" not in args:
@@ -153,6 +179,75 @@ class AGYCLIAdapter(BaseCLIAdapter):
         self.model = model
         self.default_args = self._update_arg_pair(self.default_args, "--model", model)
 
+    def config_extras(self) -> Dict[str, Any]:
+        """Adapter-specific settings to persist back into agents.yaml."""
+        extras: Dict[str, Any] = {}
+        if not self.skip_permissions:
+            extras["skip_permissions"] = False
+        if self.sandbox != (sys.platform != "win32"):
+            extras["sandbox"] = self.sandbox
+        if not self.write_guard:
+            extras["write_guard"] = False
+        return extras
+
+    def _ensure_guard(self, context: TurnContext) -> Optional[str]:
+        """Install missing agy deny rules before launch. Returns an error message if that failed."""
+        if not self.write_guard:
+            return None
+        root = Path.cwd()
+        if not _guard.is_safe_guard_root(root, context.workspace_dir):
+            return None
+        rules = _guard.build_guard_rules(root, allowed_dirs=[context.workspace_dir, context.blackboard_dir])
+        try:
+            added = _guard.ensure_guard_rules(rules, _guard.AGY_SETTINGS_PATH)
+        except (OSError, ValueError) as exc:
+            return (
+                f"agy 보호 규칙(agy-guard)을 설치하지 못해 실행을 중단했습니다: {exc}\n"
+                f"  {_guard.AGY_SETTINGS_PATH} 를 확인하거나, 이 에이전트에 write_guard: false 를 지정하세요."
+            )
+        if added:
+            print(
+                f"🛡️ agy 보호 규칙 {len(added)}개를 {_guard.AGY_SETTINGS_PATH} 에 추가했습니다 "
+                "(프로젝트 폴더 밖 쓰기 차단). 확인/제거: modue-harness agy-guard [uninstall]"
+            )
+        return None
+
+    def _guard_failure(self, context: TurnContext, message: str) -> TurnResult:
+        return TurnResult(
+            status=TaskStatus.FAILED,
+            exit_code=1,
+            error_message=message,
+            stderr=message,
+            metadata={"agent": self.name, "command": self.command, "step_id": context.step_id},
+        )
+
+    def execute(
+        self,
+        context: TurnContext,
+        extra_args: Optional[List[str]] = None,
+        custom_env: Optional[Dict[str, str]] = None,
+        timeout: Optional[float] = None,
+    ) -> TurnResult:
+        """Run agy and treat a headless auto-denied turn as a failure despite exit code 0."""
+        guard_error = self._ensure_guard(context)
+        if guard_error:
+            return self._guard_failure(context, guard_error)
+        result = super().execute(context, extra_args=extra_args, custom_env=custom_env, timeout=timeout)
+        return _mark_auto_denied(result)
+
+    def execute_stream(
+        self,
+        context: TurnContext,
+        extra_args: Optional[List[str]] = None,
+        custom_env: Optional[Dict[str, str]] = None,
+    ) -> Generator[str, None, TurnResult]:
+        """Stream agy output, then apply the same auto-denied failure check as execute()."""
+        guard_error = self._ensure_guard(context)
+        if guard_error:
+            return self._guard_failure(context, guard_error)
+        result = yield from super().execute_stream(context, extra_args=extra_args, custom_env=custom_env)
+        return _mark_auto_denied(result)
+
     def set_effort(self, effort: Optional[str]) -> None:
         """Dynamically update reasoning effort level and rebuild CLI args."""
         self.effort = effort
@@ -171,3 +266,15 @@ class AGYCLIAdapter(BaseCLIAdapter):
         if val is not None and str(val).strip():
             new_args.extend([flag, str(val).strip()])
         return new_args
+
+
+def _mark_auto_denied(result: TurnResult) -> TurnResult:
+    notice = detect_auto_denied(result.stdout, result.stderr)
+    if notice and result.status == TaskStatus.COMPLETED:
+        result.status = TaskStatus.FAILED
+        result.exit_code = result.exit_code or 1
+        result.error_message = (
+            "agy가 권한 확인이 필요한 도구를 비대화형 모드에서 자동 거부하고 턴을 중단했습니다: "
+            f"{notice}"
+        )
+    return result

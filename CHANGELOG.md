@@ -15,6 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Real token usage and OpenRouter cost recorded in `TurnResult.metadata["usage"]` and passed to the usage tracker by the conductor.
   - New optional dependency group `[openrouter]` (`openai>=1.0`), `OPENROUTER_API_KEY` in `.env.example`, and `docs/openrouter_guide.md`.
 - **Adapter-specific agents.yaml options** (`permission_mode`, `skip_permissions`, `tools`, `max_turns`, ...) now also reach adapters created by the pipeline workflow loader.
+- **`modue-harness agy-guard [status|install|uninstall]`** (#3):
+  - Adds Antigravity `permissions.deny` rules for the harness repository's top-level entries (except `projects/`, `blackboard/`) and sensitive home paths to `~/.gemini/antigravity-cli/settings.json`, backing the file up first.
+  - agy deny rules take precedence over `--dangerously-skip-permissions`, so agy's file tools can no longer write into the harness `src/`, `tests/`, etc.
+  - The agy adapter ensures these rules right before every launch (idempotent, file-locked, recomputed each run so new top-level entries are covered), printing a one-time notice when it adds rules. Opt out per agent with `write_guard: false`; the turn fails instead of running unguarded if the settings file cannot be updated.
+  - Interactive/prompt and `run` modes warn at startup when an agy agent has auto-guard disabled and the rules are missing.
+
+- **Claude Code write guard** (#3):
+  - `ClaudeCLIAdapter` passes a temporary `--settings` file with `Edit(//<abs path>)` deny rules for the same protected paths on every run, and deletes it afterwards. The user's global Claude settings are never modified.
+  - Blocks Write/Edit into the harness repository even under `--permission-mode auto`, which previously allowed writes anywhere inside the same git repository. Bash writes are not covered yet (requires the Claude Code sandbox with bubblewrap).
+  - Skipped when `--settings` is already in `args`, on Windows, or when the current directory does not contain the workspace. Opt out with `write_guard: false`.
+
+- **Codex writes to the shared blackboard**: with the default `--sandbox workspace-write`, the Codex adapter now adds the project's blackboard directory via `--add-dir` on every run, so coordination artifacts are no longer rejected. Verified with Codex CLI 0.157.1 that writes outside the workspace (including elsewhere in the same git repository) stay blocked for both `apply_patch` and shell commands.
+
+### Changed
+- **Codex rejects boolean `sandbox` values**: `sandbox` is shared with Antigravity agents (boolean), but Codex only accepts a mode string, so an agy-style `sandbox: false` no longer silently removes the Codex sandbox.
+- **Antigravity agents run with `--sandbox` by default** on macOS/Linux (#3): terminal commands can only write to the workspace and temp directories and have no network access. Opt out per agent with `sandbox: false`.
+
+### Fixed
+- **agy headless auto-denied turns are now reported as failures.** When a tool needed a permission that print mode cannot prompt for, agy aborted the turn but exited with code 0, so the harness treated it as a success.
 
 ## [0.8.0] - 2026-09-20
 

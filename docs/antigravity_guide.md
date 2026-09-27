@@ -111,8 +111,38 @@ ModueHarness는 `AGYCLIAdapter`를 통해 하위 서브프로세스로 `agy`를 
 | :--- | :--- | :--- |
 | `-p`, `--print` | 일회성 프롬프트 실행 후 결과 반환 (비대화형 모드) | `prompt_delivery="flag"`로 자동 전달 |
 | `--dangerously-skip-permissions` | 도구 실행 및 파일 편집 시 사용자 승인 대기 없이 자동 실행 | `skip_permissions=True` (기본값)로 자동 포함 (파이프라인 스톨 방지) |
+| `--sandbox` | 터미널 명령을 샌드박스에서 실행 (쓰기는 작업 폴더·임시 폴더만, 네트워크 차단) | `sandbox=True` (macOS/Linux 기본값, Windows는 Preview라 기본 off) |
 | `--model` | 세션에서 사용할 AI 모델 지정 | `--model <모델명>` 인자로 자동 전달 |
 | `--effort` | 생각/추론 노력 깊이 조절 (`low`, `medium`, `high`) | `--effort <레벨>` 인자로 자동 전달 |
+
+### 작업 폴더 밖 쓰기 차단 (agy-guard)
+
+`--dangerously-skip-permissions`로 실행하면 agy의 `allowNonWorkspaceAccess`(기본 off)가 무시되어, **파일 도구가 프로젝트 폴더 밖에도 씁니다.** `--sandbox`는 터미널 명령만 막고 파일 도구는 막지 못합니다. agy 1.2.11로 직접 확인한 동작은 다음과 같습니다.
+
+| 실행 방식 | 파일 도구로 밖에 쓰기 | 셸로 밖에 쓰기 |
+| :--- | :--- | :--- |
+| `--dangerously-skip-permissions` | 씀 | 씀 |
+| + `--sandbox` | **씀** | 차단 |
+| + `--sandbox` + deny 규칙 (자동 설치, 하네스 기본값) | 차단 | 차단 |
+
+agy의 deny 규칙은 `--dangerously-skip-permissions`보다 우선합니다. 하네스는 **agy 에이전트를 실행하기 직전에** 하네스 저장소의 최상위 항목(`projects/`, `blackboard/` 제외)과 민감한 홈 경로(`~/.ssh`, `~/.bashrc` 등)에 대한 deny 규칙이 `~/.gemini/antigravity-cli/settings.json`의 `permissions.deny`에 있는지 확인하고, 빠진 규칙을 자동으로 추가합니다.
+
+* 규칙을 처음 추가할 때 한 번 안내 메시지를 출력하고, 원래 설정은 `settings.json.modue-backup`으로 백업합니다(백업은 최초 1회만 생성).
+* 실행할 때마다 규칙을 다시 계산하므로, 저장소에 새로 만든 최상위 파일·폴더도 다음 실행부터 보호됩니다.
+* 실행 위치가 작업 폴더를 포함하지 않거나 홈 폴더(또는 그 상위)인 경우에는 agy 자신의 폴더까지 막을 수 있어 자동 설치를 건너뜁니다.
+* 설정 파일이 손상되어 규칙을 넣을 수 없으면 보호 없이 실행하지 않고 해당 턴을 실패로 처리합니다.
+* 자동 설치를 원하지 않으면 에이전트에 `write_guard: false`를 지정하세요. 이 경우 규칙이 없으면 시작할 때 경고가 표시됩니다.
+
+규칙은 다음 명령으로 직접 확인하거나 제거할 수 있습니다. 하네스 저장소 루트에서 실행하세요.
+
+```bash
+modue-harness agy-guard            # 설치 상태 확인 (기본 동작)
+modue-harness agy-guard install    # 규칙 추가 (기존 설정은 settings.json.modue-backup 으로 백업)
+modue-harness agy-guard uninstall  # 하네스가 추가한 규칙만 제거
+```
+
+* agy 규칙 우선순위가 Deny > Ask > Allow라서 "작업 폴더 밖 전부"를 막을 수는 없습니다. 목록에 없는 경로(예: 하네스 저장소 밖의 다른 폴더)는 여전히 보호되지 않습니다.
+* `skip_permissions: false`로 실행하면 비대화형 모드에서 쓰기가 전부 자동 거부되고 턴이 중단됩니다. agy는 이때도 종료 코드 0을 내지만, 하네스는 이를 실패로 처리합니다.
 
 ---
 
@@ -257,3 +287,6 @@ agents:
 ### Q2. Antigravity가 사용자 입력을 기다리며 멈춥니다.
 * `AGYCLIAdapter`는 기본적으로 `--dangerously-skip-permissions` 플래그를 자동으로 추가하여 사용자 확인 팝업 없이 작업을 자율 진행합니다.
 * 수동으로 `command`나 `args`를 재정의할 때도 `--dangerously-skip-permissions`를 포함해 주세요.
+
+### Q. 샌드박스 때문에 `pip install`이나 네트워크가 필요한 명령이 실패합니다.
+* `--sandbox`는 터미널 명령의 네트워크를 차단합니다. 필요한 에이전트에만 `agents.yaml`에서 `sandbox: false`를 지정하세요. 이 경우 셸 명령은 작업 폴더 밖에도 쓸 수 있습니다.

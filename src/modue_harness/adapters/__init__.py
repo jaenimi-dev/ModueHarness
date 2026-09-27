@@ -44,6 +44,8 @@ ADAPTER_REGISTRY: Dict[str, Type[BaseCLIAdapter]] = {
 _OPTIONAL_ADAPTER_KWARGS = frozenset({
     "permission_mode",
     "skip_permissions",
+    "sandbox",
+    "write_guard",
     "model",
     "effort",
     # API 에이전트 어댑터(openrouter) 전용
@@ -59,6 +61,8 @@ _OPTIONAL_ADAPTER_KWARGS = frozenset({
 AGENT_CONFIG_PASSTHROUGH_KEYS = (
     "permission_mode",
     "skip_permissions",
+    "sandbox",
+    "write_guard",
     "tools",
     "max_turns",
     "base_url",
