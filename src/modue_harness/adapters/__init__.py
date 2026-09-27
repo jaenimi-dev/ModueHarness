@@ -8,7 +8,6 @@ from modue_harness.adapters.agy import (
     get_agy_model_ids,
     get_available_agy_models,
 )
-from modue_harness.adapters.aider import AiderCLIAdapter
 from modue_harness.adapters.base import BaseCLIAdapter, strip_ansi
 from modue_harness.adapters.claude import (
     ClaudeCLIAdapter,
@@ -33,7 +32,6 @@ ADAPTER_REGISTRY: Dict[str, Type[BaseCLIAdapter]] = {
     "claude-code": ClaudeCLIAdapter,
     "agy": AGYCLIAdapter,
     "antigravity": AGYCLIAdapter,
-    "aider": AiderCLIAdapter,
     "codex": CodexCLIAdapter,
     "chatgpt": CodexCLIAdapter,
     "openrouter": OpenRouterAgentAdapter,
@@ -95,7 +93,6 @@ __all__ = [
     "GenericCLIAdapter",
     "ClaudeCLIAdapter",
     "AGYCLIAdapter",
-    "AiderCLIAdapter",
     "CodexCLIAdapter",
     "OpenRouterAgentAdapter",
     "create_adapter",

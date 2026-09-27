@@ -36,7 +36,7 @@ ModueHarness가 더욱 강력하고 안전하며 확장성 높은 엔터프라�
 ### 1.1 배경 및 목표
 현재 Claude Code, Google Antigravity, OpenAI Codex CLI와 OpenRouter 내장 에이전트를 지원합니다. 글로벌 오픈소스 생태계와 상용 도구에서 빠르게 등장하는 다양한 AI 코딩 도구를 플러그인 방식으로 손쉽게 연결할 수 있도록 어댑터 계층을 확장합니다.
 
-> Aider는 현재 지원 계획이 없습니다. 코드에 `AiderCLIAdapter`가 남아 있지만 로드맵과 보안 검토 대상에서 제외합니다.
+> Aider는 지원 계획이 없어 전용 어댑터를 제거했습니다.
 
 ### 1.2 주요 추진 과제
 - **상용 AI CLI 어댑터 추가**:

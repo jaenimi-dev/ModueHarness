@@ -15,7 +15,6 @@ from modue_harness.adapters import (
     BaseCLIAdapter,
     ClaudeCLIAdapter,
     AGYCLIAdapter,
-    AiderCLIAdapter,
     CodexCLIAdapter,
     GenericCLIAdapter,
     OpenRouterAgentAdapter,
@@ -110,10 +109,6 @@ def load_or_detect_agents(
                 kwargs["model"] = model
             if effort:
                 kwargs["effort"] = effort
-        elif specific_agent.lower() == "aider":
-            kwargs = {"command": "aider"}
-            if model:
-                kwargs["model"] = model
         elif specific_agent.lower() in ["codex", "chatgpt"]:
             kwargs = {"command": "codex"}
             if model:
@@ -198,7 +193,6 @@ def load_or_detect_agents(
     claude_bin = _find_bin("claude")
     agy_bin = _find_bin("agy")
     codex_bin = _find_bin("codex")
-    aider_bin = _find_bin("aider")
 
     if claude_bin:
         return {
@@ -276,14 +270,6 @@ def load_or_detect_agents(
                 effort=effort,
                 system_instruction="You verify and review implementation code and write test validations.",
             ),
-        }
-
-    if aider_bin:
-        return {
-            "developer": AiderCLIAdapter(
-                name="developer",
-                command="aider",
-            )
         }
 
     # 4. Fallback generic agent
@@ -441,8 +427,6 @@ class InteractiveSession:
                 adapter_type = "claude"
             elif "agy" in cls_name or "antigravity" in cls_name:
                 adapter_type = "agy"
-            elif "aider" in cls_name:
-                adapter_type = "aider"
             elif isinstance(agent, OpenRouterAgentAdapter):
                 adapter_type = "openrouter"
 
@@ -559,8 +543,6 @@ class InteractiveSession:
             current_adapter = "claude"
         elif "agy" in cls_name or "antigravity" in cls_name:
             current_adapter = "agy"
-        elif "aider" in cls_name:
-            current_adapter = "aider"
         elif "codex" in cls_name or "chatgpt" in cls_name:
             current_adapter = "codex"
         elif isinstance(agent, OpenRouterAgentAdapter):

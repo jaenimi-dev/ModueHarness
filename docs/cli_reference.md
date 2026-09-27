@@ -102,7 +102,7 @@ python run.py "기존 코드베이스 분석 및 버그 수정" -P my-repo
 - `--projects-dir`: 프로젝트 루트 디렉터리 경로 (기본값: `projects`)
 - `--dir`, `-d`: 공용 칠판 디렉터리 경로 (기본값: `blackboard`)
 - `--agents`, `-a`: 사용할 AI 팀 명세 파일 (`config/agents.yaml` 미존재 시 시스템 CLI 도구 자동 감지)
-- `--agent`: 특정 단일 AI 에이전트 어댑터 지정 (예: `claude`, `agy` 또는 `antigravity`, `codex`, `aider`, `generic`)
+- `--agent`: 특정 단일 AI 에이전트 어댑터 지정 (예: `claude`, `agy` 또는 `antigravity`, `codex`, `openrouter`, `generic`)
 - `-m`, `--model`: 사용할 AI 모델명 지정 (Claude: `sonnet`, `opus` 등 / Antigravity: `gemini-3.8-flash-high` 등 / Codex: `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`)
 - `-e`, `--effort`: AI 추론 노력(Reasoning Effort) 수준 지정 (Claude: `low`, `medium`, `high`, `max` / Antigravity & Codex: `low`, `medium`, `high`)
 - `-t`, `--timeout`: AI 실행 1턴당 타임아웃(초) 지정 (기본값: `None` / 무제한 대기)

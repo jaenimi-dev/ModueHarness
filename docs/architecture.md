@@ -2,7 +2,7 @@
 
 ## 1. 개요 및 핵심 가치 (Overview)
 
-**ModueHarness(모두의 하네스)**는 서로 다른 AI CLI 도구(예: `claude`, `agy`, `aider`, `copilot`, `gemini` 등)를 하나의 유기적인 팀으로 오케스트레이션하여 소프트웨어 엔지니어링 작업을 자율적·협업적으로 해결하는 하네스(Harness) 프레임워크입니다.
+**ModueHarness(모두의 하네스)**는 서로 다른 AI CLI 도구(예: `claude`, `agy`, `codex`, `copilot`, `gemini` 등)와 OpenRouter 기반 내장 에이전트를 하나의 유기적인 팀으로 오케스트레이션하여 소프트웨어 엔지니어링 작업을 자율적·협업적으로 해결하는 하네스(Harness) 프레임워크입니다.
 
 ### 1.1 핵심 가치
 - **도구 독립성 (CLI-Agnostic Abstraction)**: 상이한 인터페이스(입출력 스트림, PTY 지원, 배치 플래그, 종료 조건 등)를 가진 다양한 AI CLI를 통일된 어댑터 인터페이스(`BaseCLIAdapter`)로 추상화.
@@ -48,13 +48,13 @@ flowchart TB
         ClaudeAdapter["ClaudeCode Adapter\n(claude)"]
         AGYAdapter["Antigravity Adapter\n(agy)"]
         CodexAdapter["Codex Adapter\n(codex)"]
-        AiderAdapter["Aider Adapter\n(aider)"]
+        OpenRouterAdapter["OpenRouter Agent Adapter\n(API, in-harness tools)"]
         GenericAdapter["Generic CLI Adapter\n(Custom scripts/models)"]
         
         BaseAdapter --> ClaudeAdapter
         BaseAdapter --> AGYAdapter
         BaseAdapter --> CodexAdapter
-        BaseAdapter --> AiderAdapter
+        BaseAdapter --> OpenRouterAdapter
         BaseAdapter --> GenericAdapter
     end
 
@@ -97,14 +97,14 @@ ModueHarness는 AI 간 통신과 실제 구현 코드의 오염을 방지하고 
 
 2. **프로젝트 작업 공간 (`projects/<프로젝트명>/`)**:
    - AI CLI 어댑터가 실행될 때 서브프로세스의 작업 디렉터리(`cwd`)로 지정됩니다.
-   - AI 에이전트(Claude Code, Google Antigravity, OpenAI Codex, Aider 등)가 직접 파일 생성, 편집, 테스트 명령을 수행하는 격리된 실제 소스코드 디렉터리입니다.
+   - AI 에이전트(Claude Code, Google Antigravity, OpenAI Codex, OpenRouter 등)가 직접 파일 생성, 편집, 테스트 명령을 수행하는 격리된 실제 소스코드 디렉터리입니다.
    - `.gitignore`에 등록되어 ModueHarness 프레임워크 자체 저장소와 분리 관리됩니다.
 
 ---
 
 ### 3.2 대화형 CLI 세션 (`InteractiveSession`)
 - 사용자가 복잡한 YAML 워크플로우를 작성하지 않고도 터미널에서 즉시 프로젝트를 개발할 수 있도록 지원합니다.
-- 시스템 환경에 설치된 AI CLI(`claude`, `agy`, `codex`, `aider`)를 자동 감지하여 Leader(아키텍트)와 Worker(개발자, 리뷰어) 팀을 즉시 구성합니다.
+- 시스템 환경에 설치된 AI CLI(`claude`, `agy`, `codex`)를 자동 감지하여 Leader(아키텍트)와 Worker(개발자, 리뷰어) 팀을 즉시 구성합니다.
 - `/project <이름>`, `/projects`, `/files`, `/status` 등의 슬래시 명령어로 다중 프로젝트를 유연하게 전환하고 관리할 수 있습니다.
 
 ---
@@ -153,7 +153,8 @@ flowchart LR
 - **구현체**:
   - `ClaudeCLIAdapter`: Anthropic Claude Code (`claude -p`, `--permission-mode auto`)
   - `AGYCLIAdapter`: Google Antigravity CLI (`agy`)
-  - `AiderCLIAdapter`: Aider (`aider --yes-always --no-git`)
+  - `CodexCLIAdapter`: OpenAI Codex CLI (`codex exec --sandbox workspace-write`)
+  - `OpenRouterAgentAdapter`: OpenRouter 및 OpenAI 호환 API를 직접 호출하는 내장 에이전트 (외부 CLI 없음)
   - `GenericCLIAdapter`: Python 스크립트, 로컬 LLM, 임의의 CLI 명령어 지원
 
 ---

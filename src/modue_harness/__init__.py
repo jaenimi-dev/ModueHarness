@@ -4,7 +4,6 @@ __version__ = "0.8.0"
 
 from modue_harness.adapters import (
     AGYCLIAdapter,
-    AiderCLIAdapter,
     BaseCLIAdapter,
     ClaudeCLIAdapter,
     CodexCLIAdapter,
@@ -54,7 +53,6 @@ __all__ = [
     "GenericCLIAdapter",
     "ClaudeCLIAdapter",
     "AGYCLIAdapter",
-    "AiderCLIAdapter",
     "CodexCLIAdapter",
     "create_adapter",
     "PipelineRunner",

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Aider support**: the `AiderCLIAdapter`, the `aider` adapter name, aider auto-detection, and the Web UI option are removed because aider is not planned to be supported. An existing `adapter: "aider"` entry now falls back to the generic CLI adapter like any unregistered name.
+
 ### Added
 - **OpenRouter Agent Adapter (`adapter: "openrouter"`)**:
   - Built-in tool-calling agent that calls OpenRouter (or any OpenAI-compatible API via `base_url`) through the OpenAI SDK, with no external CLI required.
