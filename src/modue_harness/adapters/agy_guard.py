@@ -43,8 +43,28 @@ SENSITIVE_HOME_PATHS = (
 )
 
 
-def _rule(path: Path) -> str:
-    return f"write_file({path.as_posix()})"
+def build_guard_paths(
+    harness_root: Path,
+    allowed_dirs: Optional[Iterable[Path]] = None,
+    home: Optional[Path] = None,
+) -> List[Path]:
+    """Paths to protect: every top-level entry of the harness repo except allowed dirs, plus sensitive home paths."""
+    root = Path(harness_root).resolve()
+    allowed = {Path(p).resolve() for p in (allowed_dirs or [])}
+    allowed.update(root / name for name in DEFAULT_ALLOWED_TOP_LEVEL)
+
+    paths: List[Path] = []
+    if root.is_dir():
+        for entry in sorted(root.iterdir(), key=lambda p: p.name):
+            resolved = entry.resolve()
+            # 허용 폴더 자신이거나, 허용 폴더를 안에 품은 항목은 막으면 작업 공간까지 막힌다.
+            if resolved in allowed or any(_is_within(a, resolved) for a in allowed):
+                continue
+            paths.append(entry.absolute())
+
+    home_dir = Path(home) if home else Path.home()
+    paths.extend(home_dir / rel for rel in SENSITIVE_HOME_PATHS)
+    return list(dict.fromkeys(paths))
 
 
 def build_guard_rules(
@@ -52,23 +72,21 @@ def build_guard_rules(
     allowed_dirs: Optional[Iterable[Path]] = None,
     home: Optional[Path] = None,
 ) -> List[str]:
-    """Deny rules for every top-level entry of the harness repo except allowed dirs, plus sensitive home paths."""
-    root = Path(harness_root).resolve()
-    allowed = {Path(p).resolve() for p in (allowed_dirs or [])}
-    allowed.update(root / name for name in DEFAULT_ALLOWED_TOP_LEVEL)
+    """agy deny rules (`write_file(<abs path>)`) for build_guard_paths()."""
+    return [f"write_file({p.as_posix()})" for p in build_guard_paths(harness_root, allowed_dirs, home)]
 
-    rules: List[str] = []
-    if root.is_dir():
-        for entry in sorted(root.iterdir(), key=lambda p: p.name):
-            resolved = entry.resolve()
-            # 허용 폴더 자신이거나, 허용 폴더를 안에 품은 항목은 막으면 작업 공간까지 막힌다.
-            if resolved in allowed or any(_is_within(a, resolved) for a in allowed):
-                continue
-            rules.append(_rule(entry.absolute()))
 
-    home_dir = Path(home) if home else Path.home()
-    rules.extend(_rule(home_dir / rel) for rel in SENSITIVE_HOME_PATHS)
-    return list(dict.fromkeys(rules))
+def build_claude_deny_rules(
+    harness_root: Path,
+    allowed_dirs: Optional[Iterable[Path]] = None,
+    home: Optional[Path] = None,
+) -> List[str]:
+    """Claude Code deny rules for build_guard_paths().
+
+    Claude Code 권한 규칙에서 `/path` 는 설정 파일 위치 기준 상대 경로라 조용히 무시되고,
+    절대 경로는 `//path` 로 써야 한다. `Edit(...)` 은 Write/Edit 등 모든 파일 편집 도구를 덮는다.
+    """
+    return [f"Edit(/{p.as_posix()})" for p in build_guard_paths(harness_root, allowed_dirs, home)]
 
 
 def _is_within(path: Path, parent: Path) -> bool:

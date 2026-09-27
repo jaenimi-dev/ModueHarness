@@ -1,11 +1,15 @@
 import json
 import os
 from pathlib import Path
+import sys
+import tempfile
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Tuple
 import urllib.request
 
+from modue_harness.adapters import agy_guard as _guard
 from modue_harness.adapters.base import BaseCLIAdapter
+from modue_harness.core.types import TurnContext, TurnResult
 
 
 DEFAULT_CLAUDE_MODELS: List[Dict[str, str]] = [
@@ -104,11 +108,14 @@ class ClaudeCLIAdapter(BaseCLIAdapter):
         model: Optional[str] = None,
         effort: Optional[str] = None,
         permission_mode: str = "auto",
+        write_guard: bool = True,
         system_instruction: Optional[str] = None,
     ) -> None:
         self.model = model
         self.effort = effort
         self.permission_mode = permission_mode
+        # 실행마다 --settings 로 하네스 저장소·민감 경로에 대한 Edit deny 규칙을 주입한다.
+        self.write_guard = bool(write_guard)
 
         args = list(default_args or [])
         if permission_mode and "--permission-mode" not in args:
@@ -136,6 +143,63 @@ class ClaudeCLIAdapter(BaseCLIAdapter):
         """Dynamically update reasoning effort level and rebuild CLI args."""
         self.effort = effort
         self.default_args = self._update_arg_pair(self.default_args, "--effort", effort)
+
+    def config_extras(self) -> Dict[str, Any]:
+        """Adapter-specific settings to persist back into agents.yaml."""
+        return {} if self.write_guard else {"write_guard": False}
+
+    def _guard_settings(self, context: TurnContext, extra_args: Optional[List[str]]) -> Tuple[List[str], Optional[Path]]:
+        """Build `--settings <tmpfile>` carrying Edit deny rules. Returns (extra_args, tmpfile to delete).
+
+        --settings 는 사용자의 전역 설정을 건드리지 않고 이번 실행에만 규칙을 더한다.
+        파일 도구(Write/Edit)만 확실히 막힌다. Bash 는 Claude Code 샌드박스(bubblewrap)가 있어야
+        OS 수준으로 막을 수 있어 여기서는 다루지 않는다.
+        """
+        args = list(extra_args or [])
+        if (
+            not self.write_guard
+            or sys.platform == "win32"  # 윈도우 경로의 절대 경로 규칙 표기는 검증되지 않았다.
+            or "--settings" in self.default_args
+            or "--settings" in args
+            or not _guard.is_safe_guard_root(Path.cwd(), context.workspace_dir)
+        ):
+            return args, None
+        rules = _guard.build_claude_deny_rules(
+            Path.cwd(), allowed_dirs=[context.workspace_dir, context.blackboard_dir]
+        )
+        fd, name = tempfile.mkstemp(prefix="modue-claude-guard-", suffix=".json")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump({"permissions": {"deny": rules}}, fh)
+        return args + ["--settings", name], Path(name)
+
+    def execute(
+        self,
+        context: TurnContext,
+        extra_args: Optional[List[str]] = None,
+        custom_env: Optional[Dict[str, str]] = None,
+        timeout: Optional[float] = None,
+    ) -> TurnResult:
+        """Run claude with per-run deny rules that block file-tool writes into the harness repo."""
+        args, settings_file = self._guard_settings(context, extra_args)
+        try:
+            return super().execute(context, extra_args=args, custom_env=custom_env, timeout=timeout)
+        finally:
+            if settings_file:
+                settings_file.unlink(missing_ok=True)
+
+    def execute_stream(
+        self,
+        context: TurnContext,
+        extra_args: Optional[List[str]] = None,
+        custom_env: Optional[Dict[str, str]] = None,
+    ) -> Generator[str, None, TurnResult]:
+        """Stream claude output with the same per-run deny rules as execute()."""
+        args, settings_file = self._guard_settings(context, extra_args)
+        try:
+            return (yield from super().execute_stream(context, extra_args=args, custom_env=custom_env))
+        finally:
+            if settings_file:
+                settings_file.unlink(missing_ok=True)
 
     @staticmethod
     def _update_arg_pair(args: List[str], flag: str, val: Optional[str]) -> List[str]:

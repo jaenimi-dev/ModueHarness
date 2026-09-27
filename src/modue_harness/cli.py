@@ -773,7 +773,7 @@ def handle_agy_guard(args: argparse.Namespace) -> int:
 
 def warn_if_agy_guard_missing(agents, args: argparse.Namespace) -> None:
     """Warn when an agy agent runs with skip-permissions, auto-guard disabled, and the deny rules missing."""
-    if not any(isinstance(a, AGYCLIAdapter) and a.skip_permissions and not a.agy_guard for a in agents):
+    if not any(isinstance(a, AGYCLIAdapter) and a.skip_permissions and not a.write_guard for a in agents):
         return
     try:
         missing = agy_guard.missing_guard_rules(_agy_guard_rules(args))

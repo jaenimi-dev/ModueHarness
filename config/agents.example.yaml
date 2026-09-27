@@ -19,7 +19,9 @@ name: "my-engineering-team"
 #                               #              / manual / dontAsk / plan 중 선택
 #   skip_permissions: false     # Antigravity 계열. --dangerously-skip-permissions 제거
 #   sandbox: false              # Antigravity 계열. 기본 --sandbox(셸 쓰기·네트워크 제한) 해제
-#   agy_guard: false            # Antigravity 계열. 실행 전 deny 규칙 자동 설치(agy-guard) 해제
+#   write_guard: false          # 하네스 저장소·민감 경로 쓰기 차단 해제 (Claude, Antigravity)
+#                               #   Claude: 실행마다 --settings 로 Edit deny 규칙 주입 (전역 설정 불변)
+#                               #   Antigravity: 실행 전 ~/.gemini/.../settings.json 에 deny 규칙 자동 설치
 #
 # Antigravity 는 --sandbox 만으로는 파일 도구의 폴더 밖 쓰기를 막지 못하므로, 하네스가
 # 실행 직전에 ~/.gemini/antigravity-cli/settings.json 에 deny 규칙을 자동으로 추가합니다.

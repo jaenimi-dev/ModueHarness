@@ -141,7 +141,7 @@ class AGYCLIAdapter(BaseCLIAdapter):
         effort: Optional[str] = None,
         skip_permissions: bool = True,
         sandbox: Optional[bool] = None,
-        agy_guard: bool = True,
+        write_guard: bool = True,
         system_instruction: Optional[str] = None,
     ) -> None:
         self.model = model
@@ -151,7 +151,7 @@ class AGYCLIAdapter(BaseCLIAdapter):
         # Windows 에서는 아직 Preview 라 기본값에서 뺀다.
         self.sandbox = (sys.platform != "win32") if sandbox is None else bool(sandbox)
         # 실행 직전에 agy deny 규칙(agy-guard)을 확인하고 빠진 것을 설치한다.
-        self.agy_guard = bool(agy_guard)
+        self.write_guard = bool(write_guard)
 
         resolved_command = resolve_agy_binary(command)
 
@@ -186,13 +186,13 @@ class AGYCLIAdapter(BaseCLIAdapter):
             extras["skip_permissions"] = False
         if self.sandbox != (sys.platform != "win32"):
             extras["sandbox"] = self.sandbox
-        if not self.agy_guard:
-            extras["agy_guard"] = False
+        if not self.write_guard:
+            extras["write_guard"] = False
         return extras
 
     def _ensure_guard(self, context: TurnContext) -> Optional[str]:
         """Install missing agy deny rules before launch. Returns an error message if that failed."""
-        if not self.agy_guard:
+        if not self.write_guard:
             return None
         root = Path.cwd()
         if not _guard.is_safe_guard_root(root, context.workspace_dir):
@@ -203,7 +203,7 @@ class AGYCLIAdapter(BaseCLIAdapter):
         except (OSError, ValueError) as exc:
             return (
                 f"agy 보호 규칙(agy-guard)을 설치하지 못해 실행을 중단했습니다: {exc}\n"
-                f"  {_guard.AGY_SETTINGS_PATH} 를 확인하거나, 이 에이전트에 agy_guard: false 를 지정하세요."
+                f"  {_guard.AGY_SETTINGS_PATH} 를 확인하거나, 이 에이전트에 write_guard: false 를 지정하세요."
             )
         if added:
             print(

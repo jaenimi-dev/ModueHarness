@@ -190,6 +190,26 @@ Claude Code 2.1+ (Claude 3.7 Sonnet 등)는 문제 해결 시 내부 숙고를 �
    [my-web-app] > /effort architect max
    ```
 
+### 작업 폴더 밖 쓰기 차단 (write_guard)
+
+`--permission-mode auto`는 모델이 권한을 판단하는 방식이라, **같은 git 저장소 안이면 작업 폴더(`projects/<프로젝트>/`) 밖에도 씁니다.** 하네스 저장소의 `tests/`에 파일이 생긴 이슈 #3이 이 경우입니다. Claude Code 2.1.280으로 확인한 동작은 다음과 같습니다.
+
+| 실행 방식 | 파일 도구(Write/Edit)로 밖에 쓰기 | Bash로 밖에 쓰기 |
+| :--- | :--- | :--- |
+| `--permission-mode auto` | 씀 | 씀 |
+| + `--settings` deny 규칙 (하네스 기본값) | 차단 | **씀** |
+
+하네스는 Claude를 실행할 때마다 임시 설정 파일을 만들어 `--settings`로 넘기고, 실행이 끝나면 지웁니다. **사용자의 전역 Claude 설정은 건드리지 않습니다.** 이 파일에는 하네스 저장소의 최상위 항목(`projects/`, `blackboard/` 제외)과 민감한 홈 경로(`~/.ssh`, `~/.bashrc` 등)에 대한 `Edit(//<절대경로>)` deny 규칙이 들어갑니다.
+
+* `Edit` 규칙은 Write/Edit 등 모든 파일 편집 도구에 적용되며, `--permission-mode`와 무관하게 우선합니다.
+* **Bash 명령은 막지 못합니다.** OS 수준 차단에는 Claude Code 샌드박스(Linux는 `bubblewrap`, `socat` 필요)가 필요하며 아직 연동하지 않았습니다.
+* 다음 경우에는 규칙을 넣지 않습니다.
+  * 이미 `args`에 `--settings`를 지정한 경우 (사용자 설정 우선)
+  * 실행 위치가 작업 폴더를 포함하지 않거나 홈 폴더(또는 그 상위)인 경우
+  * Windows (절대 경로 규칙 표기가 검증되지 않음)
+* 끄려면 에이전트에 `write_guard: false`를 지정하세요.
+* 직접 규칙을 쓸 때 주의: 절대 경로는 `Edit(//home/me/repo/src)`처럼 **`//`로 시작**해야 합니다. `Edit(/home/me/repo/src)`는 설정 파일 위치 기준 상대 경로로 해석되어 **아무 경고 없이 무시**됩니다.
+
 ---
 
 ## 6. 프롬프팅 모범 사례 및 워크플로우

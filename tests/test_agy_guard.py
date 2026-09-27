@@ -163,9 +163,9 @@ def test_auto_guard_in_stream_mode(repo_run):
 
 def test_auto_guard_can_be_disabled(repo_run):
     root, ctx, script, settings = repo_run
-    adapter = create_adapter("agy", agy_guard=False)
-    assert adapter.config_extras().get("agy_guard") is False
-    adapter = _fake_agy(script, agy_guard=False)
+    adapter = create_adapter("agy", write_guard=False)
+    assert adapter.config_extras().get("write_guard") is False
+    adapter = _fake_agy(script, write_guard=False)
 
     assert adapter.execute(ctx).is_success
     assert not settings.exists()
@@ -199,7 +199,7 @@ def test_broken_settings_file_fails_the_turn(repo_run):
     result = _fake_agy(script).execute(ctx)
 
     assert result.status == TaskStatus.FAILED
-    assert "agy_guard: false" in result.error_message
+    assert "write_guard: false" in result.error_message
 
 
 def test_backup_keeps_the_original_settings(tmp_path: Path):
@@ -331,5 +331,5 @@ def test_warning_only_for_agy_without_auto_guard(tmp_path: Path, monkeypatch, ca
     assert capsys.readouterr().out == ""
     cli.warn_if_agy_guard_missing([AGYCLIAdapter()], args)  # 자동 설치가 켜져 있으면 경고 불필요
     assert capsys.readouterr().out == ""
-    cli.warn_if_agy_guard_missing([AGYCLIAdapter(agy_guard=False)], args)
+    cli.warn_if_agy_guard_missing([AGYCLIAdapter(write_guard=False)], args)
     assert "agy-guard install" in capsys.readouterr().out
