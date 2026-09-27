@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from modue_harness.core.events import EventBus, EventType, HarnessEvent
+from modue_harness.core.secrets import mask_secrets, mask_secrets_obj
 from modue_harness.core.types import Task, TaskStatus
 from modue_harness.core.usage import UsageTracker
 
@@ -159,7 +160,7 @@ class Blackboard:
         self.root_dir.mkdir(parents=True, exist_ok=True)
         temp_file = self.state_file.with_suffix(".tmp")
         with open(temp_file, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2, ensure_ascii=False)
+            json.dump(mask_secrets_obj(state), f, indent=2, ensure_ascii=False)
         temp_file.replace(self.state_file)
 
     def update_state(self, updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -176,7 +177,7 @@ class Blackboard:
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
         task_path = self.tasks_dir / f"{task.id}.json"
         with open(task_path, "w", encoding="utf-8") as f:
-            json.dump(task.to_dict(), f, indent=2, ensure_ascii=False)
+            json.dump(mask_secrets_obj(task.to_dict()), f, indent=2, ensure_ascii=False)
 
         if self.event_bus:
             self.event_bus.publish(
@@ -327,7 +328,9 @@ class Blackboard:
         author_agent: Optional[str] = None,
         job_id: Optional[str] = None,
     ) -> Path:
-        """Write content and companion metadata to blackboard/artifacts/."""
+        """Write content and companion metadata to blackboard/artifacts/ (secrets masked)."""
+        content = mask_secrets(content)
+        metadata = mask_secrets_obj(metadata)
         target_path = self.resolve_artifact_path(relative_path)
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -343,7 +346,8 @@ class Blackboard:
                     mtime = os.path.getmtime(target_path)
                     old_ts = datetime.datetime.fromtimestamp(mtime).strftime("%Y%m%d_%H%M%S")
                     archived_name = f"{target_path.stem}_{old_ts}{target_path.suffix}"
-                    (history_dir / archived_name).write_text(old_content, encoding="utf-8")
+                    # 마스킹 도입 전에 저장된 버전도 기록으로 옮기면서 가린다.
+                    (history_dir / archived_name).write_text(mask_secrets(old_content), encoding="utf-8")
             except Exception:
                 pass
 
@@ -524,7 +528,8 @@ class Blackboard:
     # ---------------- Logs Management ---------------- #
 
     def append_log(self, agent_name: str, step_id: str, content: str) -> Path:
-        """Append output logs for a specific agent execution step."""
+        """Append output logs for a specific agent execution step (secrets masked)."""
+        content = mask_secrets(content)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         log_file = self.logs_dir / f"{agent_name}_{step_id}.log"
         timestamp = datetime.datetime.now().isoformat()
@@ -553,7 +558,7 @@ class Blackboard:
         job_id = job_dict.get("id", "job_unknown")
         file_path = self.jobs_dir / f"{job_id}.json"
         with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(job_dict, f, indent=2, ensure_ascii=False)
+            json.dump(mask_secrets_obj(job_dict), f, indent=2, ensure_ascii=False)
         return file_path
 
     def list_jobs(self) -> List[Dict[str, Any]]:

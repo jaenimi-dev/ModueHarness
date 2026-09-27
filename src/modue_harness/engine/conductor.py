@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, List, Optional
 from modue_harness.adapters import BaseCLIAdapter, create_adapter
 from modue_harness.core.blackboard import Blackboard
 from modue_harness.core.events import EventBus, EventType, HarnessEvent
+from modue_harness.core.secrets import mask_secrets_obj
 from modue_harness.core.types import Task, TaskStatus, TurnContext, TurnResult
 from modue_harness.engine.workflow import WorkflowConfig
 
@@ -127,7 +128,8 @@ class ConductorRunner:
         """Emit real-time progress event to registered callback."""
         if self.progress_callback:
             try:
-                self.progress_callback(event, data)
+                # 알림은 CLI 실시간 출력, 웹 UI, 작업 로그로 이어지므로 여기서 한 번에 가린다.
+                self.progress_callback(event, mask_secrets_obj(data))
             except Exception:
                 pass
 
@@ -155,7 +157,10 @@ class ConductorRunner:
         return []
 
     def run(self) -> Dict[str, Any]:
-        """Execute the Leader-Worker workflow."""
+        """Execute the Leader-Worker workflow. Secrets in the returned summary are masked."""
+        return mask_secrets_obj(self._run())
+
+    def _run(self) -> Dict[str, Any]:
         self.blackboard.initialize()
         self.blackboard.clear_tasks()
         start_time = time.time()
