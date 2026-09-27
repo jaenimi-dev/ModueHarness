@@ -97,6 +97,137 @@ def test_normal_agy_output_stays_successful(tmp_path: Path):
     assert result.is_success
 
 
+# ------------------------------------------------------------- auto guard
+@pytest.fixture
+def repo_run(tmp_path: Path, monkeypatch, isolated_agy_settings):
+    """A harness-like root (cwd) with projects/p as the workspace and a fake agy binary."""
+    root = tmp_path / "harness"
+    ws = root / "projects" / "p"
+    board = root / "blackboard" / "p"
+    for d in (ws, board, root / "src", root / "tests"):
+        d.mkdir(parents=True)
+    monkeypatch.chdir(root)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
+    script = tmp_path / "fake_agy.py"
+    script.write_text("print('done')\n", encoding="utf-8")
+    ctx = TurnContext(step_id="s", instruction="x", blackboard_dir=board, workspace_dir=ws)
+    return root, ctx, script, isolated_agy_settings
+
+
+def _fake_agy(script: Path, **kwargs) -> AGYCLIAdapter:
+    adapter = AGYCLIAdapter(command=sys.executable, sandbox=False, **kwargs)
+    adapter.default_args = [str(script)]
+    adapter.prompt_delivery = "stdin"
+    return adapter
+
+
+def test_execute_auto_installs_guard_rules_once(repo_run, capsys):
+    root, ctx, script, settings = repo_run
+    adapter = _fake_agy(script)
+
+    assert adapter.execute(ctx).is_success
+    deny = json.loads(settings.read_text())["permissions"]["deny"]
+    assert f"write_file({(root / 'src').as_posix()})" in deny
+    assert f"write_file({(root / 'tests').as_posix()})" in deny
+    assert not any("/projects" in r or "/blackboard" in r for r in deny)
+    assert "agy 보호 규칙" in capsys.readouterr().out
+
+    # 두 번째 실행은 이미 설치돼 있으므로 파일을 바꾸지 않고 안내도 없다.
+    mtime = settings.stat().st_mtime_ns
+    assert adapter.execute(ctx).is_success
+    assert settings.stat().st_mtime_ns == mtime
+    assert capsys.readouterr().out == ""
+
+
+def test_new_top_level_entry_is_guarded_on_next_run(repo_run):
+    root, ctx, script, settings = repo_run
+    adapter = _fake_agy(script)
+    adapter.execute(ctx)
+
+    (root / "newdir").mkdir()
+    adapter.execute(ctx)
+
+    assert f"write_file({(root / 'newdir').as_posix()})" in json.loads(settings.read_text())["permissions"]["deny"]
+
+
+def test_auto_guard_in_stream_mode(repo_run):
+    root, ctx, script, settings = repo_run
+    gen = _fake_agy(script).execute_stream(ctx)
+    try:
+        while True:
+            next(gen)
+    except StopIteration as stop:
+        assert stop.value.is_success
+    assert settings.exists()
+
+
+def test_auto_guard_can_be_disabled(repo_run):
+    root, ctx, script, settings = repo_run
+    adapter = create_adapter("agy", agy_guard=False)
+    assert adapter.config_extras().get("agy_guard") is False
+    adapter = _fake_agy(script, agy_guard=False)
+
+    assert adapter.execute(ctx).is_success
+    assert not settings.exists()
+
+
+def test_auto_guard_skipped_when_workspace_outside_cwd(repo_run, tmp_path: Path):
+    root, ctx, script, settings = repo_run
+    outside_ws = tmp_path / "elsewhere"
+    outside_ws.mkdir()
+    ctx.workspace_dir = outside_ws
+
+    assert _fake_agy(script).execute(ctx).is_success
+    assert not settings.exists()
+
+
+def test_auto_guard_skipped_when_cwd_is_home(tmp_path: Path, monkeypatch, isolated_agy_settings):
+    from modue_harness.adapters import agy_guard as g
+
+    home = tmp_path / "home"
+    (home / "projects" / "p").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    assert g.is_safe_guard_root(home, home / "projects" / "p") is False
+    assert g.is_safe_guard_root(tmp_path, home / "projects" / "p") is False
+    assert g.is_safe_guard_root(home / "projects", home / "projects" / "p") is True
+
+
+def test_broken_settings_file_fails_the_turn(repo_run):
+    root, ctx, script, settings = repo_run
+    settings.write_text("{not json")
+
+    result = _fake_agy(script).execute(ctx)
+
+    assert result.status == TaskStatus.FAILED
+    assert "agy_guard: false" in result.error_message
+
+
+def test_backup_keeps_the_original_settings(tmp_path: Path):
+    settings = tmp_path / "settings.json"
+    settings.write_text(json.dumps({"trustedWorkspaces": ["/w"]}))
+
+    agy_guard.install_guard_rules(["write_file(/a)"], settings)
+    agy_guard.install_guard_rules(["write_file(/b)"], settings)
+
+    backup = json.loads((tmp_path / "settings.json.modue-backup").read_text())
+    assert backup == {"trustedWorkspaces": ["/w"]}
+
+
+def test_concurrent_ensure_loses_no_rules(tmp_path: Path):
+    import threading
+
+    settings = tmp_path / "settings.json"
+    rule_sets = [[f"write_file(/r/{i})", "write_file(/shared)"] for i in range(8)]
+    threads = [threading.Thread(target=agy_guard.ensure_guard_rules, args=(rs, settings)) for rs in rule_sets]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    deny = json.loads(settings.read_text())["permissions"]["deny"]
+    assert sorted(deny) == sorted({r for rs in rule_sets for r in rs})
+
+
 # ------------------------------------------------------------------ guard rules
 @pytest.fixture
 def harness(tmp_path: Path) -> Path:
@@ -185,7 +316,7 @@ def test_cli_agy_guard_install_and_status(harness: Path, tmp_path: Path, monkeyp
     assert json.loads(settings.read_text())["permissions"]["deny"] == []
 
 
-def test_warning_only_for_agy_with_skip_permissions(tmp_path: Path, monkeypatch, capsys):
+def test_warning_only_for_agy_without_auto_guard(tmp_path: Path, monkeypatch, capsys):
     import argparse
 
     from modue_harness import cli
@@ -198,5 +329,7 @@ def test_warning_only_for_agy_with_skip_permissions(tmp_path: Path, monkeypatch,
     assert capsys.readouterr().out == ""
     cli.warn_if_agy_guard_missing([AGYCLIAdapter(skip_permissions=False)], args)
     assert capsys.readouterr().out == ""
-    cli.warn_if_agy_guard_missing([AGYCLIAdapter()], args)
+    cli.warn_if_agy_guard_missing([AGYCLIAdapter()], args)  # 자동 설치가 켜져 있으면 경고 불필요
+    assert capsys.readouterr().out == ""
+    cli.warn_if_agy_guard_missing([AGYCLIAdapter(agy_guard=False)], args)
     assert "agy-guard install" in capsys.readouterr().out

@@ -10,11 +10,18 @@ agy 의 deny 규칙은 --dangerously-skip-permissions 보다 우선하므로, �
 하네스 저장소의 최상위 항목(projects/, blackboard/ 제외)과 민감한 홈 경로를 나열한다.
 """
 
+from contextlib import contextmanager
 import json
 import os
 import shutil
+import threading
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, Iterator, List, Optional
+
+try:
+    import fcntl  # POSIX 전용: 여러 하네스 프로세스가 동시에 설정을 고칠 때의 경쟁을 막는다.
+except ImportError:  # pragma: no cover - Windows
+    fcntl = None  # type: ignore
 
 AGY_SETTINGS_PATH = Path.home() / ".gemini" / "antigravity-cli" / "settings.json"
 
@@ -89,6 +96,44 @@ def _current_deny(data: Dict) -> List[str]:
     return [r for r in deny if isinstance(r, str)]
 
 
+_LOCK = threading.Lock()
+
+
+@contextmanager
+def _settings_lock(settings_path: Path) -> Iterator[None]:
+    """Serialize read-modify-write of the settings file across threads and processes."""
+    with _LOCK:
+        if fcntl is None:
+            yield
+            return
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(settings_path.with_name(settings_path.name + ".lock"), "a") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+
+
+def is_safe_guard_root(harness_root: Path, workspace_dir: Path) -> bool:
+    """Only guard a root that contains the workspace and is not the home directory or above it.
+
+    실행 위치가 홈 폴더(또는 그 상위)라면 최상위 항목에 ~/.gemini 등이 섞여 agy 자신의
+    동작까지 막을 수 있으므로 자동 설치하지 않는다.
+    """
+    root = Path(harness_root).resolve()
+    return _is_within(Path(workspace_dir).resolve(), root) and not _is_within(Path.home().resolve(), root)
+
+
+def ensure_guard_rules(rules: List[str], settings_path: Optional[Path] = None) -> List[str]:
+    """Install any missing rules (locked, idempotent). Returns the rules that were added."""
+    target = settings_path or AGY_SETTINGS_PATH
+    if not missing_guard_rules(rules, target):
+        return []
+    with _settings_lock(target):
+        return install_guard_rules(rules, target)
+
+
 def missing_guard_rules(rules: List[str], settings_path: Path = AGY_SETTINGS_PATH) -> List[str]:
     """Rules from `rules` that are not yet present in the agy settings deny list."""
     try:
@@ -106,8 +151,10 @@ def install_guard_rules(rules: List[str], settings_path: Path = AGY_SETTINGS_PAT
     if not added:
         return []
 
-    if settings_path.exists():
-        shutil.copy2(settings_path, settings_path.with_name(settings_path.name + ".modue-backup"))
+    backup = settings_path.with_name(settings_path.name + ".modue-backup")
+    # 백업은 처음 한 번만 만든다. 이후 규칙이 늘어날 때 덮어쓰면 원래 설정이 사라진다.
+    if settings_path.exists() and not backup.exists():
+        shutil.copy2(settings_path, backup)
     permissions = data.get("permissions")
     if not isinstance(permissions, dict):
         permissions = {}

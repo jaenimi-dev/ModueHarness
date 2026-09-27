@@ -122,10 +122,18 @@ ModueHarness는 `AGYCLIAdapter`를 통해 하위 서브프로세스로 `agy`를 
 | 실행 방식 | 파일 도구로 밖에 쓰기 | 셸로 밖에 쓰기 |
 | :--- | :--- | :--- |
 | `--dangerously-skip-permissions` | 씀 | 씀 |
-| + `--sandbox` (하네스 기본값) | **씀** | 차단 |
-| + `--sandbox` + deny 규칙 (`agy-guard install`) | 차단 | 차단 |
+| + `--sandbox` | **씀** | 차단 |
+| + `--sandbox` + deny 규칙 (자동 설치, 하네스 기본값) | 차단 | 차단 |
 
-agy의 deny 규칙은 `--dangerously-skip-permissions`보다 우선합니다. 다음 명령은 하네스 저장소의 최상위 항목(`projects/`, `blackboard/` 제외)과 민감한 홈 경로(`~/.ssh`, `~/.bashrc` 등)를 `~/.gemini/antigravity-cli/settings.json`의 `permissions.deny`에 추가합니다. 하네스 저장소 루트에서 실행하세요.
+agy의 deny 규칙은 `--dangerously-skip-permissions`보다 우선합니다. 하네스는 **agy 에이전트를 실행하기 직전에** 하네스 저장소의 최상위 항목(`projects/`, `blackboard/` 제외)과 민감한 홈 경로(`~/.ssh`, `~/.bashrc` 등)에 대한 deny 규칙이 `~/.gemini/antigravity-cli/settings.json`의 `permissions.deny`에 있는지 확인하고, 빠진 규칙을 자동으로 추가합니다.
+
+* 규칙을 처음 추가할 때 한 번 안내 메시지를 출력하고, 원래 설정은 `settings.json.modue-backup`으로 백업합니다(백업은 최초 1회만 생성).
+* 실행할 때마다 규칙을 다시 계산하므로, 저장소에 새로 만든 최상위 파일·폴더도 다음 실행부터 보호됩니다.
+* 실행 위치가 작업 폴더를 포함하지 않거나 홈 폴더(또는 그 상위)인 경우에는 agy 자신의 폴더까지 막을 수 있어 자동 설치를 건너뜁니다.
+* 설정 파일이 손상되어 규칙을 넣을 수 없으면 보호 없이 실행하지 않고 해당 턴을 실패로 처리합니다.
+* 자동 설치를 원하지 않으면 에이전트에 `agy_guard: false`를 지정하세요. 이 경우 규칙이 없으면 시작할 때 경고가 표시됩니다.
+
+규칙은 다음 명령으로 직접 확인하거나 제거할 수 있습니다. 하네스 저장소 루트에서 실행하세요.
 
 ```bash
 modue-harness agy-guard            # 설치 상태 확인 (기본 동작)
@@ -133,9 +141,7 @@ modue-harness agy-guard install    # 규칙 추가 (기존 설정은 settings.js
 modue-harness agy-guard uninstall  # 하네스가 추가한 규칙만 제거
 ```
 
-* 규칙이 없는 상태에서 agy 에이전트를 실행하면 시작할 때 경고가 표시됩니다.
 * agy 규칙 우선순위가 Deny > Ask > Allow라서 "작업 폴더 밖 전부"를 막을 수는 없습니다. 목록에 없는 경로(예: 하네스 저장소 밖의 다른 폴더)는 여전히 보호되지 않습니다.
-* 하네스 저장소에 최상위 파일이나 폴더를 새로 만들면 `install`을 다시 실행하세요.
 * `skip_permissions: false`로 실행하면 비대화형 모드에서 쓰기가 전부 자동 거부되고 턴이 중단됩니다. agy는 이때도 종료 코드 0을 내지만, 하네스는 이를 실패로 처리합니다.
 
 ---

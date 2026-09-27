@@ -45,6 +45,7 @@ _OPTIONAL_ADAPTER_KWARGS = frozenset({
     "permission_mode",
     "skip_permissions",
     "sandbox",
+    "agy_guard",
     "model",
     "effort",
     # API 에이전트 어댑터(openrouter) 전용
@@ -61,6 +62,7 @@ AGENT_CONFIG_PASSTHROUGH_KEYS = (
     "permission_mode",
     "skip_permissions",
     "sandbox",
+    "agy_guard",
     "tools",
     "max_turns",
     "base_url",
